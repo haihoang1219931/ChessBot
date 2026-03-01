@@ -1,8 +1,5 @@
 #include "ApplicationArduino.h"
-#include "SmoothMotion.h"
 #include <Arduino.h>
-#include "MiniStepper_driver.h"
-#include "Stepper_driver.h"
 #include "SAL/Button.h"
 #include "SAL/ChessBoard.h"
 #include "SAL/Robot.h"
@@ -34,19 +31,7 @@
 #define limitUpdown 11
 #define limitGripper 62 // A8
 
-Stepper_driver driver1(enPin, stepXPin, dirXPin);
-Stepper_driver driver2(enPin, stepYPin, dirYPin);
-MiniStepper_driver miniStepperUpdown(
-      miniStepperUpdownPin1,miniStepperUpdownPin2,miniStepperUpdownPin3,miniStepperUpdownPin4);
-MiniStepper_driver miniStepperGripper(
-      miniStepperGripperPin1,miniStepperGripperPin2,miniStepperGripperPin3,miniStepperGripperPin4);
-
-SmoothMotion motionDriver1(1,enPin, dirXPin, stepXPin);
-SmoothMotion motionDriver2(2,enPin, dirYPin, stepYPin);
-SmoothMotion motionUpdown(5,miniStepperUpdownPin1,miniStepperUpdownPin2,
-  miniStepperUpdownPin3,miniStepperUpdownPin4);
-SmoothMotion motionGripper(0,miniStepperGripperPin1,miniStepperGripperPin2,
-  miniStepperGripperPin3,miniStepperGripperPin4);
+ApplicationArduino app;
 ApplicationArduino::ApplicationArduino()
 {
     initRobot();
@@ -55,15 +40,33 @@ ApplicationArduino::ApplicationArduino()
     m_buttonPin[MOTOR_ARM2] = limitY;
     m_buttonPin[MOTOR_ARM5] = limitUpdown;
 
-    pinMode(m_buttonPin[MOTOR_ARM1], INPUT_PULLUP);
-    pinMode(m_buttonPin[MOTOR_ARM2], INPUT_PULLUP);
-    pinMode(m_buttonPin[MOTOR_ARM5], INPUT_PULLUP);
     pinMode(enPin, OUTPUT);
-    driver1.init();
-    driver2.init();
-    digitalWrite(enPin, HIGH);
+    pinMode(dirXPin, OUTPUT);
+    pinMode(stepXPin, OUTPUT);
+    pinMode(dirYPin, OUTPUT);
+    pinMode(stepYPin, OUTPUT);
 
-    initHardwareTimer();
+    digitalWrite(enPin, HIGH);
+    digitalWrite(dirXPin, LOW);
+    digitalWrite(stepXPin, HIGH);
+    digitalWrite(dirYPin, LOW);
+    digitalWrite(stepYPin, HIGH);
+    
+    pinMode(limitX, INPUT_PULLUP);
+    pinMode(limitY, INPUT_PULLUP);
+    pinMode(limitUpdown, INPUT_PULLUP);
+
+    pinMode(miniStepperUpdownPin1, OUTPUT);
+    pinMode(miniStepperUpdownPin2, OUTPUT);
+    pinMode(miniStepperUpdownPin3, OUTPUT);
+    pinMode(miniStepperUpdownPin4, OUTPUT);
+
+    pinMode(miniStepperGripperPin1, OUTPUT);
+    pinMode(miniStepperGripperPin2, OUTPUT);
+    pinMode(miniStepperGripperPin3, OUTPUT);
+    pinMode(miniStepperGripperPin4, OUTPUT);
+
+    initHardwareTimer(20000.0f);
 }
 
 ApplicationArduino::~ApplicationArduino()
@@ -79,17 +82,18 @@ void ApplicationArduino::initRobot()
     m_chessBoard->setDropZoneSpace(31);
 
     JointParam armPrams[MAX_MOTOR] = {
-    // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step|min angle|max angle|max speed (step/s)
-      {true,  1.0f/1.0f,                            0,     100,        0,         1,        0,       250,          76},
-      {true,  8.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,       100,      -17,       150,        5000},
-      {true,  8.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,       500,       50,       210,        5000},
-      {false,  1.0f/1.0f,                          15,     130,      130,         1,      130,       130,           1},
-      {false,  1.0f/1.0f,                         120,     180,      180,         1,      180,       180,           1},
-      {true,  50.0f/14.0f*(512.0f/360.0f),          0,      20,        0,      1000,        0,        45,          76}
+    // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|max step/s|frequency
+        {true,  1.0f/1.0f,                            0,     100,        0,        64,           0,       250,     5000,   20000.0f},
+        {true,  8.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,         2,         -17,       150,    10000,   20000.0f},
+        {true,  8.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,         2,          50,       210,    10000,   20000.0f},
+        {false,  1.0f/1.0f,                          15,     130,      130,         1,         130,       130,        1,   20000.0f},
+        {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,        1,   20000.0f},
+        {true,  50.0f/14.0f*(512.0f/360.0f),          0,      20,        0,        16,           0,        45,     1250,   20000.0f}
     };
 
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
         m_robot->setMotorParam(motor,armPrams[motor]);
+        m_robot->updateInitAngle(motor,armPrams[motor].initAngle);
     }
 }
 
@@ -112,7 +116,7 @@ long ApplicationArduino::getSystemTime() {
 
 void ApplicationArduino::specificPlatformGohome(int motorID)
 {
-  initHardwareTimer(40000.0f);
+  // Not used, go home is handled in Robot::executeGoHome
 }
 
 void ApplicationArduino::harwareStop(int motorID = MAX_MOTOR)
@@ -129,7 +133,7 @@ void ApplicationArduino::checkInput(){
     }
 	}
   m_limitGripperValue = analogRead(limitGripper);
-  // this->printf("Limit Gripper pin[%d] Value: %d\r\n", limitGripper, m_limitGripperValue);
+  this->printf("Limit Gripper pin[%d] Value: %d\r\n", limitGripper, m_limitGripperValue);
 }
 #define DEBUG_SERIAL
 int ApplicationArduino::readSerial(char* output, int length) {
@@ -200,24 +204,27 @@ void ApplicationArduino::enableEngine(bool enable) {
 
 void ApplicationArduino::initDirection(int motorID, int direction)
 {
-  this->printf("initDirection motorID=%d, direction=%d\r\n", motorID, direction);
+  Serial.print("initDirection motorID=");
+  Serial.print(motorID);
+  Serial.print(", direction=");
+  Serial.println(direction);
   switch(motorID){
     case MOTOR::MOTOR_ARM1: {
-      driver1.setDir(direction);
+      digitalWrite(dirXPin, direction > 0 ? LOW : HIGH);
     }
     break;
     case MOTOR::MOTOR_ARM2: {
-      driver2.setDir(direction);
+      digitalWrite(dirYPin, direction > 0 ? LOW : HIGH);
     }
     break;
     case MOTOR::MOTOR_ARM5:
     {
-      miniStepperUpdown.setDir(direction);
+      // Do nothing, direction is controlled by step sequence
     }
     break;
     case MOTOR::MOTOR_CAPTURE: 
     {
-      miniStepperGripper.setDir(direction);
+      // Do nothing, direction is controlled by step sequence
     }
     break;
     default: break;
@@ -225,30 +232,6 @@ void ApplicationArduino::initDirection(int motorID, int direction)
   
 }
 
-void ApplicationArduino::moveSingleStep(int motorID, int delayTime)
-{
-  switch(motorID){
-    case MOTOR::MOTOR_ARM1: {
-      driver1.moveStep(delayTime);
-    }
-    break;
-    case MOTOR::MOTOR_ARM2: {
-      driver2.moveStep(delayTime);
-    }
-    break;
-    case MOTOR::MOTOR_ARM5:
-    {
-      miniStepperUpdown.moveStep(delayTime);
-    }
-    break;
-    case MOTOR::MOTOR_CAPTURE: 
-    {
-      miniStepperGripper.moveStep(delayTime);
-    }
-    break;
-    default: break;
-  }
-}
 void ApplicationArduino::moveDoneAction(int motorID)
 {
   switch(motorID){
@@ -262,12 +245,18 @@ void ApplicationArduino::moveDoneAction(int motorID)
     break;
     case MOTOR::MOTOR_ARM5:
     {
-      miniStepperUpdown.enable(false);
+      digitalWrite(miniStepperUpdownPin1, LOW);
+      digitalWrite(miniStepperUpdownPin2, LOW);
+      digitalWrite(miniStepperUpdownPin3, LOW);
+      digitalWrite(miniStepperUpdownPin4, LOW);
     }
     break;
     case MOTOR::MOTOR_CAPTURE: 
     {
-      miniStepperGripper.enable(false);
+      digitalWrite(miniStepperGripperPin1, LOW);
+      digitalWrite(miniStepperGripperPin2, LOW);
+      digitalWrite(miniStepperGripperPin3, LOW);
+      digitalWrite(miniStepperGripperPin4, LOW);
     }
     break;
     default: break;
@@ -276,6 +265,7 @@ void ApplicationArduino::moveDoneAction(int motorID)
 
 void ApplicationArduino::initHardwareTimer(float samplerate)
 {
+  enableHardwareTimer(false);
   // initialize timer1
   noInterrupts(); // disable all interrupts
   TCCR1A = 0;
@@ -286,8 +276,52 @@ void ApplicationArduino::initHardwareTimer(float samplerate)
   TCCR1B |= (1 << CS10); // no prescaler
   interrupts(); // enable all interrupts
 }
-int countPulse = 0;
-void ApplicationArduino::enableMotionTask(bool enable)
+// #define DEBUG_PULSE
+uint8_t ApplicationArduino::executePulseLoop(int motorID)
+{
+    uint8_t statePulse = m_robot->statePulse(motorID);
+    uint32_t countPulse = m_robot->countPulse(motorID);
+    uint32_t numWaitPulse = m_robot->numWaitPulse(motorID);
+    uint8_t nextStatePulse = statePulse;
+#ifdef DEBUG_PULSE
+    printf("p S[%d] C[%d/%d]\r\n",
+          statePulse, (int)countPulse, (int)numWaitPulse);
+#endif
+    if(countPulse < numWaitPulse) {
+        switch (motorID)
+        {
+        case MOTOR_ARM1: {
+          nextStatePulse = executePulseStepper2Wires(statePulse, countPulse, numWaitPulse,stepXPin);
+        }
+          break;
+        case MOTOR_ARM2: {
+          nextStatePulse = executePulseStepper2Wires(statePulse, countPulse, numWaitPulse, stepYPin);
+        }
+          break;
+        case MOTOR_ARM5: {
+          int direction = m_robot->currentDirection(motorID);
+          nextStatePulse = executePulseStepper4Wires(statePulse, countPulse, numWaitPulse,
+            direction, miniStepperUpdownPin1, miniStepperUpdownPin2, miniStepperUpdownPin3, miniStepperUpdownPin4);
+        }
+          break;
+        case MOTOR_CAPTURE: {
+          int direction = m_robot->currentDirection(motorID);
+          nextStatePulse = executePulseStepper4Wires(statePulse, countPulse, numWaitPulse,
+            direction, miniStepperGripperPin1, miniStepperGripperPin2, miniStepperGripperPin3, miniStepperGripperPin4);
+        }
+          break;
+        default:
+          break;
+        }
+        m_robot->updateCountPulse(motorID,countPulse+1);
+        m_robot->updateStatePulse(motorID,nextStatePulse);
+        return nextStatePulse;
+    } else {
+        return STATE_DONE;
+    }
+}
+
+void ApplicationArduino::enableHardwareTimer(bool enable)
 {
   if(enable)
     TIMSK1 |= (1 << OCIE1A); // enable timer compare interrupt
@@ -295,73 +329,184 @@ void ApplicationArduino::enableMotionTask(bool enable)
     TIMSK1 &= ~(1 << OCIE1A);
 }
 
-void ApplicationArduino::setupMotionTask(int motorID, 
-      uint32_t stepsAccel, uint32_t stepsCruise, uint32_t stepsDecel, 
-      int direction, bool isAccel, uint32_t accelStartWaitPulse, uint32_t minWaitPulse)
+void ApplicationArduino::resetPulse(int motorID)
 {
-  switch (motorID)
-  {
-    case MOTOR::MOTOR_ARM1: {
-      motionDriver1.setupTarget(stepsAccel, stepsCruise, stepsDecel, direction, isAccel, accelStartWaitPulse, minWaitPulse);
+  m_robot->updateCountPulse(motorID,0);
+  m_robot->updateStatePulse(motorID,STATE_COMMAND1);
+}
+uint8_t ApplicationArduino::executePulseStepper2Wires(uint8_t statePulse,
+  uint32_t countPulse, uint32_t numWaitPulse, int stepPin)
+{
+#ifdef DEBUG_PULSE
+  printf("executePulseStepper2Wires statePulse=%d, countPulse=%d, numWaitPulse=%d\r\n",
+          (int)statePulse, (int)countPulse, (int)numWaitPulse);
+#endif
+  uint8_t nextStatePulse = statePulse;
+  switch(statePulse){
+    case STATE_COMMAND1: {
+      digitalWrite(stepPin,HIGH);
+      nextStatePulse = countPulse >= (uint32_t)(numWaitPulse/2-1) ? STATE_COMMAND2 : STATE_WAIT1;
+#ifdef DEBUG_PULSE
+      Serial.print("STATE_COMMAND1 -> STATE_WAIT1\r\n");
+#endif
     }
     break;
-    case MOTOR::MOTOR_ARM2: {
-      motionDriver2.setupTarget(stepsAccel, stepsCruise, stepsDecel, direction, isAccel, accelStartWaitPulse, minWaitPulse);
+    case STATE_WAIT1: {
+      if(countPulse >= (uint32_t)(numWaitPulse/2-1)) {
+#ifdef DEBUG_PULSE
+        Serial.print("STATE_WAIT1 -> STATE_COMMAND2\r\n");
+#endif
+        nextStatePulse = STATE_COMMAND2;
+      }
     }
     break;
-    case MOTOR::MOTOR_ARM5: {
-      motionUpdown.setupTarget(stepsAccel, stepsCruise, stepsDecel, direction, isAccel, accelStartWaitPulse, minWaitPulse);
+    case STATE_COMMAND2: {
+      digitalWrite(stepPin,LOW);
+      nextStatePulse = countPulse >= (uint32_t)(numWaitPulse-1) ? STATE_DONE : STATE_WAIT2;
+#ifdef DEBUG_PULSE
+      Serial.print("STATE_COMMAND2 -> STATE_WAIT2\r\n");
+#endif
     }
     break;
-    case MOTOR::MOTOR_CAPTURE: {
-      motionGripper.setupTarget(stepsAccel, stepsCruise, stepsDecel, direction, isAccel, accelStartWaitPulse, minWaitPulse);
+    case STATE_WAIT2: {
+      if(countPulse >= (uint32_t)(numWaitPulse-1)) {
+        nextStatePulse = STATE_DONE;
+#ifdef DEBUG_PULSE
+        Serial.print("STATE_WAIT2 -> STATE_DONE\r\n");
+#endif
+      }
     }
     break;
-    default:
-      this->printf("Invalid motorID=%d\r\n", motorID);
-      break;
   }
+#ifdef DEBUG_PULSE
+  Serial.print("nextStatePulse = ");
+  Serial.print(nextStatePulse);
+  Serial.print("\r\n");
+#endif
+  return nextStatePulse;
 }
 
-int ApplicationArduino::readNumStepsFeedback(int motorID)
+uint8_t ApplicationArduino::executePulseStepper4Wires(uint8_t statePulse, uint32_t countPulse, uint32_t numWaitPulse, 
+  int direction, int stepPin1, int stepPin2, int stepPin3, int stepPin4)
 {
-  switch(motorID){
-    case MOTOR::MOTOR_ARM1: {
-      return motionDriver1.getCurrentSteps();
+  uint8_t nextStatePulse = statePulse;
+  switch(statePulse){
+    case STATE_COMMAND1: {
+      digitalWrite(stepPin1, direction < 0 ? HIGH:HIGH);
+      digitalWrite(stepPin2, direction < 0 ? LOW :LOW );
+      digitalWrite(stepPin3, direction < 0 ? LOW :LOW );
+      digitalWrite(stepPin4, direction < 0 ? LOW :HIGH);
+      nextStatePulse = STATE_WAIT1;
     }
     break;
-    case MOTOR::MOTOR_ARM2: {
-      return motionDriver2.getCurrentSteps();
+    case STATE_WAIT1: {
+      if(countPulse >= (uint32_t)(1*numWaitPulse/8)) nextStatePulse = STATE_COMMAND2;
     }
     break;
-    case MOTOR::MOTOR_ARM5: {
-      return motionUpdown.getCurrentSteps();
+    case STATE_COMMAND2: {
+      digitalWrite(stepPin1, direction < 0 ? HIGH:LOW );
+      digitalWrite(stepPin2, direction < 0 ? HIGH:LOW );
+      digitalWrite(stepPin3, direction < 0 ? LOW :LOW );
+      digitalWrite(stepPin4, direction < 0 ? LOW :HIGH);
+      nextStatePulse = STATE_WAIT2;
     }
     break;
-    case MOTOR::MOTOR_CAPTURE: {
-      return motionGripper.getCurrentSteps();
+    case STATE_WAIT2: {
+      if(countPulse >= (uint32_t)(2*numWaitPulse/8)) nextStatePulse = STATE_COMMAND3;
+    }
+    break;
+    case STATE_COMMAND3: {
+      digitalWrite(stepPin1, direction < 0 ? LOW :LOW );
+      digitalWrite(stepPin2, direction < 0 ? HIGH:LOW );
+      digitalWrite(stepPin3, direction < 0 ? LOW :HIGH);
+      digitalWrite(stepPin4, direction < 0 ? LOW :HIGH);
+      nextStatePulse = STATE_WAIT3;
+    }
+    break;
+    case STATE_WAIT3: {
+      if(countPulse >= (uint32_t)(3*numWaitPulse/8)) nextStatePulse = STATE_COMMAND4;
+    }
+    break;
+    case STATE_COMMAND4: {
+      digitalWrite(stepPin1, direction < 0 ? LOW :LOW );
+      digitalWrite(stepPin2, direction < 0 ? HIGH:LOW );
+      digitalWrite(stepPin3, direction < 0 ? HIGH:HIGH);
+      digitalWrite(stepPin4, direction < 0 ? LOW :LOW );
+      nextStatePulse = STATE_WAIT4;
+    }
+    break;
+    case STATE_WAIT4: {
+      if(countPulse >= (uint32_t)(4*numWaitPulse/8)) nextStatePulse = STATE_COMMAND5;
+    }
+    break;
+    case STATE_COMMAND5: {
+      digitalWrite(stepPin1, direction < 0 ? LOW :LOW );
+      digitalWrite(stepPin2, direction < 0 ? LOW :HIGH);
+      digitalWrite(stepPin3, direction < 0 ? HIGH:HIGH);
+      digitalWrite(stepPin4, direction < 0 ? LOW :LOW );
+      nextStatePulse = STATE_WAIT5;
+    }
+    break;
+    case STATE_WAIT5: {
+      if(countPulse >= (uint32_t)(5*numWaitPulse/8)) nextStatePulse = STATE_COMMAND6;
+    }
+    break;
+    case STATE_COMMAND6: {
+      digitalWrite(stepPin1, direction < 0 ? LOW :LOW );
+      digitalWrite(stepPin2, direction < 0 ? LOW :HIGH);
+      digitalWrite(stepPin3, direction < 0 ? HIGH:LOW );
+      digitalWrite(stepPin4, direction < 0 ? HIGH:LOW );
+      nextStatePulse = STATE_WAIT6;
+    }
+    break;
+    case STATE_WAIT6: {
+      if(countPulse >= (uint32_t)(6*numWaitPulse/8)) nextStatePulse = STATE_COMMAND7;
+    }
+    break;
+    case STATE_COMMAND7: {
+      digitalWrite(stepPin1, direction < 0 ? LOW :HIGH);
+      digitalWrite(stepPin2, direction < 0 ? LOW :HIGH);
+      digitalWrite(stepPin3, direction < 0 ? LOW :LOW );
+      digitalWrite(stepPin4, direction < 0 ? HIGH:LOW );
+      nextStatePulse = STATE_WAIT7;
+    }
+    break;
+    case STATE_WAIT7: {
+      if(countPulse >= (uint32_t)(7*numWaitPulse/8)) nextStatePulse = STATE_COMMAND8;
+    }
+    break;
+    case STATE_COMMAND8: {
+      digitalWrite(stepPin1, direction < 0 ? HIGH:HIGH);
+      digitalWrite(stepPin2, direction < 0 ? LOW :LOW );
+      digitalWrite(stepPin3, direction < 0 ? LOW :LOW );
+      digitalWrite(stepPin4, direction < 0 ? HIGH:LOW );
+      nextStatePulse = STATE_WAIT8;
+    }
+    break;
+    case STATE_WAIT8: {
+      if(countPulse >= (uint32_t)(8*numWaitPulse/8)) nextStatePulse = STATE_DONE;
     }
     break;
   }
-  return 0;
+  return nextStatePulse;
 }
 
 ISR(TIMER1_COMPA_vect)
 {
-  motionDriver1.motionControlLoop();
-  motionDriver2.motionControlLoop();
-  // motionUpdown.motionControlLoop();
-  // motionGripper.motionControlLoop();
+  app.executeSmoothMotionLoop(MOTOR_ARM1);
+  app.executeSmoothMotionLoop(MOTOR_ARM2);
+  app.executeSmoothMotionLoop(MOTOR_ARM5);
+  app.executeSmoothMotionLoop(MOTOR_CAPTURE);
 }
 
-// uint8_t statePulse = STATE_HIGH;
-// uint8_t numWaitPulse = 3;
+// uint8_t statePulse = STATE_COMMAND1;
+// uint8_t numWaitPulse = 4;
 // uint8_t pulseCount = 0;
 
 // ISR(TIMER1_COMPA_vect)
 // {
 //   switch(statePulse){
-//     case STATE_HIGH: {
+//     case STATE_COMMAND1: {
 //       digitalWrite(2,HIGH);
 //       statePulse = STATE_WAIT1;
 //       pulseCount = 0;
@@ -369,10 +514,10 @@ ISR(TIMER1_COMPA_vect)
 //     break;
 //     case STATE_WAIT1: {
 //       pulseCount++;
-//       if(pulseCount >= numWaitPulse) statePulse = STATE_LOW;
+//       if(pulseCount >= numWaitPulse/2) statePulse = STATE_COMMAND2;
 //     }
 //     break;
-//     case STATE_LOW: {
+//     case STATE_COMMAND2: {
 //       digitalWrite(2,LOW);
 //       statePulse = STATE_WAIT2;
 //       pulseCount = 0;
@@ -380,7 +525,7 @@ ISR(TIMER1_COMPA_vect)
 //     break;
 //     case STATE_WAIT2: {
 //       pulseCount++;
-//       if(pulseCount >= numWaitPulse) statePulse = STATE_HIGH;
+//       if(pulseCount >= numWaitPulse) statePulse = STATE_COMMAND1;
 //     }
 //     break;
 //   }

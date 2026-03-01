@@ -1,17 +1,27 @@
 // #define DEBUG
 #ifndef DEBUG
 #include "src/ApplicationArduino.h"
-ApplicationArduino* app;
 
+extern ApplicationArduino app;
 void setup() {
   Serial.begin(38400);
   Serial.println("======Arduino Serial======");
-  app = new ApplicationArduino();
-  app->printf("APP Arduino Init done\r\n");
+  app.printf("APP Arduino Init done\r\n");
   delay(100);
+  uint8_t statePulse = STATE_COMMAND1;
+  app.enableEngine(true);
+  // app.initDirection(int motorID, int direction)
+  // digitalWrite(5, LOW);
+  app.executeCommand("h0");
+  // for(int numPulse = 0; numPulse < 1000; numPulse++)
+  for(int i=0; i<100000; i++) {
+    app.executeSmoothMotionLoop(MOTOR_CAPTURE);
+    delayMicroseconds(50);
+  }
 }
 void loop() {
-  app->loop();
+  // app.loop();
+  // delay(1);
 }
 
 #else

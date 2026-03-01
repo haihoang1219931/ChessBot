@@ -11,7 +11,7 @@ class SmoothMotion {
       int direction, uint8_t moveType, uint32_t accelStartWaitPulse, uint32_t minWaitPulse);
     void motionControlLoop();
     uint8_t pulseLoop();
-    void restartPulse();
+    void resetPulse();
     void homing();
     void increaseSpeed();
     void cruiseSpeed();
@@ -44,10 +44,6 @@ class SmoothMotion {
     uint32_t m_stepCountCruise;
     uint32_t m_stepCountDecel;
 
-    // uint8_t m_motionAccelState;
-    // uint8_t m_motionCruiseState;    
-    // uint8_t m_motionDecelState;
-    
     int m_targetStep;
     int m_targetDirection;
     

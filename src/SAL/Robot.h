@@ -33,6 +33,7 @@ public:
     void currentStep(int* listCurrentStep, int* numMotor);
     void currentAngle(float* listCurrentStep, int* numMotor);
     void armLength(float* listArmLength, int* numMotor);
+    int currentDirection(int motorID);
     
     uint8_t statePulse(int motorID);
     uint32_t numWaitPulse(int motorID);
@@ -49,7 +50,7 @@ public:
     float homeAngle(int motorID);
     int homeStep(int motorID);
     void executeSmoothMotion(int motorID);
-
+    void resetPulse(int motorID);
 private:
     ApplicationController* m_app;
     SmoothMotion* m_motorList[MAX_MOTOR];

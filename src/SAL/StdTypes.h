@@ -9,19 +9,21 @@
 #define MAX_COMMAND_LENGTH 256
 #define MAX_PARAMS_CHESSBOARD 4
 
-#ifndef _UINT8_T_DECLARED
-#define _UINT8_T_DECLARED
-typedef unsigned char uint8_t;
-#endif
+#if defined(__linux__) || defined(_WIN32)
+ #ifndef _UINT8_T_DECLARED
+ #define _UINT8_T_DECLARED
+ typedef unsigned char uint8_t;
+ #endif
 
-#ifndef _UINT16_T_DECLARED
-#define _UINT16_T_DECLARED
-typedef unsigned short uint16_t;
-#endif
+ #ifndef _UINT16_T_DECLARED
+ #define _UINT16_T_DECLARED
+ typedef unsigned short uint16_t;
+ #endif
 
-#ifndef _UINT32_T_DECLARED
-#define _UINT32_T_DECLARED
-typedef unsigned int uint32_t;
+ #ifndef _UINT32_T_DECLARED
+ #define _UINT32_T_DECLARED
+ typedef unsigned int uint32_t;
+ #endif
 #endif
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -139,6 +141,7 @@ typedef struct{
     float minAngle;
     float maxAngle;
     int maxSpeed;
+    float frequency;
     int currentStep;
     int startStep;
     int targetStep;

@@ -1,5 +1,6 @@
 #include "SmoothMotion.h"
 #include "Robot.h"
+#include <Arduino.h>
 SmoothMotion::SmoothMotion(uint32_t id, Robot* robot):
   m_robot(robot),
   m_id(id),
@@ -25,14 +26,16 @@ void SmoothMotion::setupTarget(
   m_moveType = moveType;
   m_numWaitPulse = (float)accelStartWaitPulse;
   m_minWaitPulse = minWaitPulse;
-
-  m_pulseCount = 0;
   m_robot->initDirection(m_id,direction);
+  resetPulse();
   resetAccelSteps();
   resetCruiseSteps();
   resetDecelSteps();
   changeStateControl(m_moveType);
-  printf("setup Target[%d] waitPulse[%f] done\r\n",m_id,m_numWaitPulse);
+  Serial.print("Setup Target M[");
+  Serial.print(m_id);
+  Serial.print("] direction=");
+  Serial.println(direction);
 }
 
 float SmoothMotion::delayAccel(float stepCount, float delayCur) {
@@ -100,13 +103,13 @@ void SmoothMotion::homing()
     }
     m_statePulse = pulseLoop();
     if(m_statePulse != STATE_DONE) return;
-    restartPulse();
+    resetPulse();
     increaseCruiseSteps();
 }
 void SmoothMotion::increaseSpeed() {
   m_statePulse = pulseLoop();
   if(m_statePulse != STATE_DONE) return;
-  restartPulse();
+  resetPulse();
   increaseAccelSteps();
   m_numWaitPulse = delayAccel(m_stepCountAccel,m_numWaitPulse);
   if(m_stepCountAccel >= m_numStepAccel){
@@ -117,7 +120,7 @@ void SmoothMotion::increaseSpeed() {
 void SmoothMotion::cruiseSpeed() {
   m_statePulse = pulseLoop();
   if(m_statePulse != STATE_DONE) return;
-  restartPulse();
+  resetPulse();
   increaseCruiseSteps();
   if(m_stepCountCruise >= m_numStepCruise){
     changeStateControl(m_moveType == MOTOR_EXECUTE_INCREASE_SPEED?
@@ -173,9 +176,9 @@ uint8_t SmoothMotion::pulseLoop()
   return m_robot->pulseLoop((int)m_id);
 }
 
-void SmoothMotion::restartPulse()
+void SmoothMotion::resetPulse()
 {
-  m_robot->updateCountPulse((int)m_id,0);
+  m_robot->resetPulse((int)m_id);
 }
 
 uint32_t SmoothMotion::getCurrentSteps()

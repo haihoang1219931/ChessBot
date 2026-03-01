@@ -501,3 +501,8 @@ void ApplicationController::initSequenceMove(int numberOfJoints) {
     m_robot->moveSequence(numberOfJoints);
 }
 
+void ApplicationController::executeSmoothMotionLoop(int motorID)
+{
+    m_robot->executeSmoothMotion(motorID);
+}
+

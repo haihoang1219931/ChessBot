@@ -53,6 +53,7 @@ public:
     void appendSequenceMove(Point start, Point stop, bool straightMove = false);
     void appendStandByMove();
     void initSequenceMove(int numberOfJoints);
+    void executeSmoothMotionLoop(int motorID);
     virtual void initRobot() = 0;
     virtual void specificPlatformGohome(int motorID = MAX_MOTOR) = 0;
     virtual void harwareStop(int motorID = MAX_MOTOR) = 0;
@@ -65,11 +66,11 @@ public:
                         MOTOR_LIMIT_TYPE limitType) = 0;
     virtual int readSerial(char* output, int length) = 0;
     virtual void initDirection(int motorID, int direction) = 0;
-    virtual void moveSingleStep(int motorID, int delayTime) = 0;
     virtual void moveDoneAction(int motorID) = 0;
-    virtual void enableMotionTask(bool enable) = 0;
     virtual uint8_t executePulseLoop(int motorID) = 0;
     virtual void enableHardwareTimer(bool enable) = 0;
+    virtual void resetPulse(int motorID) = 0;
+
 public:
     MACHINE_STATE m_machineState;
     Button* m_buttonList[MAX_BUTTON];

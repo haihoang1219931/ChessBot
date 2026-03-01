@@ -20,14 +20,10 @@ public:
                             MOTOR_LIMIT_TYPE limitType) override;
     int readSerial(char* output, int length) override;
     void initDirection(int motorID, int direction) override ;
-    void moveSingleStep(int motorID, int delayTime) override;
     void moveDoneAction(int motorID) override;
-    int getMotorAngle(int motorID);
-    void simulateReceivedCommand(char* command, int length);
-    void enableMotionTask(bool enable) override;
     uint8_t executePulseLoop(int motorID) override;
     void enableHardwareTimer(bool enable) override;
-    void executeSmoothMotionLoop(int motorID);
+    void simulateReceivedCommand(char* command, int length);
 private:
     MainProcess* m_mainProcess;
     char m_command[MAX_COMMAND_LENGTH];    

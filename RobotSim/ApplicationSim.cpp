@@ -34,13 +34,13 @@ void ApplicationSim::initRobot()
     m_chessBoard->setDropZoneSpace(31);
 
     JointParam armPrams[MAX_MOTOR] = {
-    // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|max speed (step/s)
-      {true,  1.0f/1.0f,                            0,     100,        0,       100,        0,       250,          100},
-      {true,  18.0f/1.0f,                          255,       0,      -17,         2,      -17,       150,          2},
-      {true,  2.0f/1.0f,                           85,     140,       50,         2,       50,       210,          2},
-      {false,  1.0f/1.0f,                          15,     130,      130,         1,      130,       130,          1},
-      {false,  1.0f/1.0f,                         120,     180,      180,         1,      180,       180,          1},
-      {true,  1.0f/1.0f,                            0,      20,        0,       100,        0,        45,          100}
+    // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|max step/s|frequency
+        {true,  1.0f/1.0f,                            0,     100,        0,      1,        0,       250,           76,      5000.0f},
+        {true,  8.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,       1,      -17,       150,        5000,      5000.0f},
+        {true,  8.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,       5,       50,       210,        5000,      5000.0f},
+        {false,  1.0f/1.0f,                          15,     130,      130,         1,      130,       130,         1,      5000.0f},
+        {false,  1.0f/1.0f,                         120,     180,      180,         1,      180,       180,         1,      5000.0f},
+        {true,  50.0f/14.0f*(512.0f/360.0f),          0,      20,        0,      1,        0,        45,           76,      5000.0f}
     };
 #else
     m_chessBoard->setChessBoardPosX(31-31*8/2);
@@ -176,13 +176,6 @@ void ApplicationSim::initDirection(int motorID, int direction)
 
 }
 
-void ApplicationSim::moveSingleStep(int motorID, int delayTime)
-{
-#ifdef DEBUG_SIM
-    this->printf("Sim M[%d] S[%d]\r\n",motorID,simCurrentStep + dir);
-#endif
-}
-
 void ApplicationSim::moveDoneAction(int motorID)
 {
 #ifdef DEBUG_SIM
@@ -190,19 +183,9 @@ void ApplicationSim::moveDoneAction(int motorID)
 #endif
 }
 
-int ApplicationSim::getMotorAngle(int motorID)
-{
-    return m_robot->currentStep(motorID);
-}
-
 void ApplicationSim::simulateReceivedCommand(char* command, int length)
 {
     memcpy(m_command,command,length);
-}
-
-void ApplicationSim::enableMotionTask(bool enable)
-{
-
 }
 
 uint8_t ApplicationSim::executePulseLoop(int motorID)
@@ -224,9 +207,4 @@ uint8_t ApplicationSim::executePulseLoop(int motorID)
 void ApplicationSim::enableHardwareTimer(bool enable)
 {
     m_mainProcess->enableHardwareTimer(enable);
-}
-
-void ApplicationSim::executeSmoothMotionLoop(int motorID)
-{
-    m_robot->executeSmoothMotion(motorID);
 }
