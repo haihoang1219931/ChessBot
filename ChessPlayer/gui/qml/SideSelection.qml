@@ -3,11 +3,11 @@ import QtQuick 2.12
 // Use FocusScope to trap focus inside this component
 FocusScope {
     id: root
-    width: 600; height: 350
+    width: 640; height: 480
     focus: true // Signals that this scope wants focus
 
     signal sideConfirmed(string side)
-
+    signal goback()
     // Ensure focus is grabbed immediately when the component loads
     Component.onCompleted: whiteItem.forceActiveFocus()
 
@@ -39,6 +39,7 @@ FocusScope {
 
                     KeyNavigation.right: blackItem
                     Keys.onReturnPressed: root.sideConfirmed("White")
+                    Keys.onEscapePressed: root.goback()
 
                     // VISUALS
                     Column {
@@ -73,6 +74,7 @@ FocusScope {
 
                     KeyNavigation.left: whiteItem
                     Keys.onReturnPressed: root.sideConfirmed("Black")
+                    Keys.onEscapePressed: root.goback()
 
                     Column {
                         anchors.fill: parent

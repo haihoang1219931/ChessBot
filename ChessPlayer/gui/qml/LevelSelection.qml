@@ -1,17 +1,24 @@
 import QtQuick 2.12
 import QtQuick.Layouts 1.12
 
-Rectangle {
+FocusScope {
     id: root
-    width: 800; height: 480
-    color: "#050505"
+    width: 640
+    height: 480
+    // 3. FocusScope needs focus: true to accept focus from StackView
+    focus: true
 
-    // CUSTOM SIGNAL: Emitted when Enter is pressed on a score
     signal itemSelected(string rank, string score)
 
-    // Log the selection to the console when the signal is triggered
     onItemSelected: (rank, score) => {
-        console.log("SELECTED: " + rank + " with score: " + score)
+        console.log("SELECTED: " + rank + " with score: " + score);
+    }
+
+    // This ensures that when the FocusScope gets focus, it passes it to rankList
+    onActiveFocusChanged: {
+        if (activeFocus) {
+            rankList.forceActiveFocus()
+        }
     }
 
     property var rankData: [
@@ -20,103 +27,90 @@ Rectangle {
         { name: "Advanced",    scores: ["1500", "1300", "1100"] }
     ]
 
-    RowLayout {
-        anchors.fill: parent;
-        anchors.horizontalCenter: parent.horizontalCenter;
-        spacing: 0
+    Rectangle {
+        anchors.fill: parent
+        color: "#050505"
+        RowLayout {
+            anchors.fill: parent
+            spacing: 0
 
-        // --- LEFT LIST: Ranks ---
-        ListView {
-            id: rankList
-            Layout.fillWidth: true; Layout.fillHeight: true
-            model: root.rankData
-            focus: true
-            KeyNavigation.right: scoreList
-            clip: true
+            ListView {
+                id: rankList
+                Layout.fillWidth: true; Layout.fillHeight: true
+                model: root.rankData
+                focus: true // Default focus child
+                KeyNavigation.right: scoreList
+                clip: true
+                highlightFollowsCurrentItem: true
 
-            delegate: Item {
-                width: rankList.width; height: 70
-                readonly property bool isSelected: ListView.isCurrentItem
+                delegate: Item {
+                    width: rankList.width; height: 70
+                    readonly property bool isSelected: ListView.isCurrentItem
 
-                Rectangle {
-                    visible: isSelected
-                    width: parent.width; height: 2; anchors.top: parent.top
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: "transparent" }
-                        GradientStop { position: 0.5; color: "#ffff00" }
-                        GradientStop { position: 1.0; color: "transparent" }
+                    // Selection Bars
+                    Rectangle {
+                        visible: isSelected
+                        width: parent.width; height: 2; anchors.top: parent.top
+                        gradient: Gradient {
+                            orientation: Gradient.Horizontal
+                            GradientStop { position: 0.0; color: "transparent" }
+                            GradientStop { position: 0.5; color: "#ffff00" }
+                            GradientStop { position: 1.0; color: "transparent" }
+                        }
                     }
-                }
-                Rectangle {
-                    visible: isSelected
-                    width: parent.width; height: 2; anchors.bottom: parent.bottom
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: "transparent" }
-                        GradientStop { position: 0.5; color: "#ffff00" }
-                        GradientStop { position: 1.0; color: "transparent" }
+                    Rectangle {
+                        visible: isSelected
+                        width: parent.width; height: 2; anchors.bottom: parent.bottom
+                        gradient: Gradient {
+                            orientation: Gradient.Horizontal
+                            GradientStop { position: 0.0; color: "transparent" }
+                            GradientStop { position: 0.5; color: "#ffff00" }
+                            GradientStop { position: 1.0; color: "transparent" }
+                        }
                     }
-                }
 
-                Text {
-                    anchors.centerIn: parent
-                    text: (isSelected && rankList.activeFocus ? "> " : "") + modelData.name
-                    color: isSelected ? "#ffff00" : "white"
-                    font.pixelSize: 28; font.bold: isSelected
+                    Text {
+                        anchors.centerIn: parent
+                        text: (isSelected && rankList.activeFocus ? "> " : "") + modelData.name
+                        color: isSelected ? "#ffff00" : "white"
+                        font.pixelSize: 28; font.bold: isSelected
+                    }
                 }
             }
-        }
 
-        // VERTICAL DIVIDER
-        Rectangle { Layout.preferredWidth: 2; Layout.fillHeight: true; color: "#222" }
+            Rectangle { Layout.preferredWidth: 2; Layout.fillHeight: true; color: "#222" }
 
-        // --- RIGHT LIST: Scores ---
-        ListView {
-            id: scoreList
-            Layout.fillWidth: true; Layout.fillHeight: true
-            model: root.rankData[rankList.currentIndex].scores
-            KeyNavigation.left: rankList
-            clip: true
+            ListView {
+                id: scoreList
+                Layout.fillWidth: true; Layout.fillHeight: true
+                model: root.rankData[rankList.currentIndex].scores
+                KeyNavigation.left: rankList
+                clip: true
 
-            // --- KEY EVENT: ENTER/RETURN ---
-            Keys.onReturnPressed: {
-                root.itemSelected(root.rankData[rankList.currentIndex].name, model[currentIndex])
-            }
-            Keys.onEnterPressed: {
-                root.itemSelected(root.rankData[rankList.currentIndex].name, model[currentIndex])
-            }
+                Keys.onReturnPressed: root.itemSelected(root.rankData[rankList.currentIndex].name, model[currentIndex])
+                Keys.onEnterPressed: root.itemSelected(root.rankData[rankList.currentIndex].name, model[currentIndex])
 
-            delegate: Item {
-                width: scoreList.width; height: 70
-                readonly property bool isSelected: ListView.isCurrentItem && scoreList.activeFocus
+                delegate: Item {
+                    width: scoreList.width; height: 70
+                    readonly property bool isSelected: ListView.isCurrentItem && scoreList.activeFocus
 
-                Rectangle {
-                    visible: isSelected
-                    width: parent.width; height: 2; anchors.top: parent.top
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: "transparent" }
-                        GradientStop { position: 0.5; color: "#ffff00" }
-                        GradientStop { position: 1.0; color: "transparent" }
+                    Rectangle {
+                        visible: isSelected
+                        width: parent.width; height: 2; anchors.top: parent.top
+                        gradient: Gradient {
+                            orientation: Gradient.Horizontal
+                            GradientStop { position: 0.0; color: "transparent" }
+                            GradientStop { position: 0.5; color: "#ffff00" }
+                            GradientStop { position: 1.0; color: "transparent" }
+                        }
                     }
-                }
-                Rectangle {
-                    visible: isSelected
-                    width: parent.width; height: 2; anchors.bottom: parent.bottom
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: "transparent" }
-                        GradientStop { position: 0.5; color: "#ffff00" }
-                        GradientStop { position: 1.0; color: "transparent" }
-                    }
-                }
 
-                Text {
-                    anchors.centerIn: parent
-                    text: (isSelected ? "> " : "") + modelData
-                    color: isSelected ? "#ffff00" : (scoreList.activeFocus ? "white" : "#666")
-                    font.pixelSize: 28; font.bold: isSelected
+                    Text {
+                        anchors.centerIn: parent
+                        text: (isSelected ? "> " : "") + modelData
+                        color: isSelected ? "#ffff00" : (scoreList.activeFocus ? "white" : "#666")
+                        font.pixelSize: 28; font.bold: isSelected
+                    }
                 }
             }
         }
