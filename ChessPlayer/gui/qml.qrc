@@ -6,5 +6,7 @@
         <file>qml/SideSelection.qml</file>
         <file>qml/CountDownTimer.qml</file>
         <file>qml/Emoji.qml</file>
+        <file>qml/SideButton.qml</file>
+        <file>fonts/chess_merida_unicode.ttf</file>
     </qresource>
 </RCC>

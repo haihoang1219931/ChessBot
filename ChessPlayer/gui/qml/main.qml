@@ -9,7 +9,7 @@ ApplicationWindow {
     width: 640
     height: 480
     title: qsTr("ChessPlayer")
-    color: "gray"
+    color: "#050505"
 
     StackView {
         id: stack
@@ -44,8 +44,19 @@ ApplicationWindow {
                 stack.pop()
                 stack.push(levelSelection)
             }
+            onSideConfirmed: {
+                stack.pop();
+                stack.push(timer)
+            }
         }
     }
-
-
+    Component {
+        id: timer
+        CountDownTimer{
+            onGoback: {
+                stack.pop()
+                stack.push(sideSelection)
+            }
+        }
+    }
 }

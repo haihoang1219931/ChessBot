@@ -13,7 +13,7 @@ FocusScope {
 
     Rectangle {
         anchors.fill: parent
-        color: "#0a0e14"
+        color: "#050505"
 
         Column {
             anchors.centerIn: parent
@@ -31,73 +31,24 @@ FocusScope {
                 spacing: 60
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                // --- WHITE SIDE ---
-                Item {
+                SideButton {
                     id: whiteItem
-                    width: 140; height: 180
-                    focus: true // Default item within the scope
-
+                    sideName: "White"
+                    iconText: "\u2654" // White King Unicode
                     KeyNavigation.right: blackItem
                     Keys.onReturnPressed: root.sideConfirmed("White")
                     Keys.onEscapePressed: root.goback()
-
-                    // VISUALS
-                    Column {
-                        anchors.fill: parent
-                        spacing: 15
-                        Rectangle {
-                            width: 110; height: 110; radius: 55
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            color: whiteItem.activeFocus ? "#bde0fe" : "#2c3e50"
-
-                            // Yellow brackets
-                            Rectangle {
-                                anchors.fill: parent; anchors.margins: -10
-                                color: "transparent"; border.color: "yellow"; border.width: 3; radius: 60
-                                visible: whiteItem.activeFocus
-                            }
-                            Text { anchors.centerIn: parent; text: "♔"; font.pixelSize: 60; color: "black" }
-                        }
-                        Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: whiteItem.activeFocus ? "▷ White ◁" : "White"
-                            color: whiteItem.activeFocus ? "yellow" : "#7f8c8d"
-                            font.pixelSize: 20; font.bold: true
-                        }
-                    }
+                    isSelected: activeFocus
                 }
 
-                // --- BLACK SIDE ---
-                Item {
+                SideButton {
                     id: blackItem
-                    width: 140; height: 180
-
-                    KeyNavigation.left: whiteItem
+                    sideName: "Black"
+                    iconText: "\u265A" // Black King Unicode
+                    KeyNavigation.right: whiteItem
                     Keys.onReturnPressed: root.sideConfirmed("Black")
                     Keys.onEscapePressed: root.goback()
-
-                    Column {
-                        anchors.fill: parent
-                        spacing: 15
-                        Rectangle {
-                            width: 110; height: 110; radius: 55
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            color: blackItem.activeFocus ? "#bde0fe" : "#2c3e50"
-
-                            Rectangle {
-                                anchors.fill: parent; anchors.margins: -10
-                                color: "transparent"; border.color: "yellow"; border.width: 3; radius: 60
-                                visible: blackItem.activeFocus
-                            }
-                            Text { anchors.centerIn: parent; text: "♚"; font.pixelSize: 60; color: "black" }
-                        }
-                        Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: blackItem.activeFocus ? "▷ Black ◁" : "Black"
-                            color: blackItem.activeFocus ? "yellow" : "#7f8c8d"
-                            font.pixelSize: 20; font.bold: true
-                        }
-                    }
+                    isSelected: activeFocus
                 }
             }
         }

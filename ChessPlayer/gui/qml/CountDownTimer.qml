@@ -2,11 +2,12 @@ import QtQuick 2.12
 import QtQuick.Shapes 1.12
 
 Rectangle {
-    id: mainRoot
-    width: 800
+    id: root
+    width: 640
     height: 480
     color: "black"
-
+    signal goback()
+    Keys.onEscapePressed: root.goback()
     Column {
         anchors.fill: parent
 
@@ -67,15 +68,15 @@ Rectangle {
                 ShapePath {
                     strokeWidth: 0
                     fillGradient: LinearGradient {
-                        x1: 0; y1: 0; x2: parent.width; y2: parent.height
+                        x1: 0; y1: 0; x2: root.width; y2: root.height
                         GradientStop { position: 0.0; color: "#9a1a00" }
                         GradientStop { position: 0.6; color: "#ff4d00" }
                     }
 
                     startX: 0; startY: 0
-                    PathLine { x: parent.width * 0.62; y: 0 }
-                    PathLine { x: parent.width * 0.42; y: parent.height }
-                    PathLine { x: 0; y: parent.height }
+                    PathLine { x: root.width * 0.62; y: 0 }
+                    PathLine { x: root.width * 0.42; y: root.height }
+                    PathLine { x: 0; y: root.height }
                     PathLine { x: 0; y: 0 }
                 }
 
