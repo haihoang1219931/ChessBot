@@ -2,5 +2,9 @@
     <qresource prefix="/">
         <file>qml/main.qml</file>
         <file>qml/ChessBoard.qml</file>
+        <file>qml/LevelSelection.qml</file>
+        <file>qml/SideSelection.qml</file>
+        <file>qml/CountDownTimer.qml</file>
+        <file>qml/Emoji.qml</file>
     </qresource>
 </RCC>

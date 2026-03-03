@@ -51,6 +51,7 @@
 import QtQuick 2.7
 import QtQuick.Window 2.2
 import QtQuick.Controls 2.0
+import QtQuick.Layouts 1.3
 ApplicationWindow {
     id: wroot
     visible: true
@@ -58,4 +59,23 @@ ApplicationWindow {
     height: 480
     title: qsTr("ChessPlayer")
     color: "gray"
+    StackLayout {
+        id: layout
+        anchors.fill: parent
+        currentIndex: 0
+        LevelSelection {
+            onItemSelected:{
+                layout.currentIndex++;
+            }
+        }
+        SideSelection{
+            onSideConfirmed:{
+                layout.currentIndex++;
+            }
+        }
+
+        CountDownTimer {
+
+        }
+    }
 }
