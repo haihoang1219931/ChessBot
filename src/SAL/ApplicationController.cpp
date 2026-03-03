@@ -146,15 +146,11 @@ void ApplicationController::executeCommand(char* command) {
     }
     else if(command[0] == 'h') {
         if(strlen(command)>=2 && command[1] == 'a') {
-            specificPlatformGohome();
-            m_robot->requestGoHome();
-            setMachineState(MACHINE_EXECUTE_COMMAND);
+            goToHome(MAX_MOTOR);
         }
         else if(strlen(command)>=2 && command[1] >= '0' && command[1] <= '5')
         {
-            specificPlatformGohome(command[1]-'0');
-            m_robot->requestGoHome(command[1]-'0');
-            setMachineState(MACHINE_EXECUTE_COMMAND);
+            goToHome(command[1]-'0');
         }
     }
     else if(command[0] == 'c' && strlen(command)>=3) {
@@ -310,6 +306,14 @@ void ApplicationController::calculateJoints(float xPos, float yPos, float upAngl
     jointSteps[MOTOR_ARM5] = m_robot->angleToStep(
                 MOTOR_ARM5,
                 upAngleInDegree);
+}
+
+void ApplicationController::goToHome(int motorID)
+{
+    specificPlatformGohome(motorID);
+    m_robot->requestGoHome(motorID);
+    if(m_machineState != MACHINE_EXECUTE_COMMAND)
+        setMachineState(MACHINE_EXECUTE_COMMAND);
 }
 
 void ApplicationController::goToReadyPosition() {
@@ -484,28 +488,21 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
     }
 }
 void ApplicationController::appendStandByMove() {
-    {
-        int jointSteps[MAX_MOTOR];
-        jointSteps[MOTOR_CAPTURE] = 0;
-        jointSteps[MOTOR_ARM1] = m_robot->angleToStep(MOTOR_ARM1,0);
-        jointSteps[MOTOR_ARM2] = m_robot->angleToStep(MOTOR_ARM2,90+m_robot->homeAngle(MOTOR_ARM2));
-        jointSteps[MOTOR_ARM3] = 0;
-        jointSteps[MOTOR_ARM4] = 0;
-        jointSteps[MOTOR_ARM5] = m_robot->angleToStep(MOTOR_ARM5,0);
-        m_robot->appendMove(jointSteps);
-    }
-//    {
-//        int jointSteps[MAX_MOTOR];
-//        jointSteps[MOTOR_CAPTURE] = 0;
-//        jointSteps[MOTOR_ARM1] = 0;
-//        jointSteps[MOTOR_ARM2] = 90+50;
-//        jointSteps[MOTOR_ARM3] = 0;
-//        jointSteps[MOTOR_ARM4] = 0;
-//        jointSteps[MOTOR_ARM5] = 0;
-//        m_robot->appendMove(jointSteps);
-//    }
+    int jointSteps[MAX_MOTOR];
+    jointSteps[MOTOR_CAPTURE] = 0;
+    jointSteps[MOTOR_ARM1] = m_robot->angleToStep(MOTOR_ARM1,0);
+    jointSteps[MOTOR_ARM2] = m_robot->angleToStep(MOTOR_ARM2,90+m_robot->homeAngle(MOTOR_ARM2));
+    jointSteps[MOTOR_ARM3] = 0;
+    jointSteps[MOTOR_ARM4] = 0;
+    jointSteps[MOTOR_ARM5] = m_robot->angleToStep(MOTOR_ARM5,0);
+    m_robot->appendMove(jointSteps);
 }
 void ApplicationController::initSequenceMove(int numberOfJoints) {
     m_robot->moveSequence(numberOfJoints);
+}
+
+void ApplicationController::executeSmoothMotionLoop(int motorID)
+{
+    m_robot->executeSmoothMotion(motorID);
 }
 

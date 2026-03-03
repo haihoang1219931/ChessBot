@@ -20,7 +20,8 @@ CONFIG += c++11
 #win32: LIBS += -lpthread
 
 HEADERS += \
-    src/SAL/Motor.h \
+    RobotSim/HardwareTimerSim.h \
+    src/SAL/SmoothMotion.h \
     src/SAL/Robot.h \
     src/SAL/Button.h \
     src/SAL/ApplicationController.h \
@@ -33,8 +34,9 @@ HEADERS += \
     RobotSim/VideoDisplay/I420Render.h
 
 SOURCES += \
+    RobotSim/HardwareTimerSim.cpp \
     main.cpp \
-    src/SAL/Motor.cpp \
+    src/SAL/SmoothMotion.cpp \
     src/SAL/Robot.cpp \
     src/SAL/Button.cpp \
     src/SAL/ApplicationController.cpp \

@@ -54,6 +54,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include "RobotSim/MainProcess.h"
+#include "RobotSim/VideoDisplay/VideoRender.h"
 
 #define QML_ROBOT
 #ifdef QML_ROBOT

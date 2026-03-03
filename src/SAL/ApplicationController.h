@@ -30,6 +30,7 @@ public:
     bool inverseKinematic(float x, float y,
                            float a1, float a2,float* p1, float* p2);
     void forwardKinematic(float a1, float a2, float p1, float p2, float* x, float* y);
+    void goToHome(int motorID);
     void goToReadyPosition();
     void executeSequence(MOVE_TYPE moveType,
                          int startCol, int startRow,
@@ -52,6 +53,7 @@ public:
     void appendSequenceMove(Point start, Point stop, bool straightMove = false);
     void appendStandByMove();
     void initSequenceMove(int numberOfJoints);
+    void executeSmoothMotionLoop(int motorID);
     virtual void initRobot() = 0;
     virtual void specificPlatformGohome(int motorID = MAX_MOTOR) = 0;
     virtual void harwareStop(int motorID = MAX_MOTOR) = 0;
@@ -64,13 +66,11 @@ public:
                         MOTOR_LIMIT_TYPE limitType) = 0;
     virtual int readSerial(char* output, int length) = 0;
     virtual void initDirection(int motorID, int direction) = 0;
-    virtual void moveSingleStep(int motorID, int delayTime) = 0;
     virtual void moveDoneAction(int motorID) = 0;
-    virtual void enableMotionTask(bool enable) = 0;
-    virtual void setupMotionTask(int motorID, 
-      uint32_t stepsAccel, uint32_t stepsCruise, uint32_t stepsDecel, 
-      int direction, bool isAccel, uint32_t accelStartWaitPulse, uint32_t minWaitPulse) = 0;
-    virtual int readNumStepsFeedback(int motorID) = 0;
+    virtual uint8_t executePulseLoop(int motorID) = 0;
+    virtual void enableHardwareTimer(bool enable) = 0;
+    virtual void resetPulse(int motorID) = 0;
+
 public:
     MACHINE_STATE m_machineState;
     Button* m_buttonList[MAX_BUTTON];

@@ -16,21 +16,21 @@ public:
   int printf(const char *fmt, ...) override;
   void msleep(int millis) override;
   long getSystemTime() override;
+  void enableEngine(bool enable) override;
   bool isLimitReached(int motor,
                       MOTOR_LIMIT_TYPE limitType) override;
   int readSerial(char* output, int length) override;
-  void enableEngine(bool enable) override;
   void initDirection(int motorID, int direction) override;
-  void moveSingleStep(int motorID, int delayTime) override;
   void moveDoneAction(int motorID) override;
-  void enableMotionTask(bool enable) override;
-  void setupMotionTask(int motorID, 
-      uint32_t stepsAccel, uint32_t stepsCruise, uint32_t stepsDecel, 
-      int direction, bool isAccel, uint32_t accelStartWaitPulse, uint32_t minWaitPulse) override;
-  int readNumStepsFeedback(int motorID) override;
+  uint8_t executePulseLoop(int motorID) override;
+  void enableHardwareTimer(bool enable) override;
+  void resetPulse(int motorID) override;
+  uint8_t executePulseStepper2Wires(uint8_t statePulse, uint32_t countPulse, uint32_t numWaitPulse, int stepPin);
+  uint8_t executePulseStepper4Wires(uint8_t statePulse, uint32_t countPulse, uint32_t numWaitPulse, int direction,
+    int stepPin1, int stepPin2, int stepPin3, int stepPin4);
 
 private:
-  void initHardwareTimer();
+  void initHardwareTimer(float samplerate = 40000.0f);
 private:
   int m_buttonPin[MAX_BUTTON];
   int m_limitGripperValue;

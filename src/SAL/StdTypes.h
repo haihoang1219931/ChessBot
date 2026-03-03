@@ -9,10 +9,22 @@
 #define MAX_COMMAND_LENGTH 256
 #define MAX_PARAMS_CHESSBOARD 4
 
-#ifndef uint8_t
-#define uint8_t unsigned char
-#endif
+#if defined(__linux__) || defined(_WIN32)
+ #ifndef _UINT8_T_DECLARED
+ #define _UINT8_T_DECLARED
+ typedef unsigned char uint8_t;
+ #endif
 
+ #ifndef _UINT16_T_DECLARED
+ #define _UINT16_T_DECLARED
+ typedef unsigned short uint16_t;
+ #endif
+
+ #ifndef _UINT32_T_DECLARED
+ #define _UINT32_T_DECLARED
+ typedef unsigned int uint32_t;
+ #endif
+#endif
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -48,6 +60,7 @@ typedef enum {
   STATE_WAIT8,
 
   // Done state
+  STATE_PENDING,
   STATE_DONE,
 } STATE_PULSE;
 
@@ -76,9 +89,10 @@ typedef enum{
 }ROBOT_STATE;
 
 typedef enum{
-    ROBOT_MOVE_INIT,
-    ROBOT_MOVE_EXECUTE,
-    ROBOT_MOVE_CAPTURE,
+    ROBOT_MOVE_EXECUTE_INIT,
+    ROBOT_MOVE_EXECUTE_CHECK_RESULT,
+    ROBOT_MOVE_CAPTURE_INIT,
+    ROBOT_MOVE_CAPTURE_CHECK_RESULT,
     ROBOT_MOVE_DONE,
 }ROBOT_SEQUENCE_STATE;
 
@@ -126,7 +140,8 @@ typedef struct{
     int homeStepTime;
     float minAngle;
     float maxAngle;
-    float maxSpeed;
+    int maxSpeed;
+    float frequency;
     int currentStep;
     int startStep;
     int targetStep;
@@ -148,4 +163,9 @@ typedef struct {
     int stepTime;
     int active;
 } Joint;
+
+typedef struct {
+    Joint jointSteps[MAX_MOTOR];
+} Move;
+
 #endif // STDTYPES_H

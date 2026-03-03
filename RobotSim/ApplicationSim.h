@@ -20,9 +20,9 @@ public:
                             MOTOR_LIMIT_TYPE limitType) override;
     int readSerial(char* output, int length) override;
     void initDirection(int motorID, int direction) override ;
-    void moveStep(int motorID, int currentStep, int nextStep) override;
     void moveDoneAction(int motorID) override;
-    int getMotorAngle(int motorID);
+    uint8_t executePulseLoop(int motorID) override;
+    void enableHardwareTimer(bool enable) override;
     void simulateReceivedCommand(char* command, int length);
 private:
     MainProcess* m_mainProcess;

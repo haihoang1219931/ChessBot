@@ -1,16 +1,20 @@
 #include "MainProcess.h"
+#include "VideoDisplay/VideoRender.h"
 #include "ApplicationSim.h"
+#include "HardwareTimerSim.h"
 #include "../src/SAL/Robot.h"
-MainProcess::MainProcess(QThread *parent) :
-    QThread(parent),
-    m_stopped(false),
-    m_sleepTime(30),
-    m_thread(nullptr)
+#include <stdio.h>
+MainProcess::MainProcess(QObject *parent) :
+    QObject(parent)
 {
     m_application = new ApplicationSim(this);
+    m_hardwareTimer = new HardwareTimerSim();
+    m_hardwareTimer->setApplication(m_application);
     memset(m_renderData,0,sizeof(m_renderData));
-    m_mutex = new QMutex;
-    m_pauseCond = new QWaitCondition;
+    m_timer = new QTimer();
+    connect(m_timer, &QTimer::timeout, this, &MainProcess::taskLoop);
+    changeSleepTime(30);
+    changeTimerPeriod(1);
     for(int i=0; i< MAX_MOTOR; i++)
     {
         m_listAngle.append(0);
@@ -26,21 +30,20 @@ MainProcess::MainProcess(QThread *parent) :
 MainProcess::~MainProcess()
 {
     stopService();
-    sleep(2);
 }
 
+void MainProcess::enableHardwareTimer(bool enable)
+{
+    m_hardwareTimer->enableTask(enable);
+}
 
 void MainProcess::pause(bool pause){
     if(pause == true){
-        m_mutex->lock();
-        m_pause = true;
-        m_mutex->unlock();
+        m_timer->stop();
     }else{
-        m_mutex->lock();
-        m_pause = false;
-        m_mutex->unlock();
-        m_pauseCond->wakeAll();
+        m_timer->start();
     }
+    m_hardwareTimer->enableTask(!pause);
 }
 void MainProcess::setBlackSide(bool isBlack) {
 //    m_application->chessController()->setChessPiece(isBlack);
@@ -94,28 +97,18 @@ void MainProcess::syncRobot()
     Q_EMIT chessBoardInfoChanged();
 }
 
-void MainProcess::run() {
-    m_application->printf("Start\r\n");
-    while(!m_stopped) {
-        m_mutex->lock();
-        if(m_pause)
-            m_pauseCond->wait(m_mutex); // in this place, your thread will stop to execute until someone calls resume
-        m_mutex->unlock();
-        m_application->loop();
-        m_application->msleep(m_sleepTime);
-        updateRobotStep();
-    }
-    m_application->printf("Exit\r\n");
+void MainProcess::taskLoop() {
+    m_application->loop();
+    updateRobotStep();
 }
 void MainProcess::startService() {
-    if(m_thread != nullptr)
-        m_thread->start();
-    else start();
+    printf("Start\r\n");
+    m_timer->start();
 }
 
 void MainProcess::stopService() {
-    m_stopped = true;
-    m_thread->terminate();
+    printf("Stop\r\n");
+    m_timer->stop();
 }
 void MainProcess::setRender(VideoRender* render)
 {
@@ -146,9 +139,13 @@ void MainProcess::updateRobotStep()
 
 void MainProcess::changeSleepTime(int sleepTime)
 {
-    m_sleepTime = sleepTime;
-}
+    m_timer->setInterval(sleepTime);
 
+}
+void MainProcess::changeTimerPeriod(int sleepTime)
+{
+    m_hardwareTimer->setInterval(sleepTime);
+}
 QVariantList MainProcess::listAngle()
 {
     return m_listAngle;

@@ -1,5 +1,5 @@
 #include "ApplicationSim.h"
-#include "../src/SAL/Motor.h"
+#include "MainProcess.h"
 #include "../src/SAL/Robot.h"
 #include "../src/SAL/ChessBoard.h"
 #include <stdio.h>
@@ -34,13 +34,13 @@ void ApplicationSim::initRobot()
     m_chessBoard->setDropZoneSpace(31);
 
     JointParam armPrams[MAX_MOTOR] = {
-    // active |scale=gear_ratio/resolution   |length|init angle|home angle|home step|min angle|max angle|
-         {true,  1.0f/1.0f,                       0,     100,        0,        1,       0,       250   },
-         {true,   18.0f/1.0f*(200.0f/360.0f),   255,       0,      -17,      100,     -17,       150   },
-         {true,  70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,      100,      50,       210   },
-         {false,  1.0f/1.0f,                     15,     130,      130,        1,     130,       130   },
-         {false,  1.0f/1.0f,                    120,     180,      180,        1,     180,       180   },
-         {true,  50.0f/14.0f*(512.0f/360.0f),     0,      20,        0,        1,       0,        45   }
+    // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|max step/s|frequency
+        {true,  1.0f/1.0f,                            0,     100,        0,      1,        0,       250,           76,      5000.0f},
+        {true,  8.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,       1,      -17,       150,        5000,      5000.0f},
+        {true,  8.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,       5,       50,       210,        5000,      5000.0f},
+        {false,  1.0f/1.0f,                          15,     130,      130,         1,      130,       130,         1,      5000.0f},
+        {false,  1.0f/1.0f,                         120,     180,      180,         1,      180,       180,         1,      5000.0f},
+        {true,  50.0f/14.0f*(512.0f/360.0f),          0,      20,        0,      1,        0,        45,           76,      5000.0f}
     };
 #else
     m_chessBoard->setChessBoardPosX(31-31*8/2);
@@ -60,13 +60,16 @@ void ApplicationSim::initRobot()
 
 #endif
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
+        printf("ApplicationSim::initRobot[%d] param maxSpeed[%d]\r\n",
+               motor,armPrams[motor].maxSpeed);
         m_robot->setMotorParam(motor,armPrams[motor]);
+        m_robot->updateInitAngle(motor,armPrams[motor].initAngle);
     }
 }
 
 void ApplicationSim::specificPlatformGohome(int motorID)
 {
-    //@todo: consider to optimize code
+    m_mainProcess->changeTimerPeriod(1);
 }
 
 void ApplicationSim::harwareStop(int motorID)
@@ -173,13 +176,6 @@ void ApplicationSim::initDirection(int motorID, int direction)
 
 }
 
-void ApplicationSim::moveStep(int motorID, int currentStep, int nextStep)
-{
-#ifdef DEBUG_SIM
-    this->printf("Sim M[%d] S[%d]\r\n",motorID,simCurrentStep + dir);
-#endif
-}
-
 void ApplicationSim::moveDoneAction(int motorID)
 {
 #ifdef DEBUG_SIM
@@ -187,12 +183,28 @@ void ApplicationSim::moveDoneAction(int motorID)
 #endif
 }
 
-int ApplicationSim::getMotorAngle(int motorID)
-{
-    return m_robot->currentStep(motorID);
-}
-
 void ApplicationSim::simulateReceivedCommand(char* command, int length)
 {
     memcpy(m_command,command,length);
+}
+
+uint8_t ApplicationSim::executePulseLoop(int motorID)
+{
+    uint8_t statePulse = m_robot->statePulse(motorID);
+    uint32_t countPulse = m_robot->countPulse(motorID);
+    uint32_t numWaitPulse = m_robot->numWaitPulse(motorID);
+//    printf("p S[%d] C[%d/%d]\r\n",
+//           statePulse, countPulse, numWaitPulse);
+    if(countPulse < numWaitPulse) {
+        m_robot->updateCountPulse(motorID,countPulse+1);
+        m_robot->updateStatePulse(motorID,STATE_PENDING);
+        return STATE_PENDING;
+    } else {
+        return STATE_DONE;
+    }
+}
+
+void ApplicationSim::enableHardwareTimer(bool enable)
+{
+    m_mainProcess->enableHardwareTimer(enable);
 }
