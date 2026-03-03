@@ -23,6 +23,7 @@ public:
     void moveDoneAction(int motorID) override;
     uint8_t executePulseLoop(int motorID) override;
     void enableHardwareTimer(bool enable) override;
+    void resetPulse(int motorID) override;
     void simulateReceivedCommand(char* command, int length);
 private:
     MainProcess* m_mainProcess;

@@ -204,6 +204,11 @@ uint8_t ApplicationSim::executePulseLoop(int motorID)
     }
 }
 
+void ApplicationSim::resetPulse(int motorID)
+{
+    m_robot->updateCountPulse(motorID,0);
+}
+
 void ApplicationSim::enableHardwareTimer(bool enable)
 {
     m_mainProcess->enableHardwareTimer(enable);

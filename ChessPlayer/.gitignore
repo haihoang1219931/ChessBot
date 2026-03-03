@@ -1,0 +1,4 @@
+.vscode/*
+.theia/*
+*.pro.*
+build/*

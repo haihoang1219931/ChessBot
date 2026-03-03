@@ -1,6 +1,5 @@
 #include "SmoothMotion.h"
 #include "Robot.h"
-#include <Arduino.h>
 SmoothMotion::SmoothMotion(uint32_t id, Robot* robot):
   m_robot(robot),
   m_id(id),
@@ -32,10 +31,6 @@ void SmoothMotion::setupTarget(
   resetCruiseSteps();
   resetDecelSteps();
   changeStateControl(m_moveType);
-  Serial.print("Setup Target M[");
-  Serial.print(m_id);
-  Serial.print("] direction=");
-  Serial.println(direction);
 }
 
 float SmoothMotion::delayAccel(float stepCount, float delayCur) {
