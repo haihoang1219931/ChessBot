@@ -1,68 +1,90 @@
-import QtQuick 2.15
-import QtQuick.Shapes 1.15
+import QtQuick 2.12
 
-Item {
-    width: 640
-    height: 480
-    // Left Side (Red Section with Diagonal Cut)
-    Shape {
-        anchors.fill: parent
-        ShapePath {
-            fillGradient: LinearGradient {
-                x1: 0; y1: 0; x2: width; y2: height
-                GradientStop { position: 0.0; color: "#b32400" }
-                GradientStop { position: 1.0; color: "#ff4d00" }
-            }
-            // Defines the diagonal trapezoid shape
-            startX: 0; startY: 0
-            PathLine { x: width * 0.65; y: 0 }    // Top edge
-            PathLine { x: width * 0.45; y: height } // Bottom edge (creates slash)
-            PathLine { x: 0; y: height }
-            PathLine { x: 0; y: 0 }
-        }
-
-        Column {
-            x: 50; anchors.verticalCenter: parent
-            Text { text: "Julie"; color: "white"; font.pixelSize: 48 }
-            Text { text: "05:39"; color: "white"; font.pixelSize: 72; font.bold: true }
-        }
+FocusScope {
+    id: robotFace
+    width: 640; height: 480
+    focus: true
+    property var listEmotion: ["neutral", "happy", "sad", "angry", "surprise"]
+    property int emotionID: 0
+    property string emotion: robotFace.listEmotion[emotionID]
+    signal enterPressed()
+    Keys.onLeftPressed: {
+        console.log("Left pressed");
+        emotionID++;
+        emotionID = emotionID % 5;
     }
 
-    // Right Side (Blue Section)
-    Rectangle {
-        z: -1 // Place behind the red shape
-        anchors.fill: parent
-        color: "#001a33"
-
-        Text {
-            anchors.right: parent.right
-            anchors.rightMargin: 100
-            anchors.verticalCenter: parent
-            text: "02:53"
-            color: "#66ccff"
-            font.pixelSize: 64
-        }
+    Keys.onEnterPressed: {
+        robotFace.enterPressed();
     }
-    // Current Level Display at the Top
-    Text {
-        id: levelDisplay
-        text: "level 1 (200)"
-        color: "white"
-        font.pixelSize: 24
-        font.family: "Arial" // Use a clean, sans-serif font
 
-        // Positioning
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.margins: 20
-
-        // Optional: Adding the small "level" icon/bar seen in the image
+    // Eye components
+    Row {
+        anchors.centerIn: parent
+        spacing: 60
         Rectangle {
-            width: 15; height: 5
-            color: "white"
-            anchors.right: parent.left
-            anchors.rightMargin: 8
-            anchors.verticalCenter: parent.verticalCenter
+            id: leftEye
+            width: 70; height: 70; radius: 35
+            color: "transparent"; border.width: 6; border.color: "#A0E0FF"
+        }
+        Rectangle {
+            id: rightEye
+            width: 70; height: 70; radius: 35
+            color: "transparent"; border.width: 6; border.color: "#A0E0FF"
+        }
+    }
+
+    // Mouth component
+    Rectangle {
+        id: mouth
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom; anchors.bottomMargin: 150
+        width: 40; height: 10; radius: 5
+        color: "transparent"; border.width: 4; border.color: "#A0E0FF"
+    }
+
+    states: [
+        State {
+            name: "happy"
+            when: robotFace.emotion === "happy"
+            PropertyChanges { target: mouth; height: 30; radius: 15; anchors.bottomMargin: 140 }
+            PropertyChanges { target: robotFace; opacity: 1.0 }
+        },
+        State {
+            name: "sad"
+            when: robotFace.emotion === "sad"
+            PropertyChanges { target: mouth; width: 40; height: 15; radius: 5; rotation: 180 }
+            PropertyChanges { target: leftEye; height: 40 } // Droopy eyes
+            PropertyChanges { target: rightEye; height: 40 } // Droopy eyes
+        },
+        State {
+            name: "angry"
+            when: robotFace.emotion === "angry"
+            PropertyChanges { target: mouth; width: 20; height: 5; border.color: "red" }
+            PropertyChanges { target: leftEye; border.color: "red"; rotation: 15 }
+            PropertyChanges { target: rightEye; border.color: "red"; rotation: 15 }
+        },
+        State {
+            name: "surprise"
+            when: robotFace.emotion === "surprise"
+            PropertyChanges { target: leftEye; width: 100; height: 100; radius: 50 }
+            PropertyChanges { target: rightEye; width: 100; height: 100; radius: 50 }
+            PropertyChanges { target: mouth; width: 40; height: 40; radius: 20 }
+        }
+    ]
+
+    transitions: Transition {
+        NumberAnimation { properties: "width,height,radius,rotation,opacity"; duration: 300; easing.type: Easing.InOutQuad }
+        ColorAnimation { duration: 300 }
+    }
+
+    // Cycle through emotions on click
+    MouseArea {
+        anchors.fill: parent
+        onClicked: {
+            let emotions = ["neutral", "happy", "sad", "angry", "surprise"]
+            let nextIndex = (emotions.indexOf(robotFace.emotion) + 1) % emotions.length
+            robotFace.emotion = emotions[nextIndex]
         }
     }
 }

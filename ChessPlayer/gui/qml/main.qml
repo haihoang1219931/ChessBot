@@ -24,9 +24,19 @@ ApplicationWindow {
         onCurrentItemChanged: if (currentItem) currentItem.forceActiveFocus()
 
         Component.onCompleted: {
-            stack.push(levelSelection)
+            stack.push(emoji)
         }
     }
+    Component {
+        id: emoji
+        Emoji {
+            onEnterPressed:{
+                stack.pop()
+                stack.push(levelSelection)
+            }
+        }
+    }
+
     Component {
         id: levelSelection
         LevelSelection {
