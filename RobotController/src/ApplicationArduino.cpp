@@ -18,15 +18,15 @@
 #define limitX 13 // X.LIMIT
 #define limitY 10 // Y.LIMIT
 
-#define miniStepperUpdownPin1 34
-#define miniStepperUpdownPin2 36
-#define miniStepperUpdownPin3 38
-#define miniStepperUpdownPin4 40
+#define miniStepperUpdownPin1 30
+#define miniStepperUpdownPin2 32
+#define miniStepperUpdownPin3 34
+#define miniStepperUpdownPin4 36
 
-#define miniStepperGripperPin1 24
-#define miniStepperGripperPin2 26
-#define miniStepperGripperPin3 28
-#define miniStepperGripperPin4 30
+#define miniStepperGripperPin1 22
+#define miniStepperGripperPin2 24
+#define miniStepperGripperPin3 26
+#define miniStepperGripperPin4 28
 
 #define limitUpdown 11
 #define limitGripper 62 // A8
@@ -65,8 +65,6 @@ ApplicationArduino::ApplicationArduino()
     pinMode(miniStepperGripperPin2, OUTPUT);
     pinMode(miniStepperGripperPin3, OUTPUT);
     pinMode(miniStepperGripperPin4, OUTPUT);
-
-    initHardwareTimer(20000.0f);
 }
 
 ApplicationArduino::~ApplicationArduino()
@@ -83,12 +81,12 @@ void ApplicationArduino::initRobot()
 
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|max step/s|frequency
-        {true,  1.0f/1.0f,                            0,     100,        0,        64,           0,       250,     5000,   20000.0f},
-        {true,  8.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,         2,         -17,       150,    10000,   20000.0f},
-        {true,  8.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,         2,          50,       210,    10000,   20000.0f},
-        {false,  1.0f/1.0f,                          15,     130,      130,         1,         130,       130,        1,   20000.0f},
-        {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,        1,   20000.0f},
-        {true,  50.0f/14.0f*(512.0f/360.0f),          0,      20,        0,        16,           0,        45,     1250,   20000.0f}
+        {true,  1.0f/1.0f,                            0,     -10,        0,       128,           0,       250,      625,   10000.0f},
+        {true,  8.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,         2,         -17,       150,     5000,   10000.0f},
+        {true,  8.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,         2,          50,       210,     5000,   10000.0f},
+        {false,  1.0f/1.0f,                          15,     130,      130,         1,         130,       130,        1,   10000.0f},
+        {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,        1,   10000.0f},
+        {true,  50.0f/14.0f*(512.0f/360.0f),          0,      -10,        0,       128,           0,        45,      625,   10000.0f}
     };
 
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
@@ -133,7 +131,7 @@ void ApplicationArduino::checkInput(){
     }
 	}
   m_limitGripperValue = analogRead(limitGripper);
-  this->printf("Limit Gripper pin[%d] Value: %d\r\n", limitGripper, m_limitGripperValue);
+  // this->printf("Limit Gripper pin[%d] Value: %d\r\n", limitGripper, m_limitGripperValue);
 }
 #define DEBUG_SERIAL
 int ApplicationArduino::readSerial(char* output, int length) {
@@ -265,13 +263,13 @@ void ApplicationArduino::moveDoneAction(int motorID)
 
 void ApplicationArduino::initHardwareTimer(float samplerate)
 {
-  enableHardwareTimer(false);
   // initialize timer1
   noInterrupts(); // disable all interrupts
   TCCR1A = 0;
   TCCR1B = 0;
   TCNT1 = 0;
   OCR1A = 16000000.0f / samplerate; // compare match register for IRQ with selected samplerate
+  TIMSK1 |= (1 << OCIE1A); // enable timer compare interrupt
   TCCR1B |= (1 << WGM12); // CTC mode
   TCCR1B |= (1 << CS10); // no prescaler
   interrupts(); // enable all interrupts
@@ -291,23 +289,23 @@ uint8_t ApplicationArduino::executePulseLoop(int motorID)
         switch (motorID)
         {
         case MOTOR_ARM1: {
-          nextStatePulse = executePulseStepper2Wires(statePulse, countPulse, numWaitPulse,stepXPin);
+          nextStatePulse = executePulseStepper2Wires(statePulse, countPulse, numWaitPulse,&PORTE,4);
         }
           break;
         case MOTOR_ARM2: {
-          nextStatePulse = executePulseStepper2Wires(statePulse, countPulse, numWaitPulse, stepYPin);
+          nextStatePulse = executePulseStepper2Wires(statePulse, countPulse, numWaitPulse, &PORTG,5);
         }
           break;
         case MOTOR_ARM5: {
           int direction = m_robot->currentDirection(motorID);
           nextStatePulse = executePulseStepper4Wires(statePulse, countPulse, numWaitPulse,
-            direction, miniStepperUpdownPin1, miniStepperUpdownPin2, miniStepperUpdownPin3, miniStepperUpdownPin4);
+            direction, &PORTC);
         }
           break;
         case MOTOR_CAPTURE: {
           int direction = m_robot->currentDirection(motorID);
           nextStatePulse = executePulseStepper4Wires(statePulse, countPulse, numWaitPulse,
-            direction, miniStepperGripperPin1, miniStepperGripperPin2, miniStepperGripperPin3, miniStepperGripperPin4);
+            direction, &PORTA);
         }
           break;
         default:
@@ -323,8 +321,9 @@ uint8_t ApplicationArduino::executePulseLoop(int motorID)
 
 void ApplicationArduino::enableHardwareTimer(bool enable)
 {
-  if(enable)
-    TIMSK1 |= (1 << OCIE1A); // enable timer compare interrupt
+  if(enable) {
+    initHardwareTimer(5000.0f);
+  }
   else
     TIMSK1 &= ~(1 << OCIE1A);
 }
@@ -335,7 +334,7 @@ void ApplicationArduino::resetPulse(int motorID)
   m_robot->updateStatePulse(motorID,STATE_COMMAND1);
 }
 uint8_t ApplicationArduino::executePulseStepper2Wires(uint8_t statePulse,
-  uint32_t countPulse, uint32_t numWaitPulse, int stepPin)
+  uint32_t countPulse, uint32_t numWaitPulse, volatile uint8_t* portRegister, int bit)
 {
 #ifdef DEBUG_PULSE
   printf("executePulseStepper2Wires statePulse=%d, countPulse=%d, numWaitPulse=%d\r\n",
@@ -344,8 +343,13 @@ uint8_t ApplicationArduino::executePulseStepper2Wires(uint8_t statePulse,
   uint8_t nextStatePulse = statePulse;
   switch(statePulse){
     case STATE_COMMAND1: {
-      digitalWrite(stepPin,HIGH);
+      // long start = micros();
+      // digitalWrite(stepPin,HIGH);
+      *portRegister |= (1 << bit);
       nextStatePulse = countPulse >= (uint32_t)(numWaitPulse/2-1) ? STATE_COMMAND2 : STATE_WAIT1;
+      // long duration = micros() - start;
+      // Serial.print("Command pulse 2wires duration (microseconds): ");
+      // Serial.println(duration);
 #ifdef DEBUG_PULSE
       Serial.print("STATE_COMMAND1 -> STATE_WAIT1\r\n");
 #endif
@@ -361,7 +365,8 @@ uint8_t ApplicationArduino::executePulseStepper2Wires(uint8_t statePulse,
     }
     break;
     case STATE_COMMAND2: {
-      digitalWrite(stepPin,LOW);
+      // digitalWrite(stepPin,LOW);
+      *portRegister &= ~(1 << bit);
       nextStatePulse = countPulse >= (uint32_t)(numWaitPulse-1) ? STATE_DONE : STATE_WAIT2;
 #ifdef DEBUG_PULSE
       Serial.print("STATE_COMMAND2 -> STATE_WAIT2\r\n");
@@ -387,16 +392,24 @@ uint8_t ApplicationArduino::executePulseStepper2Wires(uint8_t statePulse,
 }
 
 uint8_t ApplicationArduino::executePulseStepper4Wires(uint8_t statePulse, uint32_t countPulse, uint32_t numWaitPulse, 
-  int direction, int stepPin1, int stepPin2, int stepPin3, int stepPin4)
+  int direction, volatile uint8_t* portRegister)
 {
   uint8_t nextStatePulse = statePulse;
   switch(statePulse){
     case STATE_COMMAND1: {
-      digitalWrite(stepPin1, direction < 0 ? HIGH:HIGH);
-      digitalWrite(stepPin2, direction < 0 ? LOW :LOW );
-      digitalWrite(stepPin3, direction < 0 ? LOW :LOW );
-      digitalWrite(stepPin4, direction < 0 ? LOW :HIGH);
+      // long start = micros();
+      // Bits: 7 6 5 4 3 2 1 0
+      // Pins: - 28 - 26 - 24 - 22
+      // Value: B01010101 (Bits 0, 2, 4, and 6 are set)
+      // digitalWrite(stepPin1, direction < 0 ? HIGH:HIGH);
+      // digitalWrite(stepPin2, direction < 0 ? LOW :LOW );
+      // digitalWrite(stepPin3, direction < 0 ? LOW :LOW );
+      // digitalWrite(stepPin4, direction < 0 ? LOW :HIGH);
+      *portRegister = direction < 0? B00000001 : B01000001;
       nextStatePulse = STATE_WAIT1;
+      // long duration = micros() - start;
+      // Serial.print("Command pulse 4wires duration (microseconds): ");
+      // Serial.println(duration);
     }
     break;
     case STATE_WAIT1: {
@@ -404,10 +417,11 @@ uint8_t ApplicationArduino::executePulseStepper4Wires(uint8_t statePulse, uint32
     }
     break;
     case STATE_COMMAND2: {
-      digitalWrite(stepPin1, direction < 0 ? HIGH:LOW );
-      digitalWrite(stepPin2, direction < 0 ? HIGH:LOW );
-      digitalWrite(stepPin3, direction < 0 ? LOW :LOW );
-      digitalWrite(stepPin4, direction < 0 ? LOW :HIGH);
+      // digitalWrite(stepPin1, direction < 0 ? HIGH:LOW );
+      // digitalWrite(stepPin2, direction < 0 ? HIGH:LOW );
+      // digitalWrite(stepPin3, direction < 0 ? LOW :LOW );
+      // digitalWrite(stepPin4, direction < 0 ? LOW :HIGH);
+      *portRegister = direction < 0? B00000101 : B01000000;
       nextStatePulse = STATE_WAIT2;
     }
     break;
@@ -416,10 +430,11 @@ uint8_t ApplicationArduino::executePulseStepper4Wires(uint8_t statePulse, uint32
     }
     break;
     case STATE_COMMAND3: {
-      digitalWrite(stepPin1, direction < 0 ? LOW :LOW );
-      digitalWrite(stepPin2, direction < 0 ? HIGH:LOW );
-      digitalWrite(stepPin3, direction < 0 ? LOW :HIGH);
-      digitalWrite(stepPin4, direction < 0 ? LOW :HIGH);
+      // digitalWrite(stepPin1, direction < 0 ? LOW :LOW );
+      // digitalWrite(stepPin2, direction < 0 ? HIGH:LOW );
+      // digitalWrite(stepPin3, direction < 0 ? LOW :HIGH);
+      // digitalWrite(stepPin4, direction < 0 ? LOW :HIGH);
+      *portRegister = direction < 0? B00000100 : B01010000;
       nextStatePulse = STATE_WAIT3;
     }
     break;
@@ -428,10 +443,11 @@ uint8_t ApplicationArduino::executePulseStepper4Wires(uint8_t statePulse, uint32
     }
     break;
     case STATE_COMMAND4: {
-      digitalWrite(stepPin1, direction < 0 ? LOW :LOW );
-      digitalWrite(stepPin2, direction < 0 ? HIGH:LOW );
-      digitalWrite(stepPin3, direction < 0 ? HIGH:HIGH);
-      digitalWrite(stepPin4, direction < 0 ? LOW :LOW );
+      // digitalWrite(stepPin1, direction < 0 ? LOW :LOW );
+      // digitalWrite(stepPin2, direction < 0 ? HIGH:LOW );
+      // digitalWrite(stepPin3, direction < 0 ? HIGH:HIGH);
+      // digitalWrite(stepPin4, direction < 0 ? LOW :LOW );
+      *portRegister = direction < 0? B00010100 : B00010000;
       nextStatePulse = STATE_WAIT4;
     }
     break;
@@ -440,10 +456,11 @@ uint8_t ApplicationArduino::executePulseStepper4Wires(uint8_t statePulse, uint32
     }
     break;
     case STATE_COMMAND5: {
-      digitalWrite(stepPin1, direction < 0 ? LOW :LOW );
-      digitalWrite(stepPin2, direction < 0 ? LOW :HIGH);
-      digitalWrite(stepPin3, direction < 0 ? HIGH:HIGH);
-      digitalWrite(stepPin4, direction < 0 ? LOW :LOW );
+      // digitalWrite(stepPin1, direction < 0 ? LOW :LOW );
+      // digitalWrite(stepPin2, direction < 0 ? LOW :HIGH);
+      // digitalWrite(stepPin3, direction < 0 ? HIGH:HIGH);
+      // digitalWrite(stepPin4, direction < 0 ? LOW :LOW );
+      *portRegister = direction < 0? B00010000 : B00010100;
       nextStatePulse = STATE_WAIT5;
     }
     break;
@@ -452,10 +469,11 @@ uint8_t ApplicationArduino::executePulseStepper4Wires(uint8_t statePulse, uint32
     }
     break;
     case STATE_COMMAND6: {
-      digitalWrite(stepPin1, direction < 0 ? LOW :LOW );
-      digitalWrite(stepPin2, direction < 0 ? LOW :HIGH);
-      digitalWrite(stepPin3, direction < 0 ? HIGH:LOW );
-      digitalWrite(stepPin4, direction < 0 ? HIGH:LOW );
+      // digitalWrite(stepPin1, direction < 0 ? LOW :LOW );
+      // digitalWrite(stepPin2, direction < 0 ? LOW :HIGH);
+      // digitalWrite(stepPin3, direction < 0 ? HIGH:LOW );
+      // digitalWrite(stepPin4, direction < 0 ? HIGH:LOW );
+      *portRegister = direction < 0? B01010000 : B00000100;
       nextStatePulse = STATE_WAIT6;
     }
     break;
@@ -464,10 +482,11 @@ uint8_t ApplicationArduino::executePulseStepper4Wires(uint8_t statePulse, uint32
     }
     break;
     case STATE_COMMAND7: {
-      digitalWrite(stepPin1, direction < 0 ? LOW :HIGH);
-      digitalWrite(stepPin2, direction < 0 ? LOW :HIGH);
-      digitalWrite(stepPin3, direction < 0 ? LOW :LOW );
-      digitalWrite(stepPin4, direction < 0 ? HIGH:LOW );
+      // digitalWrite(stepPin1, direction < 0 ? LOW :HIGH);
+      // digitalWrite(stepPin2, direction < 0 ? LOW :HIGH);
+      // digitalWrite(stepPin3, direction < 0 ? LOW :LOW );
+      // digitalWrite(stepPin4, direction < 0 ? HIGH:LOW );
+      *portRegister = direction < 0? B01000000 : B00000101;
       nextStatePulse = STATE_WAIT7;
     }
     break;
@@ -476,10 +495,11 @@ uint8_t ApplicationArduino::executePulseStepper4Wires(uint8_t statePulse, uint32
     }
     break;
     case STATE_COMMAND8: {
-      digitalWrite(stepPin1, direction < 0 ? HIGH:HIGH);
-      digitalWrite(stepPin2, direction < 0 ? LOW :LOW );
-      digitalWrite(stepPin3, direction < 0 ? LOW :LOW );
-      digitalWrite(stepPin4, direction < 0 ? HIGH:LOW );
+      // digitalWrite(stepPin1, direction < 0 ? HIGH:HIGH);
+      // digitalWrite(stepPin2, direction < 0 ? LOW :LOW );
+      // digitalWrite(stepPin3, direction < 0 ? LOW :LOW );
+      // digitalWrite(stepPin4, direction < 0 ? HIGH:LOW );
+      *portRegister = direction < 0? B01000001 : B00000001;
       nextStatePulse = STATE_WAIT8;
     }
     break;
@@ -493,9 +513,9 @@ uint8_t ApplicationArduino::executePulseStepper4Wires(uint8_t statePulse, uint32
 
 ISR(TIMER1_COMPA_vect)
 {
-  app.executeSmoothMotionLoop(MOTOR_ARM1);
-  app.executeSmoothMotionLoop(MOTOR_ARM2);
-  app.executeSmoothMotionLoop(MOTOR_ARM5);
+  // app.executeSmoothMotionLoop(MOTOR_ARM1);
+  // app.executeSmoothMotionLoop(MOTOR_ARM2);
+  // app.executeSmoothMotionLoop(MOTOR_ARM5);
   app.executeSmoothMotionLoop(MOTOR_CAPTURE);
 }
 

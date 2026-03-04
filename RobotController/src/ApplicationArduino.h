@@ -25,9 +25,9 @@ public:
   uint8_t executePulseLoop(int motorID) override;
   void enableHardwareTimer(bool enable) override;
   void resetPulse(int motorID) override;
-  uint8_t executePulseStepper2Wires(uint8_t statePulse, uint32_t countPulse, uint32_t numWaitPulse, int stepPin);
+  uint8_t executePulseStepper2Wires(uint8_t statePulse, uint32_t countPulse, uint32_t numWaitPulse, volatile uint8_t* portRegister, int bit);
   uint8_t executePulseStepper4Wires(uint8_t statePulse, uint32_t countPulse, uint32_t numWaitPulse, int direction,
-    int stepPin1, int stepPin2, int stepPin3, int stepPin4);
+    volatile uint8_t* portRegister);
 
 private:
   void initHardwareTimer(float samplerate = 40000.0f);

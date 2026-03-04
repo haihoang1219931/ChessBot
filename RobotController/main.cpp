@@ -47,7 +47,7 @@
 ** $QT_END_LICENSE$
 **
 ****************************************************************************/
-
+#ifndef ARDUINO
 #include <QGuiApplication>
 #include <QLoggingCategory>
 #include <QQmlApplicationEngine>
@@ -66,3 +66,5 @@ int main(int argc, char *argv[])
             return -1;
     return app.exec();
 }
+#else
+#endif
