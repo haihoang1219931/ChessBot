@@ -1,5 +1,6 @@
 import QtQuick 2.12
 import QtQuick.Shapes 1.12
+import QtQuick.Controls 2.12
 
 Rectangle {
     id: root
@@ -10,7 +11,20 @@ Rectangle {
     Keys.onEscapePressed: root.goback()
     Column {
         anchors.fill: parent
+        ProgressBar {
+            height: 30
+            value: backend.progress / 100
+        }
 
+        Row {
+            Button { text: "Start"; onClicked: backend.startService() }
+            Button { text: "Stop"; onClicked: backend.stopService() }
+            Button {
+                text: checked ? "Resume" : "Pause"
+                checkable: true
+                onToggled: backend.togglePause(checked)
+            }
+        }
         // --- TOP OVERLAY SECTION ---
         Rectangle {
             id: topBar

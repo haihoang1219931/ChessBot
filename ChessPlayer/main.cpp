@@ -52,11 +52,13 @@
 #include <QLoggingCategory>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
-
+#include "ChessBot.h"
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
     QQmlApplicationEngine engine;
+    ChessBot backend; // Instantiate your class
+    engine.rootContext()->setContextProperty("backend", &backend);
     engine.load(QUrl(QStringLiteral("qrc:/qml/main.qml")));
     if (engine.rootObjects().isEmpty())
             return -1;

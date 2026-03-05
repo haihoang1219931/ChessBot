@@ -20,8 +20,12 @@ CONFIG += c++11
 #win32: LIBS += -lpthread
 
 SOURCES += \
+    ChessBot.cpp \
     main.cpp 
 
 RESOURCES += \
     gui/qml.qrc
 QML_DESIGNER_IMPORT_PATH =
+
+HEADERS += \
+    ChessBot.h

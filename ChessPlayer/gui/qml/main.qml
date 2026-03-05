@@ -24,7 +24,7 @@ ApplicationWindow {
         onCurrentItemChanged: if (currentItem) currentItem.forceActiveFocus()
 
         Component.onCompleted: {
-            stack.push(emoji)
+            stack.push(levelSelection)
         }
     }
     Component {

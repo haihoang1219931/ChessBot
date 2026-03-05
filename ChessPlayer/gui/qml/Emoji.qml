@@ -9,12 +9,13 @@ FocusScope {
     property string emotion: robotFace.listEmotion[emotionID]
     signal enterPressed()
     Keys.onLeftPressed: {
-        console.log("Left pressed");
+        console.log("Left btn pressed");
         emotionID++;
         emotionID = emotionID % 5;
     }
 
     Keys.onEnterPressed: {
+        console.log("Enter Pressed");
         robotFace.enterPressed();
     }
 
