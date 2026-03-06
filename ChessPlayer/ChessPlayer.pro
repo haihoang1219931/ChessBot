@@ -21,6 +21,7 @@ CONFIG += c++11
 
 SOURCES += \
     ChessBot.cpp \
+    SimpleChess.cpp \
     main.cpp 
 
 RESOURCES += \
@@ -28,4 +29,5 @@ RESOURCES += \
 QML_DESIGNER_IMPORT_PATH =
 
 HEADERS += \
-    ChessBot.h
+    ChessBot.h \
+    SimpleChess.h
