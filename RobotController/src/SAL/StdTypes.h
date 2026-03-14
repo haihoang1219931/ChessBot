@@ -121,6 +121,25 @@ typedef enum {
     ZONE_GUEST
 }ZONE_TYPE;
 
+typedef enum {
+    COMMAND_NORMAL,
+    COMMAND_LINE,
+    COMMAND_ARC,
+}COMMAND_TYPE;
+
+typedef enum {
+    COMMAND_STATE_INIT,
+    COMMAND_STATE_EXECUTE,
+    COMMAND_STATE_RECALCULATE,
+    COMMAND_STATE_DONE,
+}COMMAND_STATE;
+
+typedef enum {
+    COMMAND_SEQUENCE_STATE_INIT,
+    COMMAND_SEQUENCE_STATE_EXECUTE,
+    COMMAND_SEQUENCE_STATE_DONE,
+}COMMAND_SEQUENCE_STATE;
+
 typedef struct{
     float x;
     float y;
@@ -167,5 +186,13 @@ typedef struct {
 typedef struct {
     Joint jointSteps[MAX_MOTOR];
 } Move;
+
+typedef struct {
+    float x;
+    float y;
+    float updownAngle;
+    int captureStep;
+    int type;
+} Command;
 
 #endif // STDTYPES_H

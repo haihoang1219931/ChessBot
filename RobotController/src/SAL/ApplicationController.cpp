@@ -35,8 +35,8 @@ void ApplicationController::loop() {
         break;
     }
     case MACHINE_EXECUTE_COMMAND: {
-        updateInputState();
-        m_robot->loop();
+        if(executeCommandSequenceLoop() == COMMAND_SEQUENCE_STATE_DONE)
+            m_machineState = MACHINE_EXECUTE_COMMAND_DONE;
         break;
     }
     case MACHINE_EXECUTE_COMMAND_DONE: {
@@ -46,7 +46,110 @@ void ApplicationController::loop() {
     }
     }
 }
+int ApplicationController::executeCommandSequenceLoop()
+{
+    switch (m_commandSequenceState) {
+    case COMMAND_SEQUENCE_STATE_INIT:
+    {
+        m_commandSequenceState = COMMAND_SEQUENCE_STATE_EXECUTE;
+        m_commandState = COMMAND_STATE_INIT;
+    }
+        break;
+    case COMMAND_SEQUENCE_STATE_EXECUTE:
+    {
+        if(executeCommandLoop() == COMMAND_STATE_DONE) {
+            if(m_curCommandId >= m_numCommand - 1) {
+                m_commandSequenceState = COMMAND_SEQUENCE_STATE_DONE;
+            } else {
+                m_commandState = COMMAND_STATE_INIT;
+                m_curCommandId++;
+            }
+        }
+    }
+        break;
+    case COMMAND_SEQUENCE_STATE_DONE:
+    {
 
+    }
+        break;
+    }
+    return m_commandSequenceState;
+}
+int ApplicationController::executeCommandLoop()
+{
+    updateInputState();
+    int commandType = m_sequenceCommand[m_curCommandId].type;
+    switch (commandType) {
+    case COMMAND_NORMAL: {
+        executeCommandNormal();
+    }
+        break;
+    case COMMAND_LINE: {
+        executeCommandLine();
+    }
+        break;
+    }
+    return m_commandState;
+}
+
+int ApplicationController::executeCommandNormal()
+{
+    switch (m_commandState) {
+    case COMMAND_STATE_INIT: {
+        int jointSteps[MAX_MOTOR];
+        calculateJoints(m_sequenceCommand[m_curCommandId].y,
+                        m_sequenceCommand[m_curCommandId].x,
+                        m_sequenceCommand[m_curCommandId].updownAngle,
+                        jointSteps);
+        m_robot->setMoveTarget(jointSteps);
+        m_commandState = COMMAND_STATE_EXECUTE;
+    }
+        break;
+    case COMMAND_STATE_EXECUTE: {
+        if(m_robot->loop() == ROBOT_EXECUTE_DONE) {
+            m_commandState = COMMAND_STATE_DONE;
+        }
+    }
+        break;
+    case COMMAND_STATE_DONE: {
+
+    }
+        break;
+    }
+    return m_commandState;
+}
+
+int ApplicationController::executeCommandLine()
+{
+    switch (m_commandState) {
+    case COMMAND_STATE_INIT: {
+        int jointSteps[MAX_MOTOR];
+        Command lastedPoint =
+        calculateJoints(m_sequenceCommand[m_curCommandId].y,
+                        m_sequenceCommand[m_curCommandId].x,
+                        m_sequenceCommand[m_curCommandId].updownAngle,
+                        jointSteps);
+        m_robot->setMoveTarget(jointSteps);
+        m_commandState = COMMAND_STATE_EXECUTE;
+    }
+        break;
+    case COMMAND_STATE_EXECUTE: {
+        if(m_robot->loop() == ROBOT_EXECUTE_DONE) {
+            m_commandState = COMMAND_STATE_DONE;
+        }
+    }
+        break;
+    case COMMAND_STATE_RECALCULATE: {
+
+        m_commandState = COMMAND_STATE_INIT;
+    }
+        break;
+    case COMMAND_STATE_DONE: {
+
+    }
+        break;
+    }
+}
 
 void ApplicationController::storeButtonState(int btnID, bool pressed)
 {
@@ -367,7 +470,7 @@ void ApplicationController::calculateSequenceMove(int startCol, int startRow, in
     jointSteps[MOTOR_CAPTURE] = isCapture?80:0;
     // Inverse axis Oxy -> Oyx
     calculateJoints(targetPoint.y, targetPoint.x, upAngleInDegree, jointSteps);
-    m_robot->appendMove(jointSteps);
+    m_robot->setMoveTarget(jointSteps);
     initSequenceMove(MAX_MOTOR);
 
     if(m_machineState != MACHINE_EXECUTE_COMMAND)
@@ -438,7 +541,6 @@ void ApplicationController::calculateSequencePromotePiece(int startCol, int star
     appendSequenceMove(promotePiecePoint, stopPoint);
     appendSequenceMove(startPoint, dropPiecePoint);
     appendStandByMove();
-    appendStandByMove();
     initSequenceMove(MAX_MOTOR);
 }
 
@@ -459,14 +561,15 @@ void ApplicationController::calculateSequenceCastle(int kingCol, int kingRow,
         rookNewPoint = m_chessBoard->convertPoint(kingRow,kingCol+1);
     }
     clearSequenceMove();
-    appendSequenceMove(rookPoint, rookNewPoint);
+    appendSequenceMove(rookPoint, rookNewPoint, true);
     appendSequenceMove(kingPoint, kingNewPoint);
     appendStandByMove();
     initSequenceMove(MAX_MOTOR);
 }
 
 void ApplicationController::clearSequenceMove() {
-    m_robot->resetMoveSequene();
+    m_numCommand = 0;
+    m_curCommandId = 0;
 }
 void ApplicationController::appendSequenceMove(Point start, Point stop, bool straightMove) {
     if(!straightMove) {
@@ -476,16 +579,34 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
                               stop,stop,stop};
         int captureStep[6] = {0,80,80,
                                80,0,0};
-        int jointSteps[MAX_MOTOR];
         int numStep = 6;
         for(int seqStep = 0; seqStep < numStep; seqStep++)
         {
-            jointSteps[MOTOR_CAPTURE] = captureStep[seqStep];
-            // Inverse axis Oxy -> Oyx
-            calculateJoints(position[seqStep].y, position[seqStep].x, upAngles[seqStep], jointSteps);
-            m_robot->appendMove(jointSteps);
+            m_sequenceCommand[seqStep].x = position[seqStep].x;
+            m_sequenceCommand[seqStep].y = position[seqStep].y;
+            m_sequenceCommand[seqStep].updownAngle = upAngles[seqStep];
+            m_sequenceCommand[seqStep].captureStep = captureStep[seqStep];
+            m_sequenceCommand[seqStep].type = COMMAND_NORMAL;
+            m_numCommand++;
+        }
+    } else {
+        float upAngles[4] = {0.0f,45.0f,45.0f,
+                              0.0f};
+        Point position[4] = {start,start,stop,stop};
+        int captureStep[4] = {0,80,0,0};
+        int numStep = 4;
+        for(int seqStep = 0; seqStep < numStep; seqStep++)
+        {
+            m_sequenceCommand[seqStep].x = position[seqStep].x;
+            m_sequenceCommand[seqStep].y = position[seqStep].y;
+            m_sequenceCommand[seqStep].updownAngle = upAngles[seqStep];
+            m_sequenceCommand[seqStep].captureStep = captureStep[seqStep];
+            m_sequenceCommand[seqStep].type = seqStep != 2 ?
+                        COMMAND_NORMAL : COMMAND_LINE;
+            m_numCommand++;
         }
     }
+
 }
 void ApplicationController::appendStandByMove() {
     int jointSteps[MAX_MOTOR];
@@ -495,10 +616,10 @@ void ApplicationController::appendStandByMove() {
     jointSteps[MOTOR_ARM3] = 0;
     jointSteps[MOTOR_ARM4] = 0;
     jointSteps[MOTOR_ARM5] = m_robot->angleToStep(MOTOR_ARM5,0);
-    m_robot->appendMove(jointSteps);
+
 }
 void ApplicationController::initSequenceMove(int numberOfJoints) {
-    m_robot->moveSequence(numberOfJoints);
+    m_robot->moveToTarget(numberOfJoints);
 }
 
 void ApplicationController::executeSmoothMotionLoop(int motorID)

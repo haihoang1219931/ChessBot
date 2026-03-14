@@ -33,25 +33,31 @@ void Robot::setState(ROBOT_STATE newState) {
     }
 }
 
-void Robot::loop() {
+int Robot::loop() {
     m_elapsedTime = m_app->getSystemTime() - m_startTime;
 #ifdef DEBUG_ROBOT
     m_app->printf("Robot time[%ld]\r\n", m_elapsedTime);
 #endif
     switch(m_state) {
     case ROBOT_EXECUTE_GO_HOME: {
-        executeGohome();
+        if (executeGohome() == ROBOT_MOVE_DONE)
+        {
+            m_state = ROBOT_EXECUTE_DONE;
+        }
     }
         break;
     case ROBOT_EXECUTE_SEQUENCE: {
-        executeMoveSequence();
+        if (executeMoveSequence() == ROBOT_MOVE_DONE)
+        {
+            m_state = ROBOT_EXECUTE_DONE;
+        }
     }
         break;
     case ROBOT_EXECUTE_DONE: {
-        m_app->setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
     }
         break;
     }
+    return m_state;
 }
 
 void Robot::initDirection(int motorID, int direction)
@@ -62,7 +68,7 @@ void Robot::initDirection(int motorID, int direction)
 
 void Robot::requestGoHome(int motorID) {
     m_app->printf("GO HOME\r\n");
-    // m_app->enableHardwareTimer(false);
+     m_app->enableHardwareTimer(false);
     m_requestMotorID = motorID;
     int startID = motorID == MAX_MOTOR ? 0 : motorID;
     int stopID = motorID == MAX_MOTOR ? MAX_MOTOR : motorID;
@@ -79,10 +85,10 @@ void Robot::requestGoHome(int motorID) {
     }
     m_startTime = m_app->getSystemTime();
     setState(ROBOT_EXECUTE_GO_HOME);
-    // m_app->enableHardwareTimer(true);
+     m_app->enableHardwareTimer(true);
 }
 
-void Robot::executeGohome() {
+int Robot::executeGohome() {
     bool allMotorsAtHome = true;
 #ifdef DEBUG_ROBOT
     m_app->printf("Robot executeGohome M[%d]\r\n",m_requestMotorID);
@@ -115,8 +121,8 @@ void Robot::executeGohome() {
                       motor,m_motorParamList[motor].currentStep);
         }
         m_app->harwareStop(m_requestMotorID);
-        setState(ROBOT_EXECUTE_DONE);
     }
+    return allMotorsAtHome ? m_state : ROBOT_MOVE_DONE;
 }
 
 void Robot::requestGoPosition(int motorID, int targetStep, int stepTime, bool isRelativeMove)
@@ -266,26 +272,18 @@ void Robot::updateCurrentStep(int motorID)
     m_motorParamList[motorID].currentStep += m_motorParamList[motorID].direction;
 }
 
-void Robot::resetMoveSequene()
-{
-    m_curMove = 0;
-    m_numMove = 0;
-}
-
-void Robot::appendMove(int* jointSteps)
+void Robot::setMoveTarget(int* jointSteps)
 {
 //    memcpy(m_moveSequence[m_numMove].jointSteps,jointSteps,sizeof(int)*MAX_MOTOR);
     for(int i=0; i< MAX_MOTOR; i++) {
         if(!m_motorParamList[i].active) continue;
-        m_moveSequence[m_numMove].jointSteps[i].steps = jointSteps[i];
-        m_app->printf("Robot::appendMove[%d] M[%d] step[%d]\r\n",
-                      m_numMove,
-                      i,m_moveSequence[m_numMove].jointSteps[i].steps);
+        m_moveTarget.jointSteps[i].steps = jointSteps[i];
+        m_app->printf("Robot::setMoveTarget M[%d] step[%d]\r\n",
+                      i,m_moveTarget.jointSteps[i].steps);
     }
-    m_numMove++;
 }
 
-void Robot::moveSequence(int motorID)
+void Robot::moveToTarget(int motorID)
 {
 #ifdef DEBUG_ROBOT
     m_app->printf("move sequence\r\n");
@@ -302,35 +300,41 @@ uint8_t Robot::pulseLoop(int motorID)
     return newStatePulse;
 }
 
-void Robot::executeMoveSequence()
+int Robot::executeMoveSequence()
 {
     switch (m_sequenceState) {
         case ROBOT_MOVE_EXECUTE_INIT:{
             initMove(MOTOR_ARM1, MOTOR_ARM5);
+            m_sequenceState = ROBOT_MOVE_EXECUTE_CHECK_RESULT;
         }
             break;
         case ROBOT_MOVE_EXECUTE_CHECK_RESULT: {
-            gotoTarget();
+            if(gotoTarget() == ROBOT_MOVE_DONE) {
+                m_sequenceState = ROBOT_MOVE_CAPTURE_INIT;
+            }
         }
             break;
         case ROBOT_MOVE_CAPTURE_INIT: {
             initMove(MOTOR_CAPTURE, MOTOR_CAPTURE);
+            m_sequenceState = ROBOT_MOVE_CAPTURE_CHECK_RESULT;
         }
         case ROBOT_MOVE_CAPTURE_CHECK_RESULT: {
-            capture();
+            if(capture() == ROBOT_MOVE_DONE) {
+                m_sequenceState = ROBOT_MOVE_DONE;
+            }
         }
             break;
         case ROBOT_MOVE_DONE: {
-            setState(ROBOT_EXECUTE_DONE);
+            m_state = ROBOT_EXECUTE_DONE;
         }
             break;
     }
+    return m_sequenceState;
 }
 
 void Robot::initMove(int motorIDFirst, int motorIDLast)
 {
-    m_app->printf("============= Init Move [%02d/%02d] =============\r\n",
-                  m_curMove, m_numMove);
+    m_app->printf("============= Init Move =============\r\n");
     m_motorIDFirst = motorIDFirst;
     m_motorIDLast = motorIDLast;
     m_app->enableHardwareTimer(false);              
@@ -339,7 +343,7 @@ void Robot::initMove(int motorIDFirst, int motorIDLast)
     float maxTime = 0;
     for(int i=motorIDFirst; i<= motorIDLast; i++) {
         if(!m_motorParamList[i].active) continue;
-        m_motorParamList[i].targetStep = m_moveSequence[m_curMove].jointSteps[i].steps;
+        m_motorParamList[i].targetStep = m_moveTarget.jointSteps[i].steps;
         m_motorParamList[i].startStep = m_motorParamList[i].currentStep;
         m_motorParamList[i].direction = (m_motorParamList[i].targetStep > m_motorParamList[i].currentStep) ? 1 : -1;   
         float numStep = (float)abs(m_motorParamList[i].targetStep - m_motorParamList[i].currentStep);
@@ -347,7 +351,7 @@ void Robot::initMove(int motorIDFirst, int motorIDLast)
         if(time > maxTime) maxTime = time;
         m_app->printf("Motor[%d] numStep[%f][%d->%d] maxSpeed[%d] time[%f] => Max[%f]\r\n",
                       i,
-                      numStep, m_motorParamList[i].currentStep, m_moveSequence[m_curMove].jointSteps[i].steps,
+                      numStep, m_motorParamList[i].currentStep, m_moveTarget.jointSteps[i].steps,
                       m_motorParamList[i].maxSpeed, time,
                       maxTime);
     }
@@ -373,12 +377,9 @@ void Robot::initMove(int motorIDFirst, int motorIDLast)
         m_app->initDirection(i, m_motorParamList[i].direction);
     }
     m_app->enableHardwareTimer(true);
-
-    m_sequenceState = motorIDFirst != MOTOR_CAPTURE ?
-                ROBOT_MOVE_EXECUTE_CHECK_RESULT:ROBOT_MOVE_CAPTURE_CHECK_RESULT;
 }
 
-void Robot::gotoTarget()
+int Robot::gotoTarget()
 {
     bool allMotorsFinished = true;
     for(int motor = m_motorIDFirst; motor<= m_motorIDLast; motor++)
@@ -391,24 +392,16 @@ void Robot::gotoTarget()
     }
     if(allMotorsFinished) {
         m_app->printf("======All motor finished\r\n");
-        m_sequenceState = ROBOT_MOVE_CAPTURE_INIT;
     }
+    return allMotorsFinished? m_sequenceState : ROBOT_MOVE_DONE;
 }
 
-void Robot::capture()
+int Robot::capture()
 {
     bool captureDone = true;
     if(!m_motorParamList[MOTOR_CAPTURE].active)
-        m_sequenceState = ROBOT_MOVE_DONE;
+        return ROBOT_MOVE_DONE;
     if(m_motorParamList[MOTOR_CAPTURE].currentStep != m_motorParamList[MOTOR_CAPTURE].targetStep)
         captureDone = false;
-    if(captureDone) {
-        if(m_curMove < m_numMove-1) {
-            m_curMove++;
-            m_sequenceState = ROBOT_MOVE_EXECUTE_INIT;
-        } else {
-            m_app->enableHardwareTimer(false);
-            m_sequenceState = ROBOT_MOVE_DONE;
-        }
-    }
+    return captureDone ? m_sequenceState : ROBOT_MOVE_DONE;
 }

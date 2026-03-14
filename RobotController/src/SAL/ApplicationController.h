@@ -30,6 +30,10 @@ public:
     bool inverseKinematic(float x, float y,
                            float a1, float a2,float* p1, float* p2);
     void forwardKinematic(float a1, float a2, float p1, float p2, float* x, float* y);
+    int executeCommandSequenceLoop();
+    int executeCommandLoop();
+    int executeCommandNormal();
+    int executeCommandLine();
     void goToHome(int motorID);
     void goToReadyPosition();
     void executeSequence(MOVE_TYPE moveType,
@@ -77,6 +81,11 @@ public:
     Robot* m_robot;
     ChessBoard* m_chessBoard;
     CommandReader* m_commandReader;
+    Command m_sequenceCommand[MAX_MOVE_SEQUENCE];
+    int m_numCommand;
+    int m_curCommandId;
+    int m_commandState;
+    int m_commandSequenceState;
     int m_comCommandID = 0;
     int m_appTimer;
 };

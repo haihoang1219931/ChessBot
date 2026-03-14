@@ -11,20 +11,19 @@ public:
     Robot(ApplicationController* app);
     void setMotorParam(int motorID, JointParam param);
  
-    void loop();
+    int loop();
     void setState(ROBOT_STATE newState);
     void initDirection(int motorID, int direction);
     void requestGoHome(int motorID = MAX_MOTOR);
-    void executeGohome();
+    int executeGohome();
     void requestGoPosition(int motorID, int targetStep, int stepTime, bool isRelativeMove);
-    void resetMoveSequene();
-    void appendMove(int* jointSteps);
-    void moveSequence(int motorID = MAX_MOTOR);
+    void setMoveTarget(int* jointSteps);
+    void moveToTarget(int motorID = MAX_MOTOR);
     uint8_t pulseLoop(int motorID);
-    void executeMoveSequence();
+    int executeMoveSequence();
     void initMove(int motorIDFirst, int motorIDLast);
-    void gotoTarget();
-    void capture();
+    int gotoTarget();
+    int capture();
     long elapsedTime();
     bool isLimitReached(int motorID,
                             MOTOR_LIMIT_TYPE limitType);
@@ -57,11 +56,9 @@ private:
     JointParam m_motorParamList[MAX_MOTOR];
     ROBOT_STATE m_state;
     ROBOT_SEQUENCE_STATE m_sequenceState;
-    Move m_moveSequence[MAX_MOVE_SEQUENCE];
+    Move m_moveTarget;
     int m_motorIDFirst;
     int m_motorIDLast;
-    int m_curMove;
-    int m_numMove;
     int m_numMotor;
     int m_requestMotorID;
     long m_startTime;
