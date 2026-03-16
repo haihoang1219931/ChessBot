@@ -32,7 +32,7 @@ void ApplicationSim::initRobot()
     m_chessBoard->setChessBoardPosY(100);
     m_chessBoard->setChessBoardSize(31*8);
     m_chessBoard->setDropZoneSpace(31);
-
+    m_minSpace = 2;
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|max step/s|frequency
         {true,  1.0f/1.0f,                            0,     100,        0,      1,        0,       250,           76,      5000.0f},

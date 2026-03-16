@@ -27,24 +27,29 @@ ApplicationController::~ApplicationController() {
 void ApplicationController::loop() {
     m_appTimer++;
 #ifdef DEBUG_APP
-    this->printf("APP Timer[%d]\r\n",m_appTimer);
-#endif    
+    this->printf("APP Timer[%d] m_machineState[%d]\r\n",m_appTimer,m_machineState);
+#endif
     switch(m_machineState) {
     case MACHINE_WAIT_COMMAND: {
         m_commandReader->loop();
         break;
     }
+    case MACHINE_EXECUTE_HOME: {
+        if(m_robot->loop() == ROBOT_MOVE_DONE)
+            m_machineState = MACHINE_EXECUTE_COMMAND_DONE;
+        break;
+    }
     case MACHINE_EXECUTE_COMMAND: {
         if(executeCommandSequenceLoop() == COMMAND_SEQUENCE_STATE_DONE)
-            m_machineState = MACHINE_EXECUTE_COMMAND_DONE;
+            m_machineState = MACHINE_EXECUTE_COMMAND_DONE;        
         break;
     }
     case MACHINE_EXECUTE_COMMAND_DONE: {
         this->printf("_%04d DON",m_comCommandID);
-        setMachineState(MACHINE_WAIT_COMMAND);
+        setMachineState(MACHINE_WAIT_COMMAND);        
         break;
     }
-    }
+}
 }
 int ApplicationController::executeCommandSequenceLoop()
 {
@@ -102,10 +107,10 @@ int ApplicationController::executeCommandNormal()
                         m_sequenceCommand[m_curCommandId].updownAngle,
                         jointSteps);
         m_robot->setMoveTarget(jointSteps);
-        m_commandState = COMMAND_STATE_EXECUTE;
+        m_commandState = COMMAND_STATE_EXECUTE_THEN_DONE;
     }
         break;
-    case COMMAND_STATE_EXECUTE: {
+    case COMMAND_STATE_EXECUTE_THEN_DONE: {
         if(m_robot->loop() == ROBOT_EXECUTE_DONE) {
             m_commandState = COMMAND_STATE_DONE;
         }
@@ -125,11 +130,15 @@ int ApplicationController::executeCommandLine()
     case COMMAND_STATE_INIT: {
         int jointSteps[MAX_MOTOR];
         Point curPos = currentPos();
+        Point tarPos;
+        tarPos.x = m_sequenceCommand[m_curCommandId].x;
+        tarPos.y = m_sequenceCommand[m_curCommandId].y;
+
         Command nextPoint;
         if(distance(curPos.x,curPos.y,
                     m_sequenceCommand[m_curCommandId].x,
                     m_sequenceCommand[m_curCommandId].y) > m_minSpace) {
-            nextPoint = calculateNextPointInLine();
+            nextPoint = calculateNextPointInLine(curPos,tarPos);
             m_commandState = COMMAND_STATE_EXECUTE_THEN_RECAL;
         } else {
             nextPoint.x = m_sequenceCommand[m_curCommandId].x;
@@ -467,8 +476,8 @@ void ApplicationController::goToHome(int motorID)
 {
     specificPlatformGohome(motorID);
     m_robot->requestGoHome(motorID);
-    if(m_machineState != MACHINE_EXECUTE_COMMAND)
-        setMachineState(MACHINE_EXECUTE_COMMAND);
+    if(m_machineState != MACHINE_EXECUTE_HOME)
+        setMachineState(MACHINE_EXECUTE_HOME);
 }
 
 void ApplicationController::goToReadyPosition() {
@@ -515,6 +524,7 @@ void ApplicationController::executeSequence(
 
 void ApplicationController::calculateSequenceMove(int startCol, int startRow, int upAngleInDegree, bool isCapture)
 {
+    printf("ApplicationController::calculateSequenceMove\r\n");
     Point targetPoint = m_chessBoard->convertPoint(startRow,startCol);
     int jointSteps[MAX_MOTOR];
     clearSequenceMove();
@@ -617,6 +627,13 @@ void ApplicationController::calculateSequenceCastle(int kingCol, int kingRow,
     appendSequenceMove(kingPoint, kingNewPoint);
     appendStandByMove();
     initSequenceMove(MAX_MOTOR);
+}
+
+float ApplicationController::distance(float x1, float y1, float x2, float y2)
+{
+    float dx = x2-x1;
+    float dy = y2-y1;
+    return sqrt(dx*dx + dy*dy);
 }
 
 void ApplicationController::clearSequenceMove() {

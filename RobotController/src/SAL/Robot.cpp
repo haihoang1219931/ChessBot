@@ -85,7 +85,7 @@ void Robot::requestGoHome(int motorID) {
     }
     m_startTime = m_app->getSystemTime();
     setState(ROBOT_EXECUTE_GO_HOME);
-     m_app->enableHardwareTimer(true);
+    m_app->enableHardwareTimer(true);
 }
 
 int Robot::executeGohome() {
@@ -122,7 +122,7 @@ int Robot::executeGohome() {
         }
         m_app->harwareStop(m_requestMotorID);
     }
-    return allMotorsAtHome ? m_state : ROBOT_MOVE_DONE;
+    return allMotorsAtHome ? ROBOT_MOVE_DONE : m_state;
 }
 
 void Robot::requestGoPosition(int motorID, int targetStep, int stepTime, bool isRelativeMove)
