@@ -28,9 +28,9 @@ public:
     bool isLimitReached(int motorID,
                             MOTOR_LIMIT_TYPE limitType);
     int angleToStep(int motorID, float angle);
-    float stepToAngle(int motorID, int step);
+    float stepToAngle(int motorID, int step, int angleType = ANGLE_DEGREE);
     void currentStep(int* listCurrentStep, int* numMotor);
-    void currentAngle(float* listCurrentStep, int* numMotor);
+    void currentAngle(float* listCurrentAngle, int* numMotor, int angleType = ANGLE_DEGREE);
     void armLength(float* listArmLength, int* numMotor);
     int currentDirection(int motorID);
     

@@ -151,9 +151,10 @@ bool Robot::isLimitReached(int motorID,
     return m_app->isLimitReached(motorID, limitType);
 }
 
-float Robot::stepToAngle(int motorID, int step)
+float Robot::stepToAngle(int motorID, int step, int angleType)
 {
-    return (float)step / m_motorParamList[motorID].scale;
+    return (float)step / m_motorParamList[motorID].scale *
+            (angleType == ANGLE_DEGREE ? 1.0f : M_PI/180.0f);
 }
 void Robot::currentStep(int* listCurrentStep, int* numMotor)
 {
@@ -164,12 +165,12 @@ void Robot::currentStep(int* listCurrentStep, int* numMotor)
     }
 }
 
-void Robot::currentAngle(float* listCurrentAngle, int* numMotor)
+void Robot::currentAngle(float* listCurrentAngle, int* numMotor, int angleType)
 {
     *numMotor = MAX_MOTOR;
     for(int i=MOTOR_CAPTURE; i< MAX_MOTOR; i++)
     {
-        listCurrentAngle[i] = stepToAngle(i, m_motorParamList[i].currentStep);
+        listCurrentAngle[i] = stepToAngle(i, m_motorParamList[i].currentStep,angleType);
     }
 }
 

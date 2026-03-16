@@ -124,24 +124,38 @@ int ApplicationController::executeCommandLine()
     switch (m_commandState) {
     case COMMAND_STATE_INIT: {
         int jointSteps[MAX_MOTOR];
-        Command lastedPoint =
-        calculateJoints(m_sequenceCommand[m_curCommandId].y,
-                        m_sequenceCommand[m_curCommandId].x,
-                        m_sequenceCommand[m_curCommandId].updownAngle,
+        Point curPos = currentPos();
+        Command nextPoint;
+        if(distance(curPos.x,curPos.y,
+                    m_sequenceCommand[m_curCommandId].x,
+                    m_sequenceCommand[m_curCommandId].y) > m_minSpace) {
+            nextPoint = calculateNextPointInLine();
+            m_commandState = COMMAND_STATE_EXECUTE_THEN_RECAL;
+        } else {
+            nextPoint.x = m_sequenceCommand[m_curCommandId].x;
+            nextPoint.y = m_sequenceCommand[m_curCommandId].y;
+            nextPoint.updownAngle = m_sequenceCommand[m_curCommandId].updownAngle;
+            nextPoint.captureStep = m_sequenceCommand[m_curCommandId].captureStep;
+            m_commandState = COMMAND_STATE_EXECUTE_THEN_DONE;
+        }
+
+        calculateJoints(nextPoint.y,
+                        nextPoint.x,
+                        nextPoint.updownAngle,
                         jointSteps);
         m_robot->setMoveTarget(jointSteps);
-        m_commandState = COMMAND_STATE_EXECUTE;
     }
         break;
-    case COMMAND_STATE_EXECUTE: {
+    case COMMAND_STATE_EXECUTE_THEN_RECAL: {
         if(m_robot->loop() == ROBOT_EXECUTE_DONE) {
-            m_commandState = COMMAND_STATE_DONE;
+            m_commandState = COMMAND_STATE_INIT;
         }
     }
         break;
-    case COMMAND_STATE_RECALCULATE: {
-
-        m_commandState = COMMAND_STATE_INIT;
+    case COMMAND_STATE_EXECUTE_THEN_DONE: {
+        if(m_robot->loop() == ROBOT_EXECUTE_DONE) {
+            m_commandState = COMMAND_STATE_DONE;
+        }
     }
         break;
     case COMMAND_STATE_DONE: {
@@ -409,6 +423,44 @@ void ApplicationController::calculateJoints(float xPos, float yPos, float upAngl
     jointSteps[MOTOR_ARM5] = m_robot->angleToStep(
                 MOTOR_ARM5,
                 upAngleInDegree);
+}
+
+Command ApplicationController::calculateNextPointInLine(Point currPos, Point targetPos)
+{
+    Command nextPoint;
+    float dx = targetPos.x - currPos.x;
+    float dy = targetPos.y - currPos.y;
+    float angle = int(dx*10) == 0 ? M_PI_2:atan(dy/dx);
+    nextPoint.x = targetPos.x + m_minSpace * cos(angle);
+    nextPoint.y = targetPos.y + m_minSpace * sin(angle);
+    return nextPoint;
+}
+
+Point ApplicationController::currentPos()
+{
+    Point resultPos;
+    float a1 = m_robot->armLength(MOTOR_ARM1);
+//    float a2, a21, a22;
+//    float q2Offset = 0;
+    float listCurrentAngle[MAX_MOTOR];
+    int numMotor;
+    m_robot->currentAngle(listCurrentAngle,&numMotor);
+//    a21 = m_robot->armLength(MOTOR_ARM2);
+//    a22 = m_robot->armLength(MOTOR_ARM3) +
+//            m_robot->armLength(MOTOR_ARM4) *
+//            sin(listCurrentAngle[MOTOR_ARM5]);
+//    a2 = sqrt(a21*a21+a22*a22-2.0f*a21*a22*
+//            cos(listCurrentAngle[MOTOR_ARM3]));
+    float a2 = 0;
+    float q2Offset = 0;
+    calculatePolygonEdge(listCurrentAngle[MOTOR_ARM5],&a2,&q2Offset);
+    float xPosFK = 0, yPosFK = 0;
+    float q1 = listCurrentAngle[MOTOR_ARM1];
+    float q2 = 180.0f - q2Offset/M_PI*180.0f;
+    forwardKinematic(a1,a2,q1,q2,&xPosFK,&yPosFK);
+    resultPos.x = xPosFK;
+    resultPos.y = yPosFK;
+    return resultPos;
 }
 
 void ApplicationController::goToHome(int motorID)

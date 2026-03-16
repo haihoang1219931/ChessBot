@@ -30,6 +30,11 @@
 #endif
 
 typedef enum {
+    ANGLE_RAD,
+    ANGLE_DEGREE
+}ANGLE_TYPE;
+
+typedef enum {
     MOTOR_EXECUTE_WAIT_COMMAND,
     MOTOR_EXECUTE_INCREASE_SPEED,
     MOTOR_EXECUTE_CRUISE_SPEED,
@@ -129,8 +134,8 @@ typedef enum {
 
 typedef enum {
     COMMAND_STATE_INIT,
-    COMMAND_STATE_EXECUTE,
-    COMMAND_STATE_RECALCULATE,
+    COMMAND_STATE_EXECUTE_THEN_RECAL,
+    COMMAND_STATE_EXECUTE_THEN_DONE,
     COMMAND_STATE_DONE,
 }COMMAND_STATE;
 
@@ -143,6 +148,7 @@ typedef enum {
 typedef struct{
     float x;
     float y;
+    float z;
 }Point;
 
 typedef struct {

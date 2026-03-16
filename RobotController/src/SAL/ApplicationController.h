@@ -53,6 +53,9 @@ public:
                                  int rookCol, int rookRow);
     void calculatePolygonEdge(float upAngleInDegree, float* edge, float* angle);
     void calculateJoints(float xPos, float yPos, float upAngleInDegree, int* jointSteps);
+    Command calculateNextPointInLine(Point currPos, Point targetPos);
+    Point currentPos();
+    float distance(float x1, float y1, float x2, float y2);
     void clearSequenceMove();
     void appendSequenceMove(Point start, Point stop, bool straightMove = false);
     void appendStandByMove();
@@ -88,6 +91,7 @@ public:
     int m_commandSequenceState;
     int m_comCommandID = 0;
     int m_appTimer;
+    float m_minSpace;
 };
 
 #endif // APPLICATIONCONTROLLER_H
