@@ -68,10 +68,10 @@ void Robot::initDirection(int motorID, int direction)
 
 void Robot::requestGoHome(int motorID) {
     m_app->printf("GO HOME\r\n");
-     m_app->enableHardwareTimer(false);
+    m_app->enableHardwareTimer(false);
     m_requestMotorID = motorID;
     int startID = motorID == MAX_MOTOR ? 0 : motorID;
-    int stopID = motorID == MAX_MOTOR ? MAX_MOTOR : motorID;
+    int stopID = motorID == MAX_MOTOR ? MAX_MOTOR-1 : motorID;
     m_app->printf("Request go home from [%d-%d]\r\n",startID,stopID);
     for(int motor=startID; motor<= stopID; motor++)
     {
@@ -85,6 +85,7 @@ void Robot::requestGoHome(int motorID) {
     }
     m_startTime = m_app->getSystemTime();
     setState(ROBOT_EXECUTE_GO_HOME);
+    m_app->printf("Request go home from [%d-%d] done\r\n",startID,stopID);
     m_app->enableHardwareTimer(true);
 }
 
@@ -336,6 +337,7 @@ int Robot::executeMoveSequence()
 void Robot::initMove(int motorIDFirst, int motorIDLast)
 {
     m_app->printf("============= Init Move =============\r\n");
+    m_app->printf("Move motor[%d-%d]\r\n",motorIDFirst,motorIDLast);
     m_motorIDFirst = motorIDFirst;
     m_motorIDLast = motorIDLast;
     m_app->enableHardwareTimer(false);              
@@ -394,7 +396,7 @@ int Robot::gotoTarget()
     if(allMotorsFinished) {
         m_app->printf("======All motor finished\r\n");
     }
-    return allMotorsFinished? m_sequenceState : ROBOT_MOVE_DONE;
+    return allMotorsFinished? ROBOT_MOVE_DONE:m_sequenceState;
 }
 
 int Robot::capture()
@@ -404,5 +406,8 @@ int Robot::capture()
         return ROBOT_MOVE_DONE;
     if(m_motorParamList[MOTOR_CAPTURE].currentStep != m_motorParamList[MOTOR_CAPTURE].targetStep)
         captureDone = false;
-    return captureDone ? m_sequenceState : ROBOT_MOVE_DONE;
+    if(captureDone) {
+        m_app->printf("======Capture finished\r\n");
+    }
+    return captureDone ? ROBOT_MOVE_DONE:m_sequenceState;
 }

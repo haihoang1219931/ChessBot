@@ -34,7 +34,8 @@ void ApplicationController::loop() {
         m_commandReader->loop();
         break;
     }
-    case MACHINE_EXECUTE_HOME: {
+    case MACHINE_EXECUTE_HOME:
+    case MACHINE_EXECUTE_POSITION: {
         if(m_robot->loop() == ROBOT_MOVE_DONE)
             m_machineState = MACHINE_EXECUTE_COMMAND_DONE;
         break;
@@ -476,16 +477,20 @@ void ApplicationController::goToHome(int motorID)
 {
     specificPlatformGohome(motorID);
     m_robot->requestGoHome(motorID);
-    if(m_machineState != MACHINE_EXECUTE_HOME)
-        setMachineState(MACHINE_EXECUTE_HOME);
+    setMachineState(MACHINE_EXECUTE_HOME);
 }
 
 void ApplicationController::goToReadyPosition() {
-    clearSequenceMove();
-    appendStandByMove();
-    initSequenceMove(MAX_MOTOR);
-    if(m_machineState != MACHINE_EXECUTE_COMMAND)
-        setMachineState(MACHINE_EXECUTE_COMMAND);
+    int jointSteps[MAX_MOTOR];
+    jointSteps[MOTOR_CAPTURE] = 0;
+    jointSteps[MOTOR_ARM1] = m_robot->angleToStep(MOTOR_ARM1,0);
+    jointSteps[MOTOR_ARM2] = m_robot->angleToStep(MOTOR_ARM2,90+m_robot->homeAngle(MOTOR_ARM2));
+    jointSteps[MOTOR_ARM3] = 0;
+    jointSteps[MOTOR_ARM4] = 0;
+    jointSteps[MOTOR_ARM5] = m_robot->angleToStep(MOTOR_ARM5,0);
+    m_robot->setMoveTarget(jointSteps);
+    m_robot->moveToTarget(MAX_MOTOR);
+    setMachineState(MACHINE_EXECUTE_POSITION);
 }
 
 void ApplicationController::executeSequence(
@@ -518,8 +523,7 @@ void ApplicationController::executeSequence(
         break;
     }
 
-    if(m_machineState != MACHINE_EXECUTE_COMMAND)
-        setMachineState(MACHINE_EXECUTE_COMMAND);
+    setMachineState(MACHINE_EXECUTE_COMMAND);
 }
 
 void ApplicationController::calculateSequenceMove(int startCol, int startRow, int upAngleInDegree, bool isCapture)
@@ -535,8 +539,7 @@ void ApplicationController::calculateSequenceMove(int startCol, int startRow, in
     m_robot->setMoveTarget(jointSteps);
     initSequenceMove(MAX_MOTOR);
 
-    if(m_machineState != MACHINE_EXECUTE_COMMAND)
-        setMachineState(MACHINE_EXECUTE_COMMAND);
+    setMachineState(MACHINE_EXECUTE_COMMAND);
 }
 
 void ApplicationController::calculateSequenceMoveNormal(int startCol, int startRow,
