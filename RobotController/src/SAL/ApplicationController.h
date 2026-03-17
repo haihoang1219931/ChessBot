@@ -58,7 +58,6 @@ public:
     float distance(float x1, float y1, float x2, float y2);
     void clearSequenceMove();
     void appendSequenceMove(Point start, Point stop, bool straightMove = false);
-    void appendStandByMove();
     void initSequenceMove(int numberOfJoints);
     void executeSmoothMotionLoop(int motorID);
     virtual void initRobot() = 0;
