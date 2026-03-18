@@ -46,16 +46,6 @@ class SmoothMotion {
 
     int m_targetStep;
     int m_targetDirection;
-    
-
-    // pin numbers
-    
-    int m_enablePin;
-    int m_dirPin;
-    int m_stepPin1;
-    int m_stepPin2;
-    int m_stepPin3;
-    int m_stepPin4;
 
     uint8_t m_moveType;
     uint8_t m_statePulse;

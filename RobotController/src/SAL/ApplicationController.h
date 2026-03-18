@@ -84,11 +84,11 @@ public:
     ChessBoard* m_chessBoard;
     CommandReader* m_commandReader;
     Command m_sequenceCommand[MAX_MOVE_SEQUENCE];
-    int m_numCommand;
-    int m_curCommandId;
-    int m_commandState;
-    int m_commandSequenceState;
-    int m_comCommandID = 0;
+    uint8_t m_numCommand;
+    uint8_t m_curCommandId;
+    uint8_t m_commandState;
+    uint8_t m_commandSequenceState;
+    uint8_t m_comCommandID = 0;
     int m_appTimer;
     float m_minSpace;
 };

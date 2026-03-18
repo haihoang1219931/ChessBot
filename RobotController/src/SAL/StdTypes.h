@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#define MAX_MOVE_SEQUENCE 20
+#define MAX_MOVE_SEQUENCE 6
 #define MAX_BUTTON 6
 //#define MAX_MOTOR 6
 #define MAX_COMMAND_LENGTH 256

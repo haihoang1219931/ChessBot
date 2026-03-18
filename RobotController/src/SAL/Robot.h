@@ -24,7 +24,7 @@ public:
     void initMove(int motorIDFirst, int motorIDLast);
     int gotoTarget();
     int capture();
-    long elapsedTime();
+    // long elapsedTime();
     bool isLimitReached(int motorID,
                             MOTOR_LIMIT_TYPE limitType);
     int angleToStep(int motorID, float angle);
@@ -57,12 +57,12 @@ private:
     ROBOT_STATE m_state;
     ROBOT_SEQUENCE_STATE m_sequenceState;
     Move m_moveTarget;
-    int m_motorIDFirst;
-    int m_motorIDLast;
-    int m_numMotor;
-    int m_requestMotorID;
-    long m_startTime;
-    long m_elapsedTime;
+    uint8_t m_motorIDFirst;
+    uint8_t m_motorIDLast;
+    uint8_t m_numMotor;
+    uint8_t m_requestMotorID;
+    // long m_startTime;
+    // long m_elapsedTime;
 };
 
 #endif // ROBOT_H

@@ -34,7 +34,7 @@ void Robot::setState(ROBOT_STATE newState) {
 }
 
 int Robot::loop() {
-    m_elapsedTime = m_app->getSystemTime() - m_startTime;
+    // m_elapsedTime = m_app->getSystemTime() - m_startTime;
 #ifdef DEBUG_ROBOT
     m_app->printf("Robot time[%ld]\r\n", m_elapsedTime);
 #endif
@@ -83,7 +83,7 @@ void Robot::requestGoHome(int motorID) {
                 m_motorParamList[motor].homeStepTime, 0);
         }
     }
-    m_startTime = m_app->getSystemTime();
+    // m_startTime = m_app->getSystemTime();
     setState(ROBOT_EXECUTE_GO_HOME);
     m_app->printf("Request go home from [%d-%d] done\r\n",startID,stopID);
     m_app->enableHardwareTimer(true);
@@ -132,14 +132,14 @@ void Robot::requestGoPosition(int motorID, int targetStep, int stepTime, bool is
     m_motorParamList[motorID].targetStep = targetStep;
     m_motorParamList[motorID].homeStepTime = stepTime;
     m_motorParamList[motorID].direction = (targetStep > m_motorParamList[motorID].currentStep) ? 1 : -1;
-    m_startTime = m_app->getSystemTime();
+    // m_startTime = m_app->getSystemTime();
     setState(ROBOT_EXECUTE_POSITION);
 }
 
-long Robot::elapsedTime()
-{
-    return m_elapsedTime;
-}
+// long Robot::elapsedTime()
+// {
+//     return m_elapsedTime;
+// }
 
 int Robot::angleToStep(int motorID, float angle)
 {

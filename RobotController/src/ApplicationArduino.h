@@ -26,14 +26,12 @@ public:
   void enableHardwareTimer(bool enable) override;
   void resetPulse(int motorID) override;
   uint8_t executePulseStepper2Wires(uint8_t statePulse, uint32_t countPulse, uint32_t numWaitPulse, volatile uint8_t* portRegister, int bit);
-  uint8_t executePulseStepper4Wires(uint8_t statePulse, uint32_t countPulse, uint32_t numWaitPulse, int direction,
-    volatile uint8_t* portRegister);
 
 private:
   void initHardwareTimer(float samplerate = 40000.0f);
 private:
-  int m_buttonPin[MAX_BUTTON];
-  int m_limitGripperValue;
+  uint8_t m_buttonPin[MAX_BUTTON];
+  int16_t m_limitGripperValue;
 };
 
 #endif // APPLICATIONARDUINO_H
