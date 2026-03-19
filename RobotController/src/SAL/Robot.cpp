@@ -281,8 +281,8 @@ void Robot::setMoveTarget(int* jointSteps)
     for(int i=0; i< MAX_MOTOR; i++) {
         if(!m_motorParamList[i].active) continue;
         m_moveTarget.jointSteps[i].steps = jointSteps[i];
-        m_app->printf("Robot::setMoveTarget M[%d] step[%d]\r\n",
-                      i,m_moveTarget.jointSteps[i].steps);
+//        m_app->printf("Robot::setMoveTarget M[%d] step[%d]\r\n",
+//                      i,m_moveTarget.jointSteps[i].steps);
     }
     m_app->enableHardwareTimer(true);
 }
@@ -338,8 +338,8 @@ int Robot::executeMoveSequence()
 
 void Robot::initMove(int motorIDFirst, int motorIDLast)
 {
-    m_app->printf("============= Init Move =============\r\n");
-    m_app->printf("Move motor[%d-%d]\r\n",motorIDFirst,motorIDLast);
+//    m_app->printf("============= Init Move =============\r\n");
+//    m_app->printf("Move motor[%d-%d]\r\n",motorIDFirst,motorIDLast);
     m_motorIDFirst = motorIDFirst;
     m_motorIDLast = motorIDLast;
     m_app->enableHardwareTimer(false);              
@@ -354,11 +354,11 @@ void Robot::initMove(int motorIDFirst, int motorIDLast)
         float numStep = (float)abs(m_motorParamList[i].targetStep - m_motorParamList[i].currentStep);
         float time = numStep / m_motorParamList[i].maxSpeed;
         if(time > maxTime) maxTime = time;
-        m_app->printf("Motor[%d] numStep[%f][%d->%d] maxSpeed[%d] time[%f] => Max[%f]\r\n",
-                      i,
-                      numStep, m_motorParamList[i].currentStep, m_moveTarget.jointSteps[i].steps,
-                      m_motorParamList[i].maxSpeed, time,
-                      maxTime);
+//        m_app->printf("Motor[%d] numStep[%f][%d->%d] maxSpeed[%d] time[%f] => Max[%f]\r\n",
+//                      i,
+//                      numStep, m_motorParamList[i].currentStep, m_moveTarget.jointSteps[i].steps,
+//                      m_motorParamList[i].maxSpeed, time,
+//                      maxTime);
     }
 
     // Set step time for each motor
@@ -396,7 +396,7 @@ int Robot::gotoTarget()
         }
     }
     if(allMotorsFinished) {
-        m_app->printf("======All motor finished\r\n");
+//        m_app->printf("======All motor finished\r\n");
     }
     return allMotorsFinished? ROBOT_MOVE_DONE:m_sequenceState;
 }
@@ -409,7 +409,7 @@ int Robot::capture()
     if(m_motorParamList[MOTOR_CAPTURE].currentStep != m_motorParamList[MOTOR_CAPTURE].targetStep)
         captureDone = false;
     if(captureDone) {
-        m_app->printf("======Capture finished\r\n");
+//        m_app->printf("======Capture finished\r\n");
     }
     return captureDone ? ROBOT_MOVE_DONE:m_sequenceState;
 }

@@ -21,10 +21,10 @@ void HardwareTimerSim::enableTask(bool enable)
 {
     if (!enable) {
         m_timer->stop();
-        qDebug() << "Task Paused";
+//        qDebug() << "Task Paused";
     } else {
         m_timer->start();
-        qDebug() << "Task Resume";
+//        qDebug() << "Task Resume";
     }
 }
 

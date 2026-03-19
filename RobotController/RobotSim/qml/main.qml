@@ -226,21 +226,21 @@ ApplicationWindow {
             chessBoardPosX: mainProcess.chessBoardInfo[0] * visualScale
             chessBoardPosY: mainProcess.chessBoardInfo[1] * visualScale
             chessBoardWidth: mainProcess.chessBoardInfo[2] * visualScale
-//            onAngle1Changed: {
-//                var pos = robot.getPosition();
-//                if(typeof cvsPathPlan.currPos == "undefined") {
-//                    cvsPathPlan.currPos = Qt.point(pos.x + robot.x, pos.y + robot.y);
-//                    cvsPathPlan.prevPos = Qt.point(pos.x + robot.x, pos.y + robot.y);
-//                } else {
-//                    cvsPathPlan.prevPos = cvsPathPlan.currPos;
-//                    cvsPathPlan.currPos = Qt.point(pos.x + robot.x, pos.y + robot.y);
-//                }
-//                cvsPathPlan.requestPaint();
-////                console.log("["+cvsPathPlan.currPos.x + "," +cvsPathPlan.currPos.y+"]");
-//            }
-//            onPathClearClicked: {
-//                cvsPathPlan.clearCanvas();
-//            }
+            onAngle1Changed: {
+                var pos = robot.getPosition();
+                if(typeof cvsPathPlan.currPos == "undefined") {
+                    cvsPathPlan.currPos = Qt.point(pos.x + robot.x, pos.y + robot.y);
+                    cvsPathPlan.prevPos = Qt.point(pos.x + robot.x, pos.y + robot.y);
+                } else {
+                    cvsPathPlan.prevPos = cvsPathPlan.currPos;
+                    cvsPathPlan.currPos = Qt.point(pos.x + robot.x, pos.y + robot.y);
+                }
+                cvsPathPlan.requestPaint();
+//                console.log("["+cvsPathPlan.currPos.x + "," +cvsPathPlan.currPos.y+"]");
+            }
+            onPathClearClicked: {
+                cvsPathPlan.clearCanvas();
+            }
         }
     }
 

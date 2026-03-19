@@ -14,7 +14,7 @@ MainProcess::MainProcess(QObject *parent) :
     m_timer = new QTimer();
     connect(m_timer, &QTimer::timeout, this, &MainProcess::taskLoop);
     changeSleepTime(30);
-    changeTimerPeriod(1);
+    changeTimerPeriod(90);
     for(int i=0; i< MAX_MOTOR; i++)
     {
         m_listAngle.append(0);

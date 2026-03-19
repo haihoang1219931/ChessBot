@@ -40,6 +40,7 @@ public:
                          int startCol, int startRow,
                          int stopCol, int stopRow,
                          char promotePiece = 0);
+    void calculateSequenceMoveStraight(int startCol, int startRow,int stopCol, int stopRow);
     void calculateSequenceMove(int startCol, int startRow, int upAngleInDegree, bool isCapture);
     void calculateSequenceMoveNormal(int startCol, int startRow,
                          int stopCol, int stopRow);
