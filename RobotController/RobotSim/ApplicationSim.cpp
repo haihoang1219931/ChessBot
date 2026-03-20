@@ -17,23 +17,6 @@ ApplicationSim::ApplicationSim(MainProcess* mainProcess):
 {
     memset(m_command,0x00U, sizeof(m_command));
     initRobot();
-
-    Point curPos = currentPos();
-    curPos.x = 320.113770f;
-    curPos.y = 178.291351f;
-//    printf("curPos(%f,%f)\r\n",curPos.x,curPos.y);
-    Point tarPos;
-    tarPos.x = 139.500000;
-    tarPos.y = 332.500000;
-    for(int i=0; i< 1; i++){
-//        distance(curPos.x,curPos.y,tarPos.x,tarPos.y);
-
-        Command nextPoint = calculateNextPointInLine(curPos,tarPos);
-//        printf("nextPoint(%f,%f)\r\n",nextPoint.x,nextPoint.y);
-        curPos.x = nextPoint.x;
-        curPos.y = nextPoint.y;
-    }
-
 }
 
 ApplicationSim::~ApplicationSim()
@@ -49,12 +32,12 @@ void ApplicationSim::initRobot()
     m_chessBoard->setChessBoardPosY(100);
     m_chessBoard->setChessBoardSize(31*8);
     m_chessBoard->setDropZoneSpace(31);
-    m_minSpace = 20;
+    m_minSpace = 10;
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|max step/s|frequency
         {true,  1.0f/1.0f,                            0,     100,        0,       1,        0,       250,           76,      5000.0f},
-        {true,  1,                                  255,      90,      -17,       1,      -17,       150,         5000,      5000.0f},
-        {true,  1,                                   85,     140,       50,       5,       50,       210,         5000,      5000.0f},
+        {true,  18,                                  255,      90,      -17,       1,      -17,       150,         5000,      5000.0f},
+        {true,  4,                                   85,     140,       50,       5,       50,       210,         5000,      5000.0f},
         {false, 1.0f/1.0f,                           15,     130,      130,       1,      130,       130,            1,      5000.0f},
         {false, 1.0f/1.0f,                          120,     180,      180,       1,      180,       180,            1,      5000.0f},
         {true,  1,                                    0,      45,        0,       1,        0,        45,           76,      5000.0f}

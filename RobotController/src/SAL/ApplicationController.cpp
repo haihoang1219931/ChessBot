@@ -138,15 +138,21 @@ int ApplicationController::executeCommandLine()
 {
     switch (m_commandState) {
     case COMMAND_STATE_INIT: {
+        m_curPos = currentPos();
+        m_tarPos = {m_sequenceCommand[m_curCommandId].y,
+                        m_sequenceCommand[m_curCommandId].x,
+                        0};
+        m_curPointInCommand = 0;
+        m_numPointInCommand = (uint32_t)(distance(m_curPos.x,m_curPos.y,m_tarPos.x,m_tarPos.y))/
+                (uint32_t)m_minSpace;
+        m_commandState = COMMAND_STATE_EXECUTE;
+    }
+        break;
+    case COMMAND_STATE_EXECUTE: {
         int jointSteps[MAX_MOTOR];
-        Point curPos = currentPos();
-        Point tarPos;
-        tarPos.y = m_sequenceCommand[m_curCommandId].x;
-        tarPos.x = m_sequenceCommand[m_curCommandId].y;
         Command nextPoint;
-        if(distance(curPos.x,curPos.y,
-                    tarPos.x,tarPos.y) > m_minSpace) {
-            nextPoint = calculateNextPointInLine(curPos,tarPos);
+        if(m_curPointInCommand < m_numPointInCommand) {
+            nextPoint = calculateNextPointInLine(m_curPos,m_tarPos,(float)m_curPointInCommand);
             m_commandState = COMMAND_STATE_EXECUTE_THEN_RECAL;
         } else {
             nextPoint.y = m_sequenceCommand[m_curCommandId].x;
@@ -155,7 +161,7 @@ int ApplicationController::executeCommandLine()
             nextPoint.captureStep = m_sequenceCommand[m_curCommandId].captureStep;
             m_commandState = COMMAND_STATE_EXECUTE_THEN_DONE;
         }
-        printf("NextPoint: (%f,%f)\r\n",nextPoint.x,nextPoint.y);
+        m_curPointInCommand++;
         calculateJoints(nextPoint.x,
                         nextPoint.y,
                         nextPoint.updownAngle,
@@ -167,7 +173,7 @@ int ApplicationController::executeCommandLine()
         break;
     case COMMAND_STATE_EXECUTE_THEN_RECAL: {
         if(m_robot->loop() == ROBOT_EXECUTE_DONE) {
-            m_commandState = COMMAND_STATE_INIT;
+            m_commandState = COMMAND_STATE_EXECUTE;
         }
     }
         break;
@@ -278,7 +284,9 @@ void ApplicationController::executeCommand(char* command) {
     }
     else if(command[0] == 'm' && strlen(command)>=2) {
         if(command[1] == 'l')
-            calculateSequenceMoveStraight(0,0,0,7);
+            calculateSequenceMoveStraight(0,0,7,0);
+        else if(command[1] == 'c')
+            calculateSequenceMoveStraight(0,0,7,0);
     }
     else if(command[0] == 'h') {
         if(strlen(command)>=2 && command[1] == 'a') {
@@ -444,18 +452,14 @@ void ApplicationController::calculateJoints(float xPos, float yPos, float upAngl
                 upAngleInDegree);
 }
 
-Command ApplicationController::calculateNextPointInLine(Point currPos, Point targetPos)
+Command ApplicationController::calculateNextPointInLine(Point currPos, Point targetPos, float numPointInCommand)
 {
     Command nextPoint;
     float dx = targetPos.x - currPos.x;
     float dy = targetPos.y - currPos.y;
     float angle = int(dx*10) == 0 ? M_PI_2:atan(dy/dx);
-    nextPoint.x = currPos.x + m_minSpace * fabs(cos(angle))*(dx>0?1:-1);
-    nextPoint.y = currPos.y + m_minSpace * fabs(sin(angle))*(dy>0?1:-1);
-    printf("angle(%f)\r\n",angle/M_PI*180.0f);
-    printf("curPos(%f,%f)\r\n",currPos.x,currPos.y);
-    printf("targetPos(%f,%f)\r\n",targetPos.x,targetPos.y);
-    printf("nextPoint(%f,%f)\r\n",nextPoint.x,nextPoint.y);
+    nextPoint.x = currPos.x + numPointInCommand * m_minSpace * fabs(cos(angle))*(dx>0?1:-1);
+    nextPoint.y = currPos.y + numPointInCommand * m_minSpace * fabs(sin(angle))*(dy>0?1:-1);
     return nextPoint;
 }
 
