@@ -88,7 +88,7 @@ ApplicationArduino::~ApplicationArduino()
 {
 
 }
-
+#define FREQUENCY_TIMER1 1250.0f
 void ApplicationArduino::initRobot()
 {
     m_chessBoard->setChessBoardPosX(31-31*8/2);
@@ -99,12 +99,12 @@ void ApplicationArduino::initRobot()
 
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|max step/s|frequency
-        {true,  100.0f*(20.0f/360.0f),                0,     -10,        0,       2,           0,       250,      500,   10000.0f},
-        {true,  1.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,         2,         -17,       150,     500,   10000.0f},
-        {true,  1.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,         2,          50,       210,     500,   10000.0f},
-        {false,  1.0f/1.0f,                          15,     130,      130,         1,         130,       130,        1,   10000.0f},
-        {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,        1,   10000.0f},
-        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,     -10,        0,       2,           0,        45,      500,   10000.0f}
+        {true,  100.0f*(20.0f/360.0f),                0,     -10,        0,       2,           0,       250,      500,   FREQUENCY_TIMER1},
+        {true,  1.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,         8,         -17,       150,     500,   FREQUENCY_TIMER1},
+        {true,  1.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,         8,          50,       210,     100,   FREQUENCY_TIMER1},
+        {false,  1.0f/1.0f,                          15,     130,      130,         1,         130,       130,        1,   FREQUENCY_TIMER1},
+        {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,        1,   FREQUENCY_TIMER1},
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,     -10,        0,       2,           0,        45,      500,   FREQUENCY_TIMER1}
     };
 
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
@@ -114,14 +114,11 @@ void ApplicationArduino::initRobot()
 }
 
 int ApplicationArduino::printf(const char *fmt, ...) {
-    // va_list args;
-    // va_start(args, fmt);
-    // char m_buffer[128];
-    // int rc = vsprintf(m_buffer, fmt, args);
-    // va_end(args);
-    // Serial.print((const char*)m_buffer);
-    // return rc;
-    return 0;
+    va_start(m_args, fmt);
+    int rc = vsprintf(m_buffer, fmt, m_args);
+    va_end(m_args);
+    Serial.print((const char*)m_buffer);
+    return rc;
 }
 void ApplicationArduino::msleep(int millis) {
   delay(millis);
@@ -218,16 +215,17 @@ void ApplicationArduino::checkInput(){
 }
 #define DEBUG_SERIAL
 int ApplicationArduino::readSerial(char* output, int length) {
-  String command;
+  m_incomingByte = 0;
   while(Serial.available()) {
     delay(3);
     char c = Serial.read();
-    command += c;  
+    m_command[m_incomingByte++] = c;
   }
-  if(command.length()>0) {
-    Serial.print(command);
-    for(int i=0; i< command.length(); i++) {
-      output[i] = command.charAt(i);
+  if(m_incomingByte > 0) {
+    m_command[m_incomingByte] = '\0';
+    Serial.print(m_command);
+    for(int i=0; i< m_incomingByte; i++) {
+      output[i] = m_command[i];
 #ifdef DEBUG_SERIAL
       Serial.print(output[i],HEX);
       Serial.print(" ");
@@ -237,7 +235,7 @@ int ApplicationArduino::readSerial(char* output, int length) {
     Serial.print("\r\n new command\r\n");
 #endif
   }
-  return command.length();
+  return m_incomingByte;
 }
 
 bool ApplicationArduino::isLimitReached(int motorID, MOTOR_LIMIT_TYPE limitType)
@@ -401,7 +399,7 @@ uint8_t ApplicationArduino::executePulseLoop(int motorID)
 void ApplicationArduino::enableHardwareTimer(bool enable)
 {
   if(enable) {
-    initHardwareTimer(1250.0f);
+    initHardwareTimer(FREQUENCY_TIMER1);
   }
   else
     TIMSK1 &= ~(1 << OCIE1A);
