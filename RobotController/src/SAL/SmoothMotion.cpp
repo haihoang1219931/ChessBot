@@ -1,6 +1,6 @@
 #include "SmoothMotion.h"
 #include "Robot.h"
-SmoothMotion::SmoothMotion(uint32_t id, Robot* robot):
+SmoothMotion::SmoothMotion(uint8_t id, Robot* robot):
   m_robot(robot),
   m_id(id),
   m_stateControl(MOTOR_EXECUTE_WAIT_COMMAND)

@@ -3,6 +3,7 @@
 #include "SmoothMotion.h"
 #include <math.h>
 #include <string.h>
+#include <Arduino.h>
 #ifdef abs
 #undef abs
 #endif
@@ -67,12 +68,17 @@ void Robot::initDirection(int motorID, int direction)
 }
 
 void Robot::requestGoHome(int motorID) {
-    m_app->printf("GO HOME\r\n");
+    Serial.print("GO HOME\r\n");
     m_app->enableHardwareTimer(false);
     m_requestMotorID = motorID;
     int startID = motorID == MAX_MOTOR ? 0 : motorID;
     int stopID = motorID == MAX_MOTOR ? MAX_MOTOR-1 : motorID;
     m_app->printf("Request go home from [%d-%d]\r\n",startID,stopID);
+    Serial.print("Request go home from [");
+    Serial.print(startID);
+    Serial.print("-");
+    Serial.print(stopID);
+    Serial.print("]\r\n");
     for(int motor=startID; motor<= stopID; motor++)
     {
         if(m_motorParamList[motor].active) {
@@ -86,7 +92,13 @@ void Robot::requestGoHome(int motorID) {
     // m_startTime = m_app->getSystemTime();
     setState(ROBOT_EXECUTE_GO_HOME);
     m_app->printf("Request go home from [%d-%d] done\r\n",startID,stopID);
+    Serial.print("Request go home from [");
+    Serial.print(startID);
+    Serial.print("-");
+    Serial.print(stopID);
+    Serial.print("] done\r\n");
     m_app->enableHardwareTimer(true);
+    Serial.print("GO HOME DONE\r\n");
 }
 
 int Robot::executeGohome() {
