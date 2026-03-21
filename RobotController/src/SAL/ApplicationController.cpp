@@ -372,34 +372,22 @@ bool ApplicationController::inverseKinematic(float x, float y, float a1, float a
     *p2 = acos((x*x+y*y-a1*a1-a2*a2)/(2*a1*a2));
     *p1 = atan(y/x) - atan((a2*sin(*p2))/(a1+a2*cos(*p2)));
     *p1 =  *p1 < 0?*p1+M_PI:*p1;
-<<<<<<< HEAD
-//    this->printf("IK: x[%.2f] y[%.2f] a1[%.2f] a2[%.2f] q1[%.2f] q2[%.2f]\r\n",
-//                 x,y,a1,a2,
-//                 (*p1/M_PI*180.0f),(*p2/M_PI*180.0f));
-=======
 #ifdef DEBUG_KINEMATIC
     this->printf("IK: x[%.2f] y[%.2f] a1[%.2f] a2[%.2f] q1[%.2f] q2[%.2f]\r\n",
                  x,y,a1,a2,
                  (*p1/M_PI*180.0f),(*p2/M_PI*180.0f));
 #endif
->>>>>>> update_ramps15
     return true;
 }
 
 void ApplicationController::forwardKinematic(float a1, float a2, float p1, float p2, float* x, float* y) {
     *x = a1 * cos(p1) + a2 * cos(p1 + p2);
     *y = a1 * sin(p1) + a2 * sin(p1 + p2);
-<<<<<<< HEAD
-//    this->printf("FK: x[%.2f] y[%.2f] a1[%.2f] a2[%.2f] q1[%.2f] q2[%.2f]\r\n",
-//                 *x,*y,a1,a2,
-//                 (p1/M_PI*180.0f),(p2/M_PI*180.0f));
-=======
 #ifdef DEBUG_KINEMATIC
     this->printf("FK: x[%.2f] y[%.2f] a1[%.2f] a2[%.2f] q1[%.2f] q2[%.2f]\r\n",
                  *x,*y,a1,a2,
                  (p1/M_PI*180.0f),(p2/M_PI*180.0f));
 #endif
->>>>>>> update_ramps15
 }
 
 void ApplicationController::calculatePolygonEdge(float upAngleInDegree, float* edge, float* angle)
@@ -432,19 +420,6 @@ void ApplicationController::calculateJoints(float xPos, float yPos, float upAngl
     float a1 = m_robot->armLength(MOTOR_ARM1);
     float a2 = 0;
     float q2Offset = 0;
-<<<<<<< HEAD
-//    this->printf("=== calculatePolygonEdge\r\n");
-    calculatePolygonEdge(upAngleInDegree,&a2,&q2Offset);
-//    this->printf("calculatePolygonEdge ===\r\n");
-    float q1 = 0;
-    float q2 = 0;
-//    this->printf("xPos[%d]\r\n",(int)xPos);
-//    this->printf("yPos[%d]\r\n",(int)yPos);
-//    this->printf("a1[%d]\r\n",(int)a1);
-//    this->printf("a2[%d]\r\n",(int)a2);
-//    this->printf("q2Offset[%d]\r\n",(int)(q2Offset*180.f/M_PI));
-
-=======
 #ifdef DEBUG_KINEMATIC
     this->printf("=== calculatePolygonEdge\r\n");
 #endif
@@ -461,21 +436,11 @@ void ApplicationController::calculateJoints(float xPos, float yPos, float upAngl
     this->printf("a2[%d]\r\n",(int)a2);
     this->printf("q2Offset[%d]\r\n",(int)(q2Offset*180.f/M_PI));
 #endif
->>>>>>> update_ramps15
     inverseKinematic(xPos, yPos, a1, a2, &q1, &q2);
 
     float xPosFK = 0, yPosFK = 0;
     forwardKinematic(a1,a2,q1,q2,&xPosFK,&yPosFK);
     if(xPosFK*xPos < 0 || yPosFK * yPos < 0) q1 = q1 - M_PI;
-<<<<<<< HEAD
-//    this->printf("arm1Angle[%d]=[%d] arm2Angle[%d]=[%d] arm3Angle[%d] q2Offset[%d]\r\n",
-//                 (int)(q1/M_PI*180.0f),
-//                 (int)((M_PI/2 + q1)/M_PI*180.0f),
-//                 (int)((q2)/M_PI*180.0f),
-//                 (int)((M_PI - q2 - q2Offset)/M_PI*180.0f),
-//                 (int)(upAngleInDegree),
-//                 (int)(q2Offset/M_PI*180.0f));
-=======
 #ifdef DEBUG_KINEMATIC
     this->printf("arm1Angle[%d]=[%d] arm2Angle[%d]=[%d] arm3Angle[%d] q2Offset[%d]\r\n",
                  (int)(q1/M_PI*180.0f),
@@ -485,7 +450,6 @@ void ApplicationController::calculateJoints(float xPos, float yPos, float upAngl
                  (int)(upAngleInDegree),
                  (int)(q2Offset/M_PI*180.0f));
 #endif
->>>>>>> update_ramps15
     jointSteps[MOTOR_ARM1] = m_robot->angleToStep(
                 MOTOR_ARM1,
                 (M_PI/2 + q1)/M_PI*180.0f);
