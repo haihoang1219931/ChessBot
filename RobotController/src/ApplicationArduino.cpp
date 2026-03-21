@@ -9,20 +9,26 @@
 #include "SAL/StdTypes.h"
 
 #define NONE_PIN  0xFF
-#define enPin 8
-#define stepPin1 2 //MOTOR ARM1 STEP
-#define dirPin1 5 // MOTOR ARM1 DIR
-#define stepPin2 3 //MOTOR ARM2 STEP
-#define dirPin2 6 // MOTOR ARM2 DIR
-#define stepPin5 3 //MOTOR ARM5 STEP
-#define dirPin5 6 // MOTOR ARM5 DIR
-#define stepPinCapture 12 //MOTOR CAPTURE STEP
-#define dirPinCapture 13 // MOTOR CAPTURE DIR
+#define enPin1 38
+#define stepPin1 A0 //MOTOR ARM1 STEP
+#define dirPin1 A1 // MOTOR ARM1 DIR
 
-#define limit1 9 // ARM1 LIMIT
-#define limit2 10 // ARM2 LIMIT
-#define limit5 11 // ARM5 LIMIT
-#define limitGripper A0 // CAPTURE LIMIT Analog
+#define enPin2 A2
+#define stepPin2 A6 //MOTOR ARM2 STEP
+#define dirPin2 A7 // MOTOR ARM2 DIR
+
+#define enPin5 A8
+#define stepPin5 46 //MOTOR ARM5 STEP
+#define dirPin5 48 // MOTOR ARM5 DIR
+
+#define enPinCapture 24
+#define stepPinCapture 26 //MOTOR CAPTURE STEP
+#define dirPinCapture 28 // MOTOR CAPTURE DIR
+
+#define limit1 19 // ARM1 LIMIT
+#define limit2 14 // ARM2 LIMIT
+#define limit5 18 // ARM5 LIMIT
+#define limitGripper A13 // CAPTURE LIMIT Analog
 
 typedef enum {
   STATE_CHECK_SENSOR,
@@ -41,23 +47,39 @@ ApplicationArduino::ApplicationArduino()
     m_buttonPin[MOTOR_ARM2] = limit2;
     m_buttonPin[MOTOR_ARM5] = limit5;
 
-    pinMode(enPin, OUTPUT);
+    pinMode(limit1, INPUT_PULLUP);
+    pinMode(limit2, INPUT_PULLUP);
+    pinMode(limit5, INPUT_PULLUP);
+
+    pinMode(enPin1, OUTPUT);
     pinMode(dirPin1, OUTPUT);
     pinMode(stepPin1, OUTPUT);
+
+    pinMode(enPin2, OUTPUT);
     pinMode(dirPin2, OUTPUT);
     pinMode(stepPin2, OUTPUT);
+
+    pinMode(enPin5, OUTPUT);
     pinMode(dirPin5, OUTPUT);
     pinMode(stepPin5, OUTPUT);
+
+    pinMode(enPinCapture, OUTPUT);
     pinMode(dirPinCapture, OUTPUT);
     pinMode(stepPinCapture, OUTPUT);
 
-    digitalWrite(enPin, HIGH);
+    digitalWrite(enPin1, HIGH);
     digitalWrite(dirPin1, LOW);
     digitalWrite(stepPin1, HIGH);
+
+    digitalWrite(enPin2, HIGH);
     digitalWrite(dirPin2, LOW);
     digitalWrite(stepPin2, HIGH);
+
+    digitalWrite(enPin5, HIGH);
     digitalWrite(dirPin5, LOW);
     digitalWrite(stepPin5, HIGH);
+
+    digitalWrite(enPinCapture, HIGH);
     digitalWrite(dirPinCapture, LOW);
     digitalWrite(stepPinCapture, HIGH);
 }
@@ -77,12 +99,12 @@ void ApplicationArduino::initRobot()
 
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|max step/s|frequency
-        {true,  100.0f*(20.0f/360.0f),                0,     -10,        0,       128,           0,       250,      500,   10000.0f},
-        {true,  8.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,         2,         -17,       150,     5000,   10000.0f},
-        {true,  8.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,         2,          50,       210,     5000,   10000.0f},
+        {true,  100.0f*(20.0f/360.0f),                0,     -10,        0,       2,           0,       250,      500,   10000.0f},
+        {true,  8.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,         2,         -17,       150,     500,   10000.0f},
+        {true,  8.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,         2,          50,       210,     500,   10000.0f},
         {false,  1.0f/1.0f,                          15,     130,      130,         1,         130,       130,        1,   10000.0f},
         {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,        1,   10000.0f},
-        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,     -10,        0,       128,           0,        45,      500,   10000.0f}
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,     -10,        0,       2,           0,        45,      500,   10000.0f}
     };
 
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
@@ -92,13 +114,14 @@ void ApplicationArduino::initRobot()
 }
 
 int ApplicationArduino::printf(const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    char m_buffer[128];
-    int rc = vsprintf(m_buffer, fmt, args);
-    va_end(args);
-    Serial.print((const char*)m_buffer);
-    return rc;
+    // va_list args;
+    // va_start(args, fmt);
+    // char m_buffer[128];
+    // int rc = vsprintf(m_buffer, fmt, args);
+    // va_end(args);
+    // Serial.print((const char*)m_buffer);
+    // return rc;
+    return 0;
 }
 void ApplicationArduino::msleep(int millis) {
   delay(millis);
@@ -111,72 +134,70 @@ long ApplicationArduino::getSystemTime() {
 void ApplicationArduino::specificPlatformGohome(int motorID)
 {
   // Not used, go home is handled in Robot::executeGoHome
-  // if(motorID == MOTOR_CAPTURE) {
-  //   uint8_t stepPin = 4;
-  //   uint8_t dirPin = 7;
-  //   uint8_t dirClockPin = 9;
-  //   uint8_t dirClockWisePin = 10;
-  //   uint8_t dirAnalogRead = A0;
-  //   int delayTime = 500;
-  //   int sensorHomeValue = 330;
-  //   int sensorCaptureValue = 120;
-  //   int sensorValue;
-  //   int stateGoHome;
-  //   int countStep;
-  //   int initDir;
-  //   stateGoHome = STATE_CHECK_SENSOR;
-  //   while(stateGoHome != STATE_DONE) {
-  //     switch(stateGoHome){
-  //       case STATE_CHECK_SENSOR:{
-  //         sensorValue = analogRead(dirAnalogRead);
-  //         stateGoHome = STATE_SET_DIR;
-  //       }
-  //       break;
-  //       case STATE_SET_DIR:{
-  //         digitalWrite(dirPin, sensorValue > sensorHomeValue ? LOW:HIGH);
-  //         initDir = sensorValue > sensorHomeValue ? 1:-1;
-  //         stateGoHome = STATE_GO_HOME;
-  //         delay(1000);
-  //       }
-  //       break;
-  //       case STATE_GO_HOME:{
-  //         sensorValue = analogRead(dirAnalogRead);
-  //         if(initDir*sensorValue>initDir*sensorHomeValue) {
-  //           digitalWrite(stepPin, HIGH);
-  //           delayMicroseconds(delayTime);
-  //           digitalWrite(stepPin, LOW);
-  //           delayMicroseconds(delayTime);
-  //         } else {
-  //           digitalWrite(dirPin, LOW);
-  //           stateGoHome = STATE_GO_TO_TARGET;
-  //           countStep = 0;
-  //           delay(1000);
-  //         }
-  //       }
-  //       break;
-  //       case STATE_GO_TO_TARGET:{
-  //         sensorValue = analogRead(dirAnalogRead);
-  //         if(sensorValue>sensorCaptureValue) {
-  //           digitalWrite(stepPin, HIGH);
-  //           delayMicroseconds(delayTime);
-  //           digitalWrite(stepPin, LOW);
-  //           delayMicroseconds(delayTime);
-  //           countStep++;
-  //         } else {
-  //           stateGoHome = STATE_HOME_DONE;
-  //           Serial.print("countStep:");
-  //           Serial.println(countStep);
-  //           delay(1000);
-  //         }
-  //       }
-  //       break;
-  //       case STATE_HOME_DONE:{
+  if(motorID == MOTOR_CAPTURE) {
+    uint8_t stepPin = stepPinCapture;
+    uint8_t dirPin = dirPinCapture;
+    uint8_t dirAnalogRead = limitGripper;
+    int delayTime = 500;
+    int sensorHomeValue = 630;
+    int sensorCaptureValue = 300;
+    int sensorValue;
+    int stateGoHome;
+    int countStep;
+    int initDir;
+    stateGoHome = STATE_CHECK_SENSOR;
+    while(stateGoHome != STATE_HOME_DONE) {
+      switch(stateGoHome){
+        case STATE_CHECK_SENSOR:{
+          sensorValue = analogRead(dirAnalogRead);
+          stateGoHome = STATE_SET_DIR;
+        }
+        break;
+        case STATE_SET_DIR:{
+          digitalWrite(dirPin, sensorValue > sensorHomeValue ? LOW:HIGH);
+          initDir = sensorValue > sensorHomeValue ? 1:-1;
+          stateGoHome = STATE_GO_HOME;
+          delay(100);
+        }
+        break;
+        case STATE_GO_HOME:{
+          sensorValue = analogRead(dirAnalogRead);
+          if(initDir*sensorValue>initDir*sensorHomeValue) {
+            digitalWrite(stepPin, HIGH);
+            delayMicroseconds(delayTime);
+            digitalWrite(stepPin, LOW);
+            delayMicroseconds(delayTime);
+          } else {
+            digitalWrite(dirPin, LOW);
+            stateGoHome = STATE_GO_TO_TARGET;
+            countStep = 0;
+            delay(100);
+          }
+        }
+        break;
+        case STATE_GO_TO_TARGET:{
+          sensorValue = analogRead(dirAnalogRead);
+          if(sensorValue>sensorCaptureValue) {
+            digitalWrite(stepPin, HIGH);
+            delayMicroseconds(delayTime);
+            digitalWrite(stepPin, LOW);
+            delayMicroseconds(delayTime);
+            countStep++;
+          } else {
+            stateGoHome = STATE_HOME_DONE;
+            Serial.print("countStep:");
+            Serial.println(countStep);
+            // delay(1000);
+          }
+        }
+        break;
+        case STATE_HOME_DONE:{
 
-  //       }
-  //       break;
-  //     }
-  //   }
-  // }
+        }
+        break;
+      }
+    }
+  }
 }
 
 void ApplicationArduino::harwareStop(int motorID = MAX_MOTOR)
@@ -243,8 +264,8 @@ bool ApplicationArduino::isLimitReached(int motorID, MOTOR_LIMIT_TYPE limitType)
     break;
     case MOTOR::MOTOR_CAPTURE: {
       limitReached = limitType == MOTOR_LIMIT_MIN || limitType == MOTOR_LIMIT_HOME ? 
-                    m_limitGripperValue > 330 :
-                    m_limitGripperValue < 120;
+                    m_limitGripperValue > 630 :
+                    m_limitGripperValue < 300;
     }
     break;
     default: break;
@@ -255,19 +276,25 @@ bool ApplicationArduino::isLimitReached(int motorID, MOTOR_LIMIT_TYPE limitType)
 void ApplicationArduino::enableEngine(bool enable) {
   this->printf("%s engine\r\n",enable?"ENABLE":"DISABLE");
   if(enable) {
-    digitalWrite(enPin, LOW);
+    digitalWrite(enPin1, LOW);
+    digitalWrite(enPin2, LOW);
+    digitalWrite(enPin5, LOW);
+    digitalWrite(enPinCapture, LOW);
   } else {
-    digitalWrite(enPin, HIGH);
+    digitalWrite(enPin1, HIGH);
+    digitalWrite(enPin2, HIGH);
+    digitalWrite(enPin5, HIGH);
+    digitalWrite(enPinCapture, HIGH);
   }
   
 }
 
 void ApplicationArduino::initDirection(int motorID, int direction)
 {
-  Serial.print("initDirection motorID=");
-  Serial.print(motorID);
-  Serial.print(", direction=");
-  Serial.println(direction);
+  // Serial.print("initDirection motorID[");
+  // Serial.print(motorID);
+  // Serial.print("] direction=");
+  // Serial.println(direction);
   switch(motorID){
     case MOTOR::MOTOR_ARM1: {
       digitalWrite(dirPin1, direction > 0 ? LOW : HIGH);
@@ -345,19 +372,19 @@ uint8_t ApplicationArduino::executePulseLoop(int motorID)
         switch (motorID)
         {
         case MOTOR_ARM1: {
-          nextStatePulse = executePulseStepper2Wires(statePulse, countPulse, numWaitPulse,&PORTD,2);
+          nextStatePulse = executePulseStepper2Wires(statePulse, countPulse, numWaitPulse,&PORTF ,0);
         }
           break;
         case MOTOR_ARM2: {
-          nextStatePulse = executePulseStepper2Wires(statePulse, countPulse, numWaitPulse, &PORTD,3);
+          nextStatePulse = executePulseStepper2Wires(statePulse, countPulse, numWaitPulse, &PORTF,6);
         }
           break;
         case MOTOR_ARM5: {
-          nextStatePulse = executePulseStepper2Wires(statePulse, countPulse, numWaitPulse,&PORTD,4);
+          nextStatePulse = executePulseStepper2Wires(statePulse, countPulse, numWaitPulse,&PORTL,3);
         }
           break;
         case MOTOR_CAPTURE: {
-          nextStatePulse = executePulseStepper2Wires(statePulse, countPulse, numWaitPulse,&PORTB,4);
+          nextStatePulse = executePulseStepper2Wires(statePulse, countPulse, numWaitPulse,&PORTA,4);
         }
           break;
         default:
@@ -374,7 +401,7 @@ uint8_t ApplicationArduino::executePulseLoop(int motorID)
 void ApplicationArduino::enableHardwareTimer(bool enable)
 {
   if(enable) {
-    initHardwareTimer(5000.0f);
+    initHardwareTimer(1250.0f);
   }
   else
     TIMSK1 &= ~(1 << OCIE1A);
