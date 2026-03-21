@@ -100,8 +100,8 @@ void ApplicationArduino::initRobot()
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|max step/s|frequency
         {true,  100.0f*(20.0f/360.0f),                0,     -10,        0,       2,           0,       250,      500,   10000.0f},
-        {true,  8.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,         2,         -17,       150,     500,   10000.0f},
-        {true,  8.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,         2,          50,       210,     500,   10000.0f},
+        {true,  1.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,         2,         -17,       150,     500,   10000.0f},
+        {true,  1.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,         2,          50,       210,     500,   10000.0f},
         {false,  1.0f/1.0f,                          15,     130,      130,         1,         130,       130,        1,   10000.0f},
         {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,        1,   10000.0f},
         {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,     -10,        0,       2,           0,        45,      500,   10000.0f}
@@ -234,7 +234,7 @@ int ApplicationArduino::readSerial(char* output, int length) {
 #endif
     }
 #ifdef DEBUG_SERIAL
-    Serial.print("\n");
+    Serial.print("\r\n new command\r\n");
 #endif
   }
   return command.length();
