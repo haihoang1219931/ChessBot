@@ -14,7 +14,9 @@ MainProcess::MainProcess(QObject *parent) :
     m_timer = new QTimer();
     connect(m_timer, &QTimer::timeout, this, &MainProcess::taskLoop);
     changeSleepTime(30);
-    changeTimerPeriod(90);
+    changeTimerPeriodMotion(90);
+    changeTimerPeriodInput(90);
+    changeTimerPeriodCommand(90);
     for(int i=0; i< MAX_MOTOR; i++)
     {
         m_listAngle.append(0);
@@ -34,7 +36,7 @@ MainProcess::~MainProcess()
 
 void MainProcess::enableHardwareTimer(bool enable)
 {
-    m_hardwareTimer->enableTask(enable);
+    m_hardwareTimer->enableTaskMotion(enable);
 }
 
 void MainProcess::pause(bool pause){
@@ -43,7 +45,7 @@ void MainProcess::pause(bool pause){
     }else{
         m_timer->start();
     }
-    m_hardwareTimer->enableTask(!pause);
+    m_hardwareTimer->enableTaskMotion(!pause);
 }
 void MainProcess::setBlackSide(bool isBlack) {
 //    m_application->chessController()->setChessPiece(isBlack);
@@ -104,11 +106,16 @@ void MainProcess::taskLoop() {
 void MainProcess::startService() {
     printf("Start\r\n");
     m_timer->start();
+    m_hardwareTimer->enableTaskCommand(true);
+    m_hardwareTimer->enableTaskInput(true);
 }
 
 void MainProcess::stopService() {
     printf("Stop\r\n");
     m_timer->stop();
+    m_hardwareTimer->enableTaskMotion(false);
+    m_hardwareTimer->enableTaskCommand(false);
+    m_hardwareTimer->enableTaskInput(false);
 }
 void MainProcess::setRender(VideoRender* render)
 {
@@ -119,7 +126,7 @@ void MainProcess::updateScreen() {
 }
 void MainProcess::executeCommand(QString command)
 {
-    m_application->simulateReceivedCommand((char*)command.toStdString().c_str(),command.length());
+    m_application->simulateReceivedCommand((char*)command.toStdString().c_str());
 }
 
 void MainProcess::updateRobotStep()
@@ -142,9 +149,17 @@ void MainProcess::changeSleepTime(int sleepTime)
     m_timer->setInterval(sleepTime);
 
 }
-void MainProcess::changeTimerPeriod(int sleepTime)
+void MainProcess::changeTimerPeriodMotion(int sleepTime)
 {
-    m_hardwareTimer->setInterval(sleepTime);
+    m_hardwareTimer->setIntervalMotion(sleepTime);
+}
+void MainProcess::changeTimerPeriodInput(int sleepTime)
+{
+    m_hardwareTimer->setIntervalInput(sleepTime);
+}
+void MainProcess::changeTimerPeriodCommand(int sleepTime)
+{
+    m_hardwareTimer->setIntervalCommand(sleepTime);
 }
 QVariantList MainProcess::listAngle()
 {

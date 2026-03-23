@@ -2,7 +2,6 @@
 #include "Button.h"
 #include "Robot.h"
 #include "ChessBoard.h"
-#include "CommandReader.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -13,7 +12,6 @@ ApplicationController::ApplicationController()
     for(int i=0;i< MAX_BUTTON; i++) {
         m_buttonList[i] = new Button(this);
     }
-    m_commandReader = new CommandReader(this);
     m_robot = new Robot(this);
     m_chessBoard = new ChessBoard();
     m_machineState = MACHINE_WAIT_COMMAND;
@@ -30,8 +28,7 @@ void ApplicationController::loop() {
     this->printf("APP Timer[%d] m_machineState[%d]\r\n",m_appTimer,m_machineState);
 #endif
     switch(m_machineState) {
-        case MACHINE_WAIT_COMMAND: {
-            m_commandReader->loop();
+        case MACHINE_WAIT_COMMAND: {            
             break;
         }
         case MACHINE_EXECUTE_HOME:
@@ -58,6 +55,14 @@ void ApplicationController::loop() {
         }
     }
 }
+
+void ApplicationController::readCommand()
+{
+    printf("readCommand\r\n");
+    int incomingBytes = readSerial(m_commandRead,sizeof(m_commandRead));
+    if(incomingBytes>0) executeCommand(m_commandRead);
+}
+
 int ApplicationController::executeCommandSequenceLoop()
 {
     switch (m_commandSequenceState) {

@@ -25,7 +25,6 @@ HEADERS += \
     src/SAL/Robot.h \
     src/SAL/Button.h \
     src/SAL/ApplicationController.h \
-    src/SAL/CommandReader.h \
     src/SAL/ChessBoard.h \
     src/SAL/StdTypes.h \
     RobotSim/ApplicationSim.h \
@@ -40,7 +39,6 @@ SOURCES += \
     src/SAL/Robot.cpp \
     src/SAL/Button.cpp \
     src/SAL/ApplicationController.cpp \
-    src/SAL/CommandReader.cpp \
     src/SAL/ChessBoard.cpp \
     RobotSim/ApplicationSim.cpp \
     RobotSim/MainProcess.cpp \

@@ -6,7 +6,6 @@
 class Button;
 class Robot;
 class ChessBoard;
-class CommandReader;
 
 class ApplicationController
 {
@@ -15,6 +14,7 @@ public:
     virtual ~ApplicationController();
     
     void loop();
+    void readCommand();
     void storeButtonState(int btnID, bool pressed);
     void updateInputState();
     MACHINE_STATE stateMachine();
@@ -83,9 +83,9 @@ public:
     Button* m_buttonList[MAX_BUTTON];
     Robot* m_robot;
     ChessBoard* m_chessBoard;
-    CommandReader* m_commandReader;
     Command m_sequenceCommand[MAX_MOVE_SEQUENCE];
     Command m_nextPoint;
+    char m_commandRead[64];
     uint8_t m_numCommand;
     uint8_t m_curCommandId;
     uint8_t m_commandState;

@@ -24,10 +24,10 @@ public:
     uint8_t executePulseLoop(int motorID) override;
     void enableHardwareTimer(bool enable) override;
     void resetPulse(int motorID) override;
-    void simulateReceivedCommand(char* command, int length);
+    void simulateReceivedCommand(char* command);
 private:
     MainProcess* m_mainProcess;
-    char m_command[MAX_COMMAND_LENGTH];    
+    char m_command[MAX_COMMAND_LENGTH];
 };
 
 #endif // APPLICATIONSIM_H

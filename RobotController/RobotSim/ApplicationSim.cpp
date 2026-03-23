@@ -52,7 +52,9 @@ void ApplicationSim::initRobot()
 
 void ApplicationSim::specificPlatformGohome(int motorID)
 {
-    m_mainProcess->changeTimerPeriod(1);
+    m_mainProcess->changeTimerPeriodMotion(1);
+    m_mainProcess->changeTimerPeriodCommand(1000);
+    m_mainProcess->changeTimerPeriodInput(1000);
 }
 
 void ApplicationSim::harwareStop(int motorID)
@@ -166,9 +168,11 @@ void ApplicationSim::moveDoneAction(int motorID)
 #endif
 }
 
-void ApplicationSim::simulateReceivedCommand(char* command, int length)
+void ApplicationSim::simulateReceivedCommand(char* command)
 {
-    memcpy(m_command,command,length);
+    memset(m_command,0x00,sizeof(m_command));
+    memcpy(m_command,command,strlen(command));
+    printf("simulateReceivedCommand:[%s]\r\n",m_command);
 }
 
 uint8_t ApplicationSim::executePulseLoop(int motorID)
