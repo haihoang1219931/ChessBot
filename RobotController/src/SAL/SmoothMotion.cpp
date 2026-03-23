@@ -102,35 +102,39 @@ void SmoothMotion::homing()
     increaseCruiseSteps();
 }
 void SmoothMotion::increaseSpeed() {
+  if(m_stepCountAccel >= m_numStepAccel){
+    changeStateControl(MOTOR_EXECUTE_CRUISE_SPEED);
+    return;
+  }
   m_statePulse = pulseLoop();
   if(m_statePulse != STATE_DONE) return;
   resetPulse();
   increaseAccelSteps();
   m_numWaitPulse = delayAccel(m_stepCountAccel,m_numWaitPulse);
-  if(m_stepCountAccel >= m_numStepAccel){
-    changeStateControl(MOTOR_EXECUTE_CRUISE_SPEED);
-  }
+
 }
 
 void SmoothMotion::cruiseSpeed() {
+  if(m_stepCountCruise >= m_numStepCruise){
+    changeStateControl(m_moveType == MOTOR_EXECUTE_INCREASE_SPEED?
+                           MOTOR_EXECUTE_DECREASE_SPEED:MOTOR_EXECUTE_DONE);
+    return;
+  }
   m_statePulse = pulseLoop();
   if(m_statePulse != STATE_DONE) return;
   resetPulse();
   increaseCruiseSteps();
-  if(m_stepCountCruise >= m_numStepCruise){
-    changeStateControl(m_moveType == MOTOR_EXECUTE_INCREASE_SPEED?
-                           MOTOR_EXECUTE_DECREASE_SPEED:MOTOR_EXECUTE_DONE);
-  }
 }
 
 void SmoothMotion::decreaseSpeed() {
+  if(m_stepCountDecel >= m_numStepDecel) {
+    changeStateControl(MOTOR_EXECUTE_DONE);
+    return;
+  }
   m_statePulse = pulseLoop();
   if(m_statePulse != STATE_DONE) return;
   increaseDecelSteps();
-  m_numWaitPulse = delayDecel(m_numStepDecel - m_stepCountDecel,m_numWaitPulse);  
-  if(m_stepCountDecel >= m_numStepDecel) {
-    changeStateControl(MOTOR_EXECUTE_DONE);
-  }
+  m_numWaitPulse = delayDecel(m_numStepDecel - m_stepCountDecel,m_numWaitPulse);
 }
 
 void SmoothMotion::resetAccelSteps()

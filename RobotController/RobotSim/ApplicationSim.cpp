@@ -24,44 +24,27 @@ ApplicationSim::~ApplicationSim()
 
 }
 
-#define ROBOT_SENSE
+#define FREQUENCY_TIMER1 1250.0f
 void ApplicationSim::initRobot()
 {
-#ifdef ROBOT_SENSE
     m_chessBoard->setChessBoardPosX(31-31*8/2);
     m_chessBoard->setChessBoardPosY(100);
     m_chessBoard->setChessBoardSize(31*8);
     m_chessBoard->setDropZoneSpace(31);
-    m_minSpace = 10;
-    JointParam armPrams[MAX_MOTOR] = {
-    // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|max step/s|frequency
-        {true,  1.0f/1.0f,                            0,     100,        0,       1,        0,       250,           76,      5000.0f},
-        {true,  18,                                  255,      90,      -17,       1,      -17,       150,         5000,      5000.0f},
-        {true,  4,                                   85,     140,       50,       5,       50,       210,         5000,      5000.0f},
-        {false, 1.0f/1.0f,                           15,     130,      130,       1,      130,       130,            1,      5000.0f},
-        {false, 1.0f/1.0f,                          120,     180,      180,       1,      180,       180,            1,      5000.0f},
-        {true,  1,                                    0,      45,        0,       1,        0,        45,           76,      5000.0f}
-    };
-#else
-    m_chessBoard->setChessBoardPosX(31-31*8/2);
-    m_chessBoard->setChessBoardPosY(100);
-    m_chessBoard->setChessBoardSize(31*8);
-    m_chessBoard->setDropZoneSpace(31);
+    m_minSpace = 2;
 
     JointParam armPrams[MAX_MOTOR] = {
-    // active |scale=gear_ratio/resolution   |length|init angle|home angle|home step|min angle|max angle|
-        {true,  1.0f/1.0f,                        0,    100,        0,          1,      0,       250   },
-        {true,  18.0f/1.0f*(200.0f/360.0f),     255,      0,      -17,        100,    -17,       150   },
-        {true,  70.0f/20.0f*(200.0f/360.0f),     85,    140,       50,        100,     50,       210   },
-        {false, 1.0f/1.0f,                       15,    130,      130,          1,    130,       130   },
-        {false, 1.0f/1.0f,                      120,    180,      180,          1,    180,       180   },
-        {true,  50.0f/14.0f*(512.0f/360.0f),      0,      20,       0,          1,      0,        45   }
+    // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
+        {true,  100.0f*(20.0f/360.0f),                0,      10,        0,         2,           0,       250,       2,   FREQUENCY_TIMER1,     50},
+        {true,  1.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,         8,         -17,       150,       2,   FREQUENCY_TIMER1,    150},
+        {true,  1.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,         8,          50,       210,       2,   FREQUENCY_TIMER1,    150},
+        {false,  1.0f/1.0f,                          15,     130,      130,         1,         130,       130,       1,   FREQUENCY_TIMER1,      0},
+        {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       1,   FREQUENCY_TIMER1,      0},
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,      10,        0,         2,           0,        45,       2,   FREQUENCY_TIMER1,     50}
     };
-
-#endif
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
         printf("ApplicationSim::initRobot[%d] param maxSpeed[%d]\r\n",
-               motor,armPrams[motor].maxSpeed);
+               motor,armPrams[motor].minPulsePerStep);
         m_robot->setMotorParam(motor,armPrams[motor]);
         m_robot->updateInitAngle(motor,armPrams[motor].initAngle);
     }
@@ -193,8 +176,11 @@ uint8_t ApplicationSim::executePulseLoop(int motorID)
     uint8_t statePulse = m_robot->statePulse(motorID);
     uint32_t countPulse = m_robot->countPulse(motorID);
     uint32_t numWaitPulse = m_robot->numWaitPulse(motorID);
-//    printf("p S[%d] C[%d/%d]\r\n",
-//           statePulse, countPulse, numWaitPulse);
+#ifdef DEBUG_SIM
+    printf("p motorID[%d] S[%d] C[%d/%d]\r\n",
+           motorID,
+           statePulse, countPulse, numWaitPulse);
+#endif
     if(countPulse < numWaitPulse) {
         m_robot->updateCountPulse(motorID,countPulse+1);
         m_robot->updateStatePulse(motorID,STATE_PENDING);

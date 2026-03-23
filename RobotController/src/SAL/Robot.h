@@ -50,10 +50,16 @@ public:
     int homeStep(int motorID);
     void executeSmoothMotion(int motorID);
     void resetPulse(int motorID);
+    float delayDecel(float stepCount, float delayCur);
+    void calculateTotalTime(int numStepAccel, int numStepTotal, float minsleep,
+                            float* totalDelay, float* startDelay);
+
 private:
     ApplicationController* m_app;
     SmoothMotion* m_motorList[MAX_MOTOR];
     JointParam m_motorParamList[MAX_MOTOR];
+    float m_timeDelay[MAX_MOTOR];
+    float m_startDelay[MAX_MOTOR];
     ROBOT_STATE m_state;
     ROBOT_SEQUENCE_STATE m_sequenceState;
     Move m_moveTarget;
