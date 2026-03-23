@@ -151,21 +151,23 @@ int ApplicationController::executeCommandLine()
         break;
     case COMMAND_STATE_EXECUTE: {
         int jointSteps[MAX_MOTOR];
-        Command nextPoint;
         if(m_curPointInCommand < m_numPointInCommand) {
-            nextPoint = calculateNextPointInLine(m_curPos,m_tarPos,(float)m_curPointInCommand);
+            m_nextPoint = calculateNextPointInLine(m_curPos,m_tarPos,(float)m_curPointInCommand);
             m_commandState = COMMAND_STATE_EXECUTE_THEN_RECAL;
         } else {
-            nextPoint.y = m_sequenceCommand[m_curCommandId].x;
-            nextPoint.x = m_sequenceCommand[m_curCommandId].y;
-            nextPoint.updownAngle = m_sequenceCommand[m_curCommandId].updownAngle;
-            nextPoint.captureStep = m_sequenceCommand[m_curCommandId].captureStep;
+            m_nextPoint.y = m_sequenceCommand[m_curCommandId].x;
+            m_nextPoint.x = m_sequenceCommand[m_curCommandId].y;
+            m_nextPoint.updownAngle = m_sequenceCommand[m_curCommandId].updownAngle;
+            m_nextPoint.captureStep = m_sequenceCommand[m_curCommandId].captureStep;
             m_commandState = COMMAND_STATE_EXECUTE_THEN_DONE;
         }
+        printf("updownAngle (%f - %f)\r\n",
+               m_sequenceCommand[m_curCommandId].updownAngle,
+               m_nextPoint.updownAngle);
         m_curPointInCommand++;
-        calculateJoints(nextPoint.x,
-                        nextPoint.y,
-                        nextPoint.updownAngle,
+        calculateJoints(m_nextPoint.x,
+                        m_nextPoint.y,
+                        m_nextPoint.updownAngle,
                         jointSteps);
         jointSteps[MOTOR_CAPTURE] = m_sequenceCommand[m_curCommandId].captureStep;
         m_robot->setMoveTarget(jointSteps);
@@ -462,6 +464,7 @@ void ApplicationController::calculateJoints(float xPos, float yPos, float upAngl
     jointSteps[MOTOR_ARM5] = m_robot->angleToStep(
                 MOTOR_ARM5,
                 upAngleInDegree);
+    this->printf("calculateJoints upAngleInDegree[%f]\r\n",upAngleInDegree);
 }
 
 Command ApplicationController::calculateNextPointInLine(Point currPos, Point targetPos, float numPointInCommand)

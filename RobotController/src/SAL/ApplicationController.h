@@ -85,6 +85,7 @@ public:
     ChessBoard* m_chessBoard;
     CommandReader* m_commandReader;
     Command m_sequenceCommand[MAX_MOVE_SEQUENCE];
+    Command m_nextPoint;
     uint8_t m_numCommand;
     uint8_t m_curCommandId;
     uint8_t m_commandState;
