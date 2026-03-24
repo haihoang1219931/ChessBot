@@ -5,7 +5,7 @@
 class Robot;
 class SmoothMotion {
   public:
-    SmoothMotion(uint32_t id, Robot* robot);
+    SmoothMotion(uint8_t id, Robot* robot);
     void init();
     void setupTarget(uint32_t stepsAccel, uint32_t stepsCruise, uint32_t stepsDecel, 
       int direction, uint8_t moveType, uint32_t accelStartWaitPulse, uint32_t minWaitPulse);
@@ -29,7 +29,6 @@ class SmoothMotion {
     
   public:
     Robot* m_robot;
-    uint32_t m_id;
     uint32_t m_minWaitPulse;
     
     float m_numWaitPulse;
@@ -46,17 +45,8 @@ class SmoothMotion {
 
     int m_targetStep;
     int m_targetDirection;
-    
 
-    // pin numbers
-    
-    int m_enablePin;
-    int m_dirPin;
-    int m_stepPin1;
-    int m_stepPin2;
-    int m_stepPin3;
-    int m_stepPin4;
-
+    uint8_t m_id;
     uint8_t m_moveType;
     uint8_t m_statePulse;
     uint8_t m_stateControl;

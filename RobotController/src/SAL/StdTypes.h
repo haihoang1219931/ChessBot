@@ -5,7 +5,7 @@
 
 #define MAX_MOVE_SEQUENCE 20
 #define MAX_BUTTON 6
-#define MAX_MOTOR 6
+//#define MAX_MOTOR 6
 #define MAX_COMMAND_LENGTH 256
 #define MAX_PARAMS_CHESSBOARD 4
 
@@ -28,6 +28,11 @@
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+
+typedef enum {
+    ANGLE_RAD,
+    ANGLE_DEGREE
+}ANGLE_TYPE;
 
 typedef enum {
     MOTOR_EXECUTE_WAIT_COMMAND,
@@ -99,6 +104,9 @@ typedef enum{
 typedef enum {
     MACHINE_INIT,
     MACHINE_WAIT_COMMAND,
+    MACHINE_EXECUTE_HOME,
+    MACHINE_EXECUTE_POSITION,
+    MACHINE_EXECUTE_POSITION_STANDBY,
     MACHINE_EXECUTE_COMMAND,
     MACHINE_EXECUTE_COMMAND_DONE,
 }MACHINE_STATE;
@@ -121,9 +129,30 @@ typedef enum {
     ZONE_GUEST
 }ZONE_TYPE;
 
+typedef enum {
+    COMMAND_NORMAL,
+    COMMAND_LINE,
+    COMMAND_ARC,
+}COMMAND_TYPE;
+
+typedef enum {
+    COMMAND_STATE_INIT,
+    COMMAND_STATE_EXECUTE,
+    COMMAND_STATE_EXECUTE_THEN_RECAL,
+    COMMAND_STATE_EXECUTE_THEN_DONE,
+    COMMAND_STATE_DONE,
+}COMMAND_STATE;
+
+typedef enum {
+    COMMAND_SEQUENCE_STATE_INIT,
+    COMMAND_SEQUENCE_STATE_EXECUTE,
+    COMMAND_SEQUENCE_STATE_DONE,
+}COMMAND_SEQUENCE_STATE;
+
 typedef struct{
     float x;
     float y;
+    float z;
 }Point;
 
 typedef struct {
@@ -140,8 +169,9 @@ typedef struct{
     int homeStepTime;
     float minAngle;
     float maxAngle;
-    int maxSpeed;
+    int minPulsePerStep;
     float frequency;
+    int numStepAccel;
     int currentStep;
     int startStep;
     int targetStep;
@@ -156,6 +186,7 @@ typedef enum {
   MOTOR_ARM3,
   MOTOR_ARM4,
   MOTOR_ARM5,
+  MAX_MOTOR
 } MOTOR;
 
 typedef struct {
@@ -167,5 +198,13 @@ typedef struct {
 typedef struct {
     Joint jointSteps[MAX_MOTOR];
 } Move;
+
+typedef struct {
+    float x;
+    float y;
+    float updownAngle;
+    int captureStep;
+    int type;
+} Command;
 
 #endif // STDTYPES_H

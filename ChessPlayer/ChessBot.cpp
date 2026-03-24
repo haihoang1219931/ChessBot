@@ -88,7 +88,7 @@ void ChessBot::calculateNextMove()
 void ChessBot::executeNextMove()
 {
     // TODO: Send command to robot and wait until execution is done
-    m_
+//    m_
 }
 
 void ChessBot::informResult()

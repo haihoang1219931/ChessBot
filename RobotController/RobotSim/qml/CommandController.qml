@@ -215,7 +215,25 @@ Item {
                             }
                         }
                     }
-
+                    Row {
+                        spacing: 10
+                        Button {
+                            width: 100
+                            height: 40
+                            text: "Straight move"
+                            onClicked: {
+                                mainProcess.executeCommand("ml");
+                            }
+                        }
+                        Button {
+                            width: 100
+                            height: 40
+                            text: "Circle move"
+                            onClicked: {
+                                mainProcess.executeCommand("mc");
+                            }
+                        }
+                    }
                     Row {
                         spacing: 10
                         Button {

@@ -11,27 +11,26 @@ public:
     Robot(ApplicationController* app);
     void setMotorParam(int motorID, JointParam param);
  
-    void loop();
+    int loop();
     void setState(ROBOT_STATE newState);
     void initDirection(int motorID, int direction);
     void requestGoHome(int motorID = MAX_MOTOR);
-    void executeGohome();
+    int executeGohome();
     void requestGoPosition(int motorID, int targetStep, int stepTime, bool isRelativeMove);
-    void resetMoveSequene();
-    void appendMove(int* jointSteps);
-    void moveSequence(int motorID = MAX_MOTOR);
+    void setMoveTarget(int* jointSteps);
+    void moveToTarget(int motorID = MAX_MOTOR);
     uint8_t pulseLoop(int motorID);
-    void executeMoveSequence();
+    int executeMoveSequence();
     void initMove(int motorIDFirst, int motorIDLast);
-    void gotoTarget();
-    void capture();
-    long elapsedTime();
+    int gotoTarget();
+    int capture();
+    // long elapsedTime();
     bool isLimitReached(int motorID,
                             MOTOR_LIMIT_TYPE limitType);
     int angleToStep(int motorID, float angle);
-    float stepToAngle(int motorID, int step);
+    float stepToAngle(int motorID, int step, int angleType = ANGLE_DEGREE);
     void currentStep(int* listCurrentStep, int* numMotor);
-    void currentAngle(float* listCurrentStep, int* numMotor);
+    void currentAngle(float* listCurrentAngle, int* numMotor, int angleType = ANGLE_DEGREE);
     void armLength(float* listArmLength, int* numMotor);
     int currentDirection(int motorID);
     
@@ -51,21 +50,25 @@ public:
     int homeStep(int motorID);
     void executeSmoothMotion(int motorID);
     void resetPulse(int motorID);
+    float delayDecel(float stepCount, float delayCur);
+    void calculateTotalTime(int numStepAccel, int numStepTotal, float minsleep,
+                            float* totalDelay, float* startDelay);
+
 private:
     ApplicationController* m_app;
     SmoothMotion* m_motorList[MAX_MOTOR];
     JointParam m_motorParamList[MAX_MOTOR];
+    float m_timeDelay[MAX_MOTOR];
+    float m_startDelay[MAX_MOTOR];
     ROBOT_STATE m_state;
     ROBOT_SEQUENCE_STATE m_sequenceState;
-    Move m_moveSequence[MAX_MOVE_SEQUENCE];
-    int m_motorIDFirst;
-    int m_motorIDLast;
-    int m_curMove;
-    int m_numMove;
-    int m_numMotor;
-    int m_requestMotorID;
-    long m_startTime;
-    long m_elapsedTime;
+    Move m_moveTarget;
+    uint8_t m_motorIDFirst;
+    uint8_t m_motorIDLast;
+    uint8_t m_numMotor;
+    uint8_t m_requestMotorID;
+    // long m_startTime;
+    // long m_elapsedTime;
 };
 
 #endif // ROBOT_H

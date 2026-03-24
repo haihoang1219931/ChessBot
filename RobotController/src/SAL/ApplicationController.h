@@ -6,7 +6,6 @@
 class Button;
 class Robot;
 class ChessBoard;
-class CommandReader;
 
 class ApplicationController
 {
@@ -15,6 +14,7 @@ public:
     virtual ~ApplicationController();
     
     void loop();
+    void readCommand();
     void storeButtonState(int btnID, bool pressed);
     void updateInputState();
     MACHINE_STATE stateMachine();
@@ -30,12 +30,17 @@ public:
     bool inverseKinematic(float x, float y,
                            float a1, float a2,float* p1, float* p2);
     void forwardKinematic(float a1, float a2, float p1, float p2, float* x, float* y);
+    int executeCommandSequenceLoop();
+    int executeCommandLoop();
+    int executeCommandNormal();
+    int executeCommandLine();
     void goToHome(int motorID);
     void goToReadyPosition();
     void executeSequence(MOVE_TYPE moveType,
                          int startCol, int startRow,
                          int stopCol, int stopRow,
                          char promotePiece = 0);
+    void calculateSequenceMoveStraight(int startCol, int startRow,int stopCol, int stopRow);
     void calculateSequenceMove(int startCol, int startRow, int upAngleInDegree, bool isCapture);
     void calculateSequenceMoveNormal(int startCol, int startRow,
                          int stopCol, int stopRow);
@@ -49,9 +54,11 @@ public:
                                  int rookCol, int rookRow);
     void calculatePolygonEdge(float upAngleInDegree, float* edge, float* angle);
     void calculateJoints(float xPos, float yPos, float upAngleInDegree, int* jointSteps);
+    Command calculateNextPointInLine(Point currPos, Point targetPos, float numPointInCommand);
+    Point currentPos();
+    float distance(float x1, float y1, float x2, float y2);
     void clearSequenceMove();
     void appendSequenceMove(Point start, Point stop, bool straightMove = false);
-    void appendStandByMove();
     void initSequenceMove(int numberOfJoints);
     void executeSmoothMotionLoop(int motorID);
     virtual void initRobot() = 0;
@@ -76,9 +83,20 @@ public:
     Button* m_buttonList[MAX_BUTTON];
     Robot* m_robot;
     ChessBoard* m_chessBoard;
-    CommandReader* m_commandReader;
-    int m_comCommandID = 0;
+    Command m_sequenceCommand[MAX_MOVE_SEQUENCE];
+    Command m_nextPoint;
+    char m_commandRead[64];
+    uint8_t m_numCommand;
+    uint8_t m_curCommandId;
+    uint8_t m_commandState;
+    uint8_t m_commandSequenceState;
+    uint8_t m_comCommandID = 0;
+    uint32_t m_curPointInCommand;
+    uint32_t m_numPointInCommand;
+    Point m_curPos;
+    Point m_tarPos;
     int m_appTimer;
+    float m_minSpace;
 };
 
 #endif // APPLICATIONCONTROLLER_H
