@@ -1,7 +1,7 @@
 TEMPLATE = app
 CONFIG += c++11 no_keywords console
 
-QT += qml quick qml
+QT += qml quick qml serialport
 CONFIG += c++11
 
 #unix:!macx: INCLUDEPATH += /usr/local/include/opencv4
