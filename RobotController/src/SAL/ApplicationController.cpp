@@ -34,7 +34,6 @@ void ApplicationController::loop() {
         case MACHINE_EXECUTE_HOME:
         case MACHINE_EXECUTE_POSITION:
         {
-            updateInputState();
             if(m_robot->loop() == ROBOT_MOVE_DONE)
                 m_machineState = MACHINE_EXECUTE_COMMAND_DONE;
             break;
@@ -94,7 +93,6 @@ int ApplicationController::executeCommandSequenceLoop()
 }
 int ApplicationController::executeCommandLoop()
 {
-    updateInputState();
     int commandType = m_sequenceCommand[m_curCommandId].type;
 //    printf("executeCommandLoop state[%d] m_curCommandId[%d]\r\n",
 //           commandType,m_curCommandId);
@@ -166,9 +164,6 @@ int ApplicationController::executeCommandLine()
             m_nextPoint.captureStep = m_sequenceCommand[m_curCommandId].captureStep;
             m_commandState = COMMAND_STATE_EXECUTE_THEN_DONE;
         }
-        printf("updownAngle (%f - %f)\r\n",
-               m_sequenceCommand[m_curCommandId].updownAngle,
-               m_nextPoint.updownAngle);
         m_curPointInCommand++;
         calculateJoints(m_nextPoint.x,
                         m_nextPoint.y,
@@ -553,6 +548,7 @@ void ApplicationController::executeSequence(
     }
 
     setMachineState(MACHINE_EXECUTE_COMMAND);
+    m_commandSequenceState = COMMAND_SEQUENCE_STATE_INIT;
 }
 
 void ApplicationController::calculateSequenceMoveStraight(int startCol, int startRow,int stopCol, int stopRow)
@@ -628,7 +624,6 @@ void ApplicationController::calculateSequenceAttack(int startCol, int startRow,
     clearSequenceMove();
     appendSequenceMove(stopPoint, dropPoint);
     appendSequenceMove(startPoint, stopPoint);
-    initSequenceMove(MAX_MOTOR);
 }
 
 void ApplicationController::calculateSequencePastPawn(int startCol, int startRow,
@@ -642,7 +637,6 @@ void ApplicationController::calculateSequencePastPawn(int startCol, int startRow
     clearSequenceMove();
     appendSequenceMove(pawnPoint, dropPoint);
     appendSequenceMove(startPoint, stopPoint);
-    initSequenceMove(MAX_MOTOR);
 }
 
 void ApplicationController::calculateSequencePromotePiece(int startCol, int startRow,
@@ -662,7 +656,6 @@ void ApplicationController::calculateSequencePromotePiece(int startCol, int star
     }
     appendSequenceMove(promotePiecePoint, stopPoint);
     appendSequenceMove(startPoint, dropPiecePoint);
-    initSequenceMove(MAX_MOTOR);
 }
 
 void ApplicationController::calculateSequenceCastle(int kingCol, int kingRow,
@@ -682,9 +675,8 @@ void ApplicationController::calculateSequenceCastle(int kingCol, int kingRow,
         rookNewPoint = m_chessBoard->convertPoint(kingRow,kingCol+1);
     }
     clearSequenceMove();
-    appendSequenceMove(rookPoint, rookNewPoint, true);
+    appendSequenceMove(rookPoint, rookNewPoint);
     appendSequenceMove(kingPoint, kingNewPoint);
-    initSequenceMove(MAX_MOTOR);
 }
 
 float ApplicationController::distance(float x1, float y1, float x2, float y2)
@@ -710,11 +702,11 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
         int numStep = 6;
         for(int seqStep = 0; seqStep < numStep; seqStep++)
         {
-            m_sequenceCommand[seqStep].x = position[seqStep].x;
-            m_sequenceCommand[seqStep].y = position[seqStep].y;
-            m_sequenceCommand[seqStep].updownAngle = upAngles[seqStep];
-            m_sequenceCommand[seqStep].captureStep = captureStep[seqStep];
-            m_sequenceCommand[seqStep].type = COMMAND_NORMAL;
+            m_sequenceCommand[m_numCommand].x = position[seqStep].x;
+            m_sequenceCommand[m_numCommand].y = position[seqStep].y;
+            m_sequenceCommand[m_numCommand].updownAngle = upAngles[seqStep];
+            m_sequenceCommand[m_numCommand].captureStep = captureStep[seqStep];
+            m_sequenceCommand[m_numCommand].type = COMMAND_NORMAL;
             m_numCommand++;
         }
     } else {
@@ -725,11 +717,11 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
         int numStep = 4;
         for(int seqStep = 0; seqStep < numStep; seqStep++)
         {
-            m_sequenceCommand[seqStep].x = position[seqStep].x;
-            m_sequenceCommand[seqStep].y = position[seqStep].y;
-            m_sequenceCommand[seqStep].updownAngle = upAngles[seqStep];
-            m_sequenceCommand[seqStep].captureStep = captureStep[seqStep];
-            m_sequenceCommand[seqStep].type = seqStep != 2 ?
+            m_sequenceCommand[m_numCommand].x = position[seqStep].x;
+            m_sequenceCommand[m_numCommand].y = position[seqStep].y;
+            m_sequenceCommand[m_numCommand].updownAngle = upAngles[seqStep];
+            m_sequenceCommand[m_numCommand].captureStep = captureStep[seqStep];
+            m_sequenceCommand[m_numCommand].type = seqStep != 2 ?
                         COMMAND_NORMAL : COMMAND_LINE;
             m_numCommand++;
         }
