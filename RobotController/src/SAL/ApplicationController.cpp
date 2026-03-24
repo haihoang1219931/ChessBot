@@ -57,7 +57,7 @@ void ApplicationController::loop() {
 
 void ApplicationController::readCommand()
 {
-    printf("readCommand\r\n");
+    // printf("readCommand\r\n");
     int incomingBytes = readSerial(m_commandRead,sizeof(m_commandRead));
     if(incomingBytes>0) executeCommand(m_commandRead);
 }

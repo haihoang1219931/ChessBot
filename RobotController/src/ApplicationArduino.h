@@ -28,13 +28,13 @@ public:
   uint8_t executePulseStepper2Wires(uint8_t statePulse, uint32_t countPulse, uint32_t numWaitPulse, volatile uint8_t* portRegister, int bit);
 
 private:
-  void initHardwareTimer(float samplerate = 40000.0f);
+  void initHardwareTimer(int timerID, float samplerate = 40000.0f);
 private:
   va_list m_args;
   char m_buffer[128];    
   char m_command[64];
   uint8_t m_incomingByte;
-  uint8_t m_buttonPin[MAX_BUTTON];
+  // uint8_t m_buttonPin[MAX_BUTTON];
   int16_t m_limitGripperValue;
 };
 

@@ -31,6 +31,11 @@
 #define limitGripper A13 // CAPTURE LIMIT Analog
 
 typedef enum {
+  TIMER_ID_CHECK_COMMAND,
+  TIMER_ID_UPDATE_INPUT,
+  TIMER_ID_EXECUTE_MOTION,
+} TIMER_ID;
+typedef enum {
   STATE_CHECK_SENSOR,
   STATE_SET_DIR,
   STATE_GO_HOME,
@@ -42,10 +47,10 @@ ApplicationArduino app;
 ApplicationArduino::ApplicationArduino()
 {
     initRobot();
-    memset(m_buttonPin,NONE_PIN,sizeof(m_buttonPin));
-    m_buttonPin[MOTOR_ARM1] = limit1;
-    m_buttonPin[MOTOR_ARM2] = limit2;
-    m_buttonPin[MOTOR_ARM5] = limit5;
+    // memset(m_buttonPin,NONE_PIN,sizeof(m_buttonPin));
+    // m_buttonPin[MOTOR_ARM1] = limit1;
+    // m_buttonPin[MOTOR_ARM2] = limit2;
+    // m_buttonPin[MOTOR_ARM5] = limit5;
 
     pinMode(limit1, INPUT_PULLUP);
     pinMode(limit2, INPUT_PULLUP);
@@ -82,6 +87,12 @@ ApplicationArduino::ApplicationArduino()
     digitalWrite(enPinCapture, HIGH);
     digitalWrite(dirPinCapture, LOW);
     digitalWrite(stepPinCapture, HIGH);
+
+    // Clear the prescaler bits (bits 0, 1, 2)
+    ADCSRA &= ~( (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0) );
+
+    // Set prescaler to 16 (ADPS2 = 1, ADPS1 = 0, ADPS0 = 0)
+    ADCSRA |= (1 << ADPS2);
 }
 
 ApplicationArduino::~ApplicationArduino()
@@ -89,6 +100,25 @@ ApplicationArduino::~ApplicationArduino()
 
 }
 #define FREQUENCY_TIMER1 1250.0f
+
+int16_t readA13() {
+  // A13 is channel 13 (binary 1101)
+  // MUX5 (in ADCSRB) must be 1 for channels 8-15
+  ADCSRB |= (1 << MUX5);
+  
+  // Set lower MUX bits (101 for channel 13: MUX2 and MUX0)
+  ADMUX = (ADMUX & 0xF8) | 0x05; 
+
+  // Start conversion
+  ADCSRA |= (1 << ADSC);
+
+  // Wait for conversion to complete
+  while (ADCSRA & (1 << ADSC));
+
+  // Return the 10-bit result (0-1023)
+  return ADC;
+}
+
 void ApplicationArduino::initRobot()
 {
     m_chessBoard->setChessBoardPosX(31-31*8/2);
@@ -111,6 +141,7 @@ void ApplicationArduino::initRobot()
         m_robot->setMotorParam(motor,armPrams[motor]);
         m_robot->updateInitAngle(motor,armPrams[motor].initAngle);
     }
+    initHardwareTimer(TIMER_ID_CHECK_COMMAND, 100.0f);
 }
 
 int ApplicationArduino::printf(const char *fmt, ...) {
@@ -203,15 +234,15 @@ void ApplicationArduino::harwareStop(int motorID = MAX_MOTOR)
 }
 
 void ApplicationArduino::checkInput(){
-	for(unsigned int btnID = 0; btnID< MAX_BUTTON; btnID++) {
-    if(m_buttonPin[btnID] != NONE_PIN) {
-      pinMode(m_buttonPin[btnID], INPUT_PULLUP);
-      storeButtonState(btnID, digitalRead(m_buttonPin[btnID]) == LOW);
-      // this->printf("button[%d] %s\r\n",btnID, digitalRead(m_buttonPin[btnID]) == LOW ? "pressed" : "normal");
-    }
-	}
-  m_limitGripperValue = analogRead(limitGripper);
-  // this->printf("Limit Gripper pin[%d] Value: %d\r\n", limitGripper, m_limitGripperValue);
+	// for(unsigned int btnID = 0; btnID< MAX_BUTTON; btnID++) {
+  //   if(m_buttonPin[btnID] != NONE_PIN) {
+  //     pinMode(m_buttonPin[btnID], INPUT_PULLUP);
+  //     storeButtonState(btnID, digitalRead(m_buttonPin[btnID]) == LOW);
+  //     // this->printf("button[%d] %s\r\n",btnID, digitalRead(m_buttonPin[btnID]) == LOW ? "pressed" : "normal");
+  //   }
+	// }
+  // m_limitGripperValue = analogRead(limitGripper);
+  // // this->printf("Limit Gripper pin[%d] Value: %d\r\n", limitGripper, m_limitGripperValue);
 }
 #define DEBUG_SERIAL
 int ApplicationArduino::readSerial(char* output, int length) {
@@ -244,23 +275,24 @@ bool ApplicationArduino::isLimitReached(int motorID, MOTOR_LIMIT_TYPE limitType)
   switch(motorID){
     case MOTOR::MOTOR_ARM1: {
       limitReached = limitType == MOTOR_LIMIT_MIN || limitType == MOTOR_LIMIT_HOME ? 
-                    (m_buttonList[MOTOR_ARM1]->buttonState() != BUTTON_STATE::BUTTON_NOMAL) :
+                    PIND & (1 << 2) == 0 :
                     false;
     }
     break;
     case MOTOR::MOTOR_ARM2: {
       limitReached = limitType == MOTOR_LIMIT_MIN || limitType == MOTOR_LIMIT_HOME ? 
-                    (m_buttonList[MOTOR_ARM2]->buttonState() != BUTTON_STATE::BUTTON_NOMAL) :
+                    PINJ & (1 << 1) == 0 :
                     false;
     }
     break;
     case MOTOR::MOTOR_ARM5: {
       limitReached = limitType == MOTOR_LIMIT_MIN || limitType == MOTOR_LIMIT_HOME ? 
-                    (m_buttonList[MOTOR_ARM5]->buttonState() != BUTTON_STATE::BUTTON_NOMAL) :
+                    PIND & (1 << 3) == 0 :
                     false;
     }
     break;
     case MOTOR::MOTOR_CAPTURE: {
+      m_limitGripperValue = readA13(); // Read the analog value from A13
       limitReached = limitType == MOTOR_LIMIT_MIN || limitType == MOTOR_LIMIT_HOME ? 
                     m_limitGripperValue > 630 :
                     m_limitGripperValue < 300;
@@ -342,17 +374,26 @@ void ApplicationArduino::moveDoneAction(int motorID)
   }
 }
 
-void ApplicationArduino::initHardwareTimer(float samplerate)
+void ApplicationArduino::initHardwareTimer(int timerID, float samplerate)
 {
-  // initialize timer1
+  // initialize timer with CTC mode and 1024 prescaler, and enable compare interrupt
   noInterrupts(); // disable all interrupts
-  TCCR1A = 0;
-  TCCR1B = 0;
-  TCNT1 = 0;
-  OCR1A = 16000000.0f / samplerate; // compare match register for IRQ with selected samplerate
-  TIMSK1 |= (1 << OCIE1A); // enable timer compare interrupt
-  TCCR1B |= (1 << WGM12); // CTC mode
-  TCCR1B |= (1 << CS10); // no prescaler
+  if(timerID == TIMER_ID_CHECK_COMMAND) {
+    TCCR0A = (1 << WGM01); // Set CTC mode
+    TCCR0B = 1 << CS00; // 1024 prescaler
+    OCR0A = 16000000.0f / samplerate; // Compare value
+    TIMSK0 = (1 << OCIE0A); // Enable timer compare interrupt
+  } else if(timerID == TIMER_ID_EXECUTE_MOTION) {
+    TCCR1A = 0; // Set normal mode
+    TCCR1B = (1 << WGM12) | (1 << CS10); // CTC mode + 1024 prescaler
+    OCR1A = 16000000.0f / samplerate; // Compare value (16MHz / (1024 * 0.5Hz) - 1)
+    TIMSK1 = (1 << OCIE1A); // Enable timer compare interrupt
+  } else if(timerID == TIMER_ID_UPDATE_INPUT) {
+    TCCR2A = (1 << WGM21); // Set CTC mode
+    TCCR2B = 1 << CS20; // 1024 prescaler
+    OCR2A = 16000000.0f / samplerate; // Compare value
+    TIMSK2 = (1 << OCIE2A); // Enable timer compare interrupt
+  }
   interrupts(); // enable all interrupts
 }
 // #define DEBUG_PULSE
@@ -467,6 +508,9 @@ uint8_t ApplicationArduino::executePulseStepper2Wires(uint8_t statePulse,
 #endif
   return nextStatePulse;
 }
+ISR(TIMER0_COMPA_vect){
+  app.readCommand();
+}
 
 ISR(TIMER1_COMPA_vect)
 {
@@ -474,4 +518,8 @@ ISR(TIMER1_COMPA_vect)
   app.executeSmoothMotionLoop(MOTOR_ARM2);
   app.executeSmoothMotionLoop(MOTOR_ARM5);
   app.executeSmoothMotionLoop(MOTOR_CAPTURE);
+}
+
+ISR(TIMER2_COMPA_vect){
+  // app.updateInputState();
 }
