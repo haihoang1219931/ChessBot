@@ -30,27 +30,12 @@
 #define limit5 18 // ARM5 LIMIT
 #define limitGripper A13 // CAPTURE LIMIT Analog
 
-typedef enum {
-  TIMER_ID_CHECK_COMMAND,
-  TIMER_ID_UPDATE_INPUT,
-  TIMER_ID_EXECUTE_MOTION,
-} TIMER_ID;
-typedef enum {
-  STATE_CHECK_SENSOR,
-  STATE_SET_DIR,
-  STATE_GO_HOME,
-  STATE_GO_TO_TARGET,
-  STATE_HOME_DONE,
-} STATE_HOMING;
+#define FREQUENCY_TIMER1 1250.0f
 
 ApplicationArduino app;
 ApplicationArduino::ApplicationArduino()
 {
     initRobot();
-    // memset(m_buttonPin,NONE_PIN,sizeof(m_buttonPin));
-    // m_buttonPin[MOTOR_ARM1] = limit1;
-    // m_buttonPin[MOTOR_ARM2] = limit2;
-    // m_buttonPin[MOTOR_ARM5] = limit5;
 
     pinMode(limit1, INPUT_PULLUP);
     pinMode(limit2, INPUT_PULLUP);
@@ -87,35 +72,26 @@ ApplicationArduino::ApplicationArduino()
     digitalWrite(enPinCapture, HIGH);
     digitalWrite(dirPinCapture, LOW);
     digitalWrite(stepPinCapture, HIGH);
-
+  
     // Clear the prescaler bits (bits 0, 1, 2)
     ADCSRA &= ~( (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0) );
 
     // Set prescaler to 16 (ADPS2 = 1, ADPS1 = 0, ADPS0 = 0)
-    ADCSRA |= (1 << ADPS2);
+    ADCSRA |= (1 << ADPS2); 
+
+    analogRead(limitGripper);
 }
 
 ApplicationArduino::~ApplicationArduino()
 {
 
 }
-#define FREQUENCY_TIMER1 1250.0f
 
-int16_t readA13() {
-  // A13 is channel 13 (binary 1101)
-  // MUX5 (in ADCSRB) must be 1 for channels 8-15
+int16_t ApplicationArduino::readA13() {
   ADCSRB |= (1 << MUX5);
-  
-  // Set lower MUX bits (101 for channel 13: MUX2 and MUX0)
   ADMUX = (ADMUX & 0xF8) | 0x05; 
-
-  // Start conversion
   ADCSRA |= (1 << ADSC);
-
-  // Wait for conversion to complete
   while (ADCSRA & (1 << ADSC));
-
-  // Return the 10-bit result (0-1023)
   return ADC;
 }
 
@@ -128,20 +104,19 @@ void ApplicationArduino::initRobot()
     m_minSpace = 2;
 
     JointParam armPrams[MAX_MOTOR] = {
-    // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|max step/s|frequency
-        {true,  100.0f*(20.0f/360.0f),                0,     -10,        0,       2,           0,       250,      500,   FREQUENCY_TIMER1},
-        {true,  1.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,         8,         -17,       150,     500,   FREQUENCY_TIMER1},
-        {true,  1.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,         8,          50,       210,     100,   FREQUENCY_TIMER1},
-        {false,  1.0f/1.0f,                          15,     130,      130,         1,         130,       130,        1,   FREQUENCY_TIMER1},
-        {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,        1,   FREQUENCY_TIMER1},
-        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,     -10,        0,       2,           0,        45,      500,   FREQUENCY_TIMER1}
+    // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
+        {true,  100.0f*(20.0f/360.0f),                0,      10,        0,         2,           0,       250,       2,   FREQUENCY_TIMER1,     50},
+        {true,  1.0f*18.0f/01.0f*(200.0f/360.0f),   260,       0,      -17,         8,         -17,       150,       8,   FREQUENCY_TIMER1,    150},
+        {true,  1.0f*70.0f/20.0f*(200.0f/360.0f), 76.27,     140,       50,         8,          50,       210,       8,   FREQUENCY_TIMER1,    150},
+        {false,  1.0f/1.0f,                       25.57,     130,      130,         1,         130,       130,       1,   FREQUENCY_TIMER1,      0},
+        {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       1,   FREQUENCY_TIMER1,      0},
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,      10,        0,         2,           0,        45,       2,   FREQUENCY_TIMER1,     50}
     };
 
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
         m_robot->setMotorParam(motor,armPrams[motor]);
         m_robot->updateInitAngle(motor,armPrams[motor].initAngle);
     }
-    initHardwareTimer(TIMER_ID_CHECK_COMMAND, 100.0f);
 }
 
 int ApplicationArduino::printf(const char *fmt, ...) {
@@ -275,19 +250,19 @@ bool ApplicationArduino::isLimitReached(int motorID, MOTOR_LIMIT_TYPE limitType)
   switch(motorID){
     case MOTOR::MOTOR_ARM1: {
       limitReached = limitType == MOTOR_LIMIT_MIN || limitType == MOTOR_LIMIT_HOME ? 
-                    PIND & (1 << 2) == 0 :
+                    (PIND & (1 << 2)) == 0 :
                     false;
     }
     break;
     case MOTOR::MOTOR_ARM2: {
       limitReached = limitType == MOTOR_LIMIT_MIN || limitType == MOTOR_LIMIT_HOME ? 
-                    PINJ & (1 << 1) == 0 :
+                    (PINJ & (1 << 1)) == 0 :
                     false;
     }
     break;
     case MOTOR::MOTOR_ARM5: {
       limitReached = limitType == MOTOR_LIMIT_MIN || limitType == MOTOR_LIMIT_HOME ? 
-                    PIND & (1 << 3) == 0 :
+                    (PIND & (1 << 3)) == 0 :
                     false;
     }
     break;
@@ -380,18 +355,21 @@ void ApplicationArduino::initHardwareTimer(int timerID, float samplerate)
   noInterrupts(); // disable all interrupts
   if(timerID == TIMER_ID_CHECK_COMMAND) {
     TCCR0A = (1 << WGM01); // Set CTC mode
-    TCCR0B = 1 << CS00; // 1024 prescaler
-    OCR0A = 16000000.0f / samplerate; // Compare value
+    TCCR0B = (1 << CS02) | (1 << CS00); // 1024 prescaler
+    OCR0A = 255; // Compare value
     TIMSK0 = (1 << OCIE0A); // Enable timer compare interrupt
   } else if(timerID == TIMER_ID_EXECUTE_MOTION) {
     TCCR1A = 0; // Set normal mode
-    TCCR1B = (1 << WGM12) | (1 << CS10); // CTC mode + 1024 prescaler
-    OCR1A = 16000000.0f / samplerate; // Compare value (16MHz / (1024 * 0.5Hz) - 1)
-    TIMSK1 = (1 << OCIE1A); // Enable timer compare interrupt
+    TCCR1B = 0;               // Reset Timer1 Control Register B
+    TCNT1  = 0;               // Initialize counter value to 0
+    OCR1A = 16000000.0f / samplerate-1; // Compare value (16MHz / (1024 * 0.5Hz) - 1)
+    TCCR1B |= (1 << WGM12);   // Turn on CTC mode
+    TCCR1B |= (1 << CS10);    // Set CS10 bit for NO prescaler
+    TIMSK1 |= (1 << OCIE1A);  // Enable timer compare interrupt
   } else if(timerID == TIMER_ID_UPDATE_INPUT) {
     TCCR2A = (1 << WGM21); // Set CTC mode
     TCCR2B = 1 << CS20; // 1024 prescaler
-    OCR2A = 16000000.0f / samplerate; // Compare value
+    OCR2A = 16000000.0f / samplerate-1; // Compare value
     TIMSK2 = (1 << OCIE2A); // Enable timer compare interrupt
   }
   interrupts(); // enable all interrupts
@@ -440,7 +418,7 @@ uint8_t ApplicationArduino::executePulseLoop(int motorID)
 void ApplicationArduino::enableHardwareTimer(bool enable)
 {
   if(enable) {
-    initHardwareTimer(FREQUENCY_TIMER1);
+    initHardwareTimer(TIMER_ID_EXECUTE_MOTION, FREQUENCY_TIMER1);
   }
   else
     TIMSK1 &= ~(1 << OCIE1A);
@@ -508,12 +486,20 @@ uint8_t ApplicationArduino::executePulseStepper2Wires(uint8_t statePulse,
 #endif
   return nextStatePulse;
 }
+
+volatile int countSample0 = 0;
+volatile int countSample1 = 0;
 ISR(TIMER0_COMPA_vect){
-  app.readCommand();
+  countSample0++;
+  if(countSample0 >= 61) {
+    countSample0 = 0;
+    app.readCommand();
+  }
 }
 
 ISR(TIMER1_COMPA_vect)
 {
+  countSample1++;
   app.executeSmoothMotionLoop(MOTOR_ARM1);
   app.executeSmoothMotionLoop(MOTOR_ARM2);
   app.executeSmoothMotionLoop(MOTOR_ARM5);

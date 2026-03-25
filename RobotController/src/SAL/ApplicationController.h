@@ -36,6 +36,7 @@ public:
     int executeCommandLine();
     void goToHome(int motorID);
     void goToReadyPosition();
+    void goToSpetialPosition();
     void executeSequence(MOVE_TYPE moveType,
                          int startCol, int startRow,
                          int stopCol, int stopRow,

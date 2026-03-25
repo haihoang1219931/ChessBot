@@ -282,8 +282,11 @@ void ApplicationController::executeCommand(char* command) {
     else if(command[0] == 'd') {
         this->enableEngine(false);
     }
-    else if(command[0] == 'r') {
-        goToReadyPosition();
+    else if(command[0] == 'r' && strlen(command)>=2) {
+        if(command[1] == 'a')
+            goToReadyPosition();
+        else if(command[1] == 's')
+            goToSpetialPosition();
     }
     else if(command[0] == 'm' && strlen(command)>=2) {
         if(command[1] == 'l')
@@ -517,6 +520,18 @@ void ApplicationController::goToReadyPosition() {
     setMachineState(MACHINE_EXECUTE_POSITION);
 }
 
+void ApplicationController::goToSpetialPosition() {
+    int jointSteps[MAX_MOTOR];
+    jointSteps[MOTOR_CAPTURE] = 0;
+    jointSteps[MOTOR_ARM1] = m_robot->angleToStep(MOTOR_ARM1,120);
+    jointSteps[MOTOR_ARM2] = m_robot->angleToStep(MOTOR_ARM2,90+m_robot->homeAngle(MOTOR_ARM2));
+    jointSteps[MOTOR_ARM3] = 0;
+    jointSteps[MOTOR_ARM4] = 0;
+    jointSteps[MOTOR_ARM5] = m_robot->angleToStep(MOTOR_ARM5,45);
+    m_robot->setMoveTarget(jointSteps);
+    m_robot->moveToTarget(MAX_MOTOR);
+    setMachineState(MACHINE_EXECUTE_POSITION);    
+}
 void ApplicationController::executeSequence(
         MOVE_TYPE moveType,
         int startCol, int startRow,

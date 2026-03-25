@@ -369,6 +369,7 @@ void Robot::calculateTotalTime(int numStepAccel, int numStepTotal, float minslee
     }
 }
 
+#define DEBUG_INITMOVE
 void Robot::initMove(int motorIDFirst, int motorIDLast)
 {
 #ifdef DEBUG_INITMOVE
@@ -392,11 +393,11 @@ void Robot::initMove(int motorIDFirst, int motorIDLast)
                              &m_timeDelay[i],&m_startDelay[i]);
         if(m_timeDelay[i] > maxTime) maxTime = m_timeDelay[i];
 #ifdef DEBUG_INITMOVE
-        m_app->printf("Motor[%d] numStep[%f][%d->%d] minPulsePerStep[%d] time[%f] => Max[%f]\r\n",
+        m_app->printf("Motor[%d] numStep[%f][%d->%d] minPulsePerStep[%d] time[%d] => Max[%d]\r\n",
                       i,
                       numStep, m_motorParamList[i].currentStep, m_moveTarget.jointSteps[i].steps,
-                      m_motorParamList[i].minPulsePerStep, m_timeDelay[i],
-                      maxTime);
+                      m_motorParamList[i].minPulsePerStep, (int)m_timeDelay[i],
+                      (int)maxTime);
 #endif
     }
 
@@ -418,8 +419,8 @@ void Robot::initMove(int motorIDFirst, int motorIDLast)
                     MOTOR_EXECUTE_CRUISE_SPEED:MOTOR_EXECUTE_INCREASE_SPEED,
                     startDelay, m_motorParamList[i].minPulsePerStep);
 #ifdef DEBUG_INITMOVE
-        m_app->printf("Motor[%d] numStep[%d] delayTime[%f]\r\n",
-                      i, numStep, startDelay);
+        m_app->printf("Motor[%d] numStep[%d] delayTime[%d]\r\n",
+                      i, numStep, (int)startDelay);
 #endif
     }
 

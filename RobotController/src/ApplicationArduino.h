@@ -3,6 +3,18 @@
 
 #include <Arduino.h>
 #include "SAL/ApplicationController.h"
+typedef enum {
+  TIMER_ID_CHECK_COMMAND,
+  TIMER_ID_UPDATE_INPUT,
+  TIMER_ID_EXECUTE_MOTION,
+} TIMER_ID;
+typedef enum {
+  STATE_CHECK_SENSOR,
+  STATE_SET_DIR,
+  STATE_GO_HOME,
+  STATE_GO_TO_TARGET,
+  STATE_HOME_DONE,
+} STATE_HOMING;
 
 class ApplicationArduino : public ApplicationController
 {
@@ -26,9 +38,8 @@ public:
   void enableHardwareTimer(bool enable) override;
   void resetPulse(int motorID) override;
   uint8_t executePulseStepper2Wires(uint8_t statePulse, uint32_t countPulse, uint32_t numWaitPulse, volatile uint8_t* portRegister, int bit);
-
-private:
   void initHardwareTimer(int timerID, float samplerate = 40000.0f);
+  int16_t readA13();
 private:
   va_list m_args;
   char m_buffer[128];    
