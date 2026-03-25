@@ -35,6 +35,19 @@ struct Piece {
             case pieceName::QUEEN:	(color != pieceColor::WHITE) ? std::cout << "Q" : std::cout << "q";	break;
 		}
 	}
+    int value() {
+        int pieceValue = 0;
+        switch(name) {
+            case pieceName::EMPTY:	; break;
+            case pieceName::PAWN:	pieceValue = (color == pieceColor::WHITE) ? 8 : 14;	break;
+            case pieceName::ROOK:	pieceValue = (color == pieceColor::WHITE) ? 5 : 11;	break;
+            case pieceName::BISHOP:	pieceValue = (color == pieceColor::WHITE) ? 6 : 12;	break;
+            case pieceName::KNIGHT:	pieceValue = (color == pieceColor::WHITE) ? 7 : 13;	break;
+            case pieceName::KING:	pieceValue = (color == pieceColor::WHITE) ? 3 :  9;	break;
+            case pieceName::QUEEN:	pieceValue = (color == pieceColor::WHITE) ? 4 : 10;	break;
+        }
+        return pieceValue;
+    }
 	pieceName name;
 	pieceColor color;
 
@@ -59,11 +72,12 @@ class Game {
 		
 		pieceColor currentPlayer() const;
 		pieceColor nextPlayer() const;
-		unsigned turn;
 		gameState state;
 		Game* previous;
 		void undo();
-	private:
+        void setTurn(int _turn);
+
+        void resetGame();
 		Board position;
 		unsigned fiftyMoveRule;
 
@@ -74,4 +88,6 @@ class Game {
 		bool preventsCheck(const Move &m) const;
 		std::vector<Move> getLegalMoves(const unsigned &x, const unsigned &y) const;
 		std::vector<Move> getPossibleMoves(const unsigned &x, const unsigned &y) const;
+    private:
+        unsigned turn;
 };

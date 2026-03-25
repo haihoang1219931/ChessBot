@@ -24,9 +24,22 @@ ApplicationWindow {
         onCurrentItemChanged: if (currentItem) currentItem.forceActiveFocus()
 
         Component.onCompleted: {
-            stack.push(levelSelection)
+            stack.push(menuSelection)
         }
     }
+
+    Component {
+        id: menuSelection
+        StartupMenu {
+            onEnterItem: {
+                if(item === 0) {
+                    stack.pop()
+                    stack.push(levelSelection)
+                }
+            }
+        }
+    }
+
     Component {
         id: emoji
         Emoji {
@@ -43,6 +56,7 @@ ApplicationWindow {
             onItemSelected: {
                 stack.pop()
                 stack.push(sideSelection)
+                backend.setLevel(score)
             }
         }
     }
@@ -56,7 +70,8 @@ ApplicationWindow {
             }
             onSideConfirmed: {
                 stack.pop();
-                stack.push(timer)
+                stack.push(timer);
+                backend.setSide(side==="White"?0:1);
             }
         }
     }
@@ -66,6 +81,10 @@ ApplicationWindow {
             onGoback: {
                 stack.pop()
                 stack.push(sideSelection)
+            }
+            onGobackLevelSelection: {
+                stack.pop()
+                stack.push(levelSelection)
             }
         }
     }

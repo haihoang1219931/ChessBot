@@ -37,10 +37,6 @@ function createChessPiecesModel(){
         B_PAWN,  B_PAWN,   B_PAWN,   B_PAWN,  B_PAWN,  B_PAWN,   B_PAWN,   B_PAWN,
         B_ROOK,  B_KNIGHT, B_BISHOP, B_QUEEN ,B_KING , B_BISHOP, B_KNIGHT, B_ROOK,
     ];
-    chessPieceModel[2*8+2] = B_ROOK
-    chessPieceModel[2*8+3] = B_ROOK
-    chessPieceModel[3*8+4] = B_ROOK
-    chessPieceModel[3*8+5] = W_ROOK
     return chessPieceModel;
 }
 

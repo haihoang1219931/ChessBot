@@ -1,6 +1,7 @@
 #include "SimpleChess.h"
 
-Board::Board() : inCheck(false) {
+Board::Board() : inCheck(false)
+{
 	/* -- Initialize board to chess starting position -- */
 	unsigned piecerows = 0; unsigned pawnrows = 1; pieceColor color = pieceColor::WHITE;
 	for (unsigned c = 0; c < 2; ++c) {
@@ -23,7 +24,8 @@ Board::Board() : inCheck(false) {
 	}
 }
 
-Board::Board(const Board &b) : inCheck(b.inCheck) {
+Board::Board(const Board &b) : inCheck(b.inCheck)
+{
 	for (unsigned i=0; i < 8; ++i) {
 		for (unsigned j=0; j < 8; ++j) {
 			board[i][j] = new Piece(b.board[i][j]);
@@ -31,7 +33,8 @@ Board::Board(const Board &b) : inCheck(b.inCheck) {
 	}
 }
 
-bool Board::equals(const Game &g) const {
+bool Board::equals(const Game &g) const
+{
 	for (unsigned i=0; i < 8; ++i) {
 		for (unsigned j=0; j < 8; ++j) {
 			Piece* p = g.getPiece(i, j);
@@ -43,15 +46,15 @@ bool Board::equals(const Game &g) const {
 	return true;
 }
 
-Game::Game() {
-	turn = 0;
+Game::Game()
+{
 	previous = NULL;
 	fiftyMoveRule = 0;
-	state = gameState::PLAYING;
-	calculateAllPossibleMoves(pieceColor::WHITE);
+    state = gameState::PLAYING;
 }
 
-Game::Game(const Game &g) {
+Game::Game(const Game &g)
+{
 	turn = g.turn;
 	previous = g.previous;
 	fiftyMoveRule = g.fiftyMoveRule;
@@ -114,6 +117,18 @@ void Game::undo() {
 		previous = previous->previous;
 		calculateAllPossibleMoves(currentPlayer());
 	}
+}
+void Game::setTurn(int _turn)
+{
+    turn = _turn;
+}
+
+void Game::resetGame()
+{
+    previous = NULL;
+    fiftyMoveRule = 0;
+    state = gameState::PLAYING;
+    position = Board();
 }
 
 void Game::movePieceTo(const Move m) {

@@ -6,6 +6,8 @@
 #include <QWaitCondition>
 #include <QThread>
 #include <QSerialPort>
+#include <QVariant>
+#include <QVariantList>
 
 class Game;
 
@@ -46,9 +48,15 @@ typedef enum{
 class ChessBot : public QThread {
     Q_OBJECT
     Q_PROPERTY(int progress READ progress NOTIFY progressChanged)
+    Q_PROPERTY(int levelType READ levelType NOTIFY levelTypeChanged)
+    Q_PROPERTY(int levelScore READ levelScore NOTIFY levelScoreChanged)
+    Q_PROPERTY(int side READ side NOTIFY sideChanged)
 public:
     explicit ChessBot(QThread *parent = nullptr);
     int progress();
+    int levelType();
+    int levelScore();
+    int side();
 public Q_SLOTS:
     void run() override;
     void startService();
@@ -56,9 +64,18 @@ public Q_SLOTS:
     void togglePause(bool paused);
     void sendTestCommand(QString command);
     void processNextMove();
+    void setLevel(int level);
+    void setSide(int side);
+    void randomMove();
+    void resetGame();
 
 Q_SIGNALS:
+    void gameEnded(QString endState);
     void progressChanged(int value);
+    void sideChanged(int side);
+    void levelTypeChanged(int type);
+    void levelScoreChanged(int score);
+    void gameUpdated(QVariantList newModel);
 
 private:
     void playLoop();
@@ -72,6 +89,7 @@ private:
     uint8_t configureSide();
     uint8_t configureLevel();
     uint8_t testRobot();
+    QVariantList getModelFromGame();
 
 private:
     bool m_stopped = false;
@@ -86,6 +104,9 @@ private:
     int m_statePlay;
     int m_stateConfigure;
     int m_stateTest;
+    int m_levelType;
+    int m_levelScore;
+    int m_side;
 };
 
 #endif // CHESSBOT_H

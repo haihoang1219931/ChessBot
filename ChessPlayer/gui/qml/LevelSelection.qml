@@ -22,9 +22,9 @@ FocusScope {
     }
 
     property var rankData: [
-        { name: "Grandmaster", scores: ["2700", "2500", "2300"] },
-        { name: "Master",      scores: ["2100", "1900", "1700"] },
-        { name: "Advanced",    scores: ["1500", "1300", "1100"] }
+        { name: "Grandmaster", scores: [2700, 2500, 2300] },
+        { name: "Master",      scores: [2100, 1900, 1700] },
+        { name: "Advanced",    scores: [1500, 1300, 1100] }
     ]
 
     Rectangle {

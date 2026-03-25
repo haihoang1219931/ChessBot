@@ -16,7 +16,6 @@ void ChessBot::run()
     printf("Dowork\r\n");
     m_stopped = false; // Reset flags
     int i = 0;
-    m_state = PLAY_DETECT_MOVE;
     while(!m_stopped){
         // Check for Stop
         m_mutex->lock();
@@ -39,7 +38,7 @@ void ChessBot::run()
         }
         // Simulate work
         QThread::msleep(1);
-        printf("process %d\r\n",i);
+//        printf("process %d\r\n",i);
         i++;
         m_progress = i;
         Q_EMIT progressChanged(i%101);
@@ -53,6 +52,7 @@ void ChessBot::playLoop()
     switch (m_statePlay) {
     case PLAY_INIT: {
         m_statePlay = PLAY_DETECT_MOVE;
+        Q_EMIT gameUpdated(getModelFromGame());
     }
         break;
     case PLAY_DETECT_MOVE: {
@@ -75,7 +75,8 @@ void ChessBot::playLoop()
         break;
     case PLAY_INFORM_RESULT: {
         if(playInformResult()== STATE_DONE){
-            m_statePlay = PLAY_INFORM_RESULT;
+            Q_EMIT gameUpdated(getModelFromGame());
+            m_statePlay = PLAY_PROCESS_DONE;
         }
     }
         break;
@@ -132,6 +133,7 @@ void ChessBot::testLoop()
 
 uint8_t ChessBot::playDetectMove()
 {
+    playCalculateNextMove();
     return STATE_DONE;
 }
 
@@ -143,9 +145,13 @@ int random(int a, int b) {
 }
 uint8_t ChessBot::playCalculateNextMove()
 {
+    if(m_game->state != gameState::PLAYING) {
+        return STATE_DONE;
+    }
     // get all pieces that are allowed to move
     std::vector<Piece*> moveable_pieces;
     pieceColor player = m_game->currentPlayer();
+    m_game->calculateAllPossibleMoves(player);
     for (unsigned i=0; i < 8; ++i) {
         for (unsigned j=0; j < 8; ++j) {
             Piece* p = m_game->getPiece(i, j);
@@ -234,6 +240,77 @@ void ChessBot::sendTestCommand(QString command)
 void ChessBot::processNextMove()
 {
     m_state = STATE_PLAY;
-    m_stateTest = PLAY_INIT;
+    m_statePlay = PLAY_INIT;
     togglePause(false);
+    startService();
+}
+
+void ChessBot::setLevel(int level)
+{
+    printf("Set level: %d\r\n",level);
+    m_levelScore = level;
+    m_levelType = level/1000+1;
+}
+
+void ChessBot::setSide(int side)
+{
+    printf("Set side: %d\r\n",side);
+    m_side = side;
+    m_game->setTurn(side);
+}
+
+int ChessBot::levelType()
+{
+    return m_levelType;
+}
+
+int ChessBot::levelScore()
+{
+    return m_levelScore;
+}
+
+int ChessBot::side()
+{
+    return m_side;
+}
+
+void ChessBot::randomMove()
+{
+    if(m_game->state != gameState::PLAYING) {
+        switch (m_game->state) {
+        case gameState::DRAW: {
+            Q_EMIT gameEnded("DRAW");
+        }
+            break;
+        case gameState::WON_BLACK: {
+            Q_EMIT gameEnded("BLACK");
+        }
+            break;
+        case gameState::WON_WHITE: {
+            Q_EMIT gameEnded("WHITE");
+        }
+            break;
+        }
+
+    } else {
+        processNextMove();
+    }
+}
+
+QVariantList ChessBot::getModelFromGame()
+{
+    QVariantList gameModel;
+    for (unsigned i=0; i < 8; ++i) {
+        for (unsigned j=0; j < 8; ++j) {
+            gameModel.append(QVariant::fromValue(
+               m_game->getPiece(i, j)->value()));
+//            m_game->getPiece(i, j)->print();
+        }
+    }
+    return gameModel;
+}
+
+void ChessBot::resetGame(){
+    m_game->resetGame();
+    Q_EMIT gameUpdated(getModelFromGame());
 }
