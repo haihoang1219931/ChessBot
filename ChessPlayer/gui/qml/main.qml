@@ -58,6 +58,10 @@ ApplicationWindow {
                 stack.push(sideSelection)
                 backend.setLevel(score)
             }
+            onExitPressed: {
+                stack.pop()
+                stack.push(menuSelection)
+            }
         }
     }
 

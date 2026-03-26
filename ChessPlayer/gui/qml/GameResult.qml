@@ -28,6 +28,8 @@ Rectangle {
 
         Text {
             text: gameResultList[gameResult]
+            color: "white"
+            font.bold: true
             font.pixelSize: 24
             Layout.alignment: Qt.AlignHCenter
         }

@@ -48,7 +48,7 @@ Item {
 
                     // Top-Left Corner
                     ShapePath {
-                        strokeColor: "yellow"; strokeWidth: 4; fillColor: "transparent"
+                        strokeColor: "#0055ff"; strokeWidth: 4; fillColor: "transparent"
                         capStyle: ShapePath.RoundCap
                         startX: 0; startY: 30 // Start point of the arc
                         PathArc { x: 30; y: 00; radiusX: 30; radiusY: 30} // End point
@@ -56,7 +56,7 @@ Item {
 
                     // Top-Right Corner
                     ShapePath {
-                        strokeColor: "yellow"; strokeWidth: 4; fillColor: "transparent"
+                        strokeColor: "#0055ff"; strokeWidth: 4; fillColor: "transparent"
                         capStyle: ShapePath.RoundCap
                         startX: 110; startY: 0
                         PathArc { x: 140; y: 30; radiusX: 30; radiusY: 30 }
@@ -64,7 +64,7 @@ Item {
 
                     // Bottom-Left Corner
                     ShapePath {
-                        strokeColor: "yellow"; strokeWidth: 4; fillColor: "transparent"
+                        strokeColor: "#0055ff"; strokeWidth: 4; fillColor: "transparent"
                         capStyle: ShapePath.RoundCap
                         startX: 30; startY: 140
                         PathArc { x: 0; y: 110; radiusX: 30; radiusY: 30 }
@@ -72,7 +72,7 @@ Item {
 
                     // Bottom-Right Corner
                     ShapePath {
-                        strokeColor: "yellow"; strokeWidth: 4; fillColor: "transparent"
+                        strokeColor: "#0055ff"; strokeWidth: 4; fillColor: "transparent"
                         capStyle: ShapePath.RoundCap
                         startX: 140; startY: 110
                         PathArc { x: 110; y: 140; radiusX: 30; radiusY: 30 }
@@ -84,7 +84,7 @@ Item {
         // 3. Selection Text
         Text {
             text: (root.isSelected ? "▷ " : "") + root.sideName + (root.isSelected ? " ◁" : "")
-            color: root.isSelected ? "yellow" : "white"
+            color: root.isSelected ? "#0055ff" : "white"
             font.pixelSize: 22
             font.bold: true
             anchors.horizontalCenter: parent.horizontalCenter

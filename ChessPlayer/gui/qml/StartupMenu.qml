@@ -26,10 +26,12 @@ FocusScope {
         RowLayout {
             anchors.fill: parent
             spacing: 0
-            Rectangle {
+            StackLayout {
                 width: 440
                 height: 400
-                color: "yellow"
+                currentIndex: menuListView.currentIndex
+                MenuBotIcon{ }
+                MenuSettingIcon{ }
             }
 
             ListView {
@@ -59,7 +61,7 @@ FocusScope {
                         anchors.margins: 5
                         color: isSelected ? "#22FFFFFF" : "transparent"
                         radius: 4
-                        border.color: isSelected ? "#00F2FF" : "transparent"
+                        border.color: isSelected ? "#4488ff" : "transparent"
                         border.width: 1
 
                         RowLayout {
@@ -81,7 +83,7 @@ FocusScope {
                                 layer.enabled: isSelected
                                 layer.effect: Glow {
                                     samples: 15
-                                    color: "#00F2FF"
+                                    color: "#4488ff"
                                     transparentBorder: true
                                 }
                             }
@@ -89,7 +91,7 @@ FocusScope {
                             // Selection Indicator (The "Arrow")
                             Text {
                                 text: "◀"
-                                color: "#00F2FF"
+                                color: "#4488ff"
                                 font.pixelSize: 24
                                 visible: isSelected
 

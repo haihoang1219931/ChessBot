@@ -11,5 +11,7 @@
         <file>qml/StartupMenu.qml</file>
         <file>qml/ChessSupport.js</file>
         <file>qml/GameResult.qml</file>
+        <file>qml/MenuBotIcon.qml</file>
+        <file>qml/MenuSettingIcon.qml</file>
     </qresource>
 </RCC>

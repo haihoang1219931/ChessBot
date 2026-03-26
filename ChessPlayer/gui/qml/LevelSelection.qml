@@ -9,7 +9,7 @@ FocusScope {
     focus: true
 
     signal itemSelected(string rank, string score)
-
+    signal exitPressed()
     onItemSelected: (rank, score) => {
         console.log("SELECTED: " + rank + " with score: " + score);
     }
@@ -40,6 +40,10 @@ FocusScope {
                 model: root.rankData
                 focus: true // Default focus child
                 KeyNavigation.right: scoreList
+                Keys.onEscapePressed: {
+                    root.exitPressed()
+                }
+
                 clip: true
                 highlightFollowsCurrentItem: true
 
@@ -54,7 +58,7 @@ FocusScope {
                         gradient: Gradient {
                             orientation: Gradient.Horizontal
                             GradientStop { position: 0.0; color: "transparent" }
-                            GradientStop { position: 0.5; color: "#ffff00" }
+                            GradientStop { position: 0.5; color: "#0055ff" }
                             GradientStop { position: 1.0; color: "transparent" }
                         }
                     }
@@ -64,7 +68,7 @@ FocusScope {
                         gradient: Gradient {
                             orientation: Gradient.Horizontal
                             GradientStop { position: 0.0; color: "transparent" }
-                            GradientStop { position: 0.5; color: "#ffff00" }
+                            GradientStop { position: 0.5; color: "#0055ff" }
                             GradientStop { position: 1.0; color: "transparent" }
                         }
                     }
@@ -72,7 +76,7 @@ FocusScope {
                     Text {
                         anchors.centerIn: parent
                         text: (isSelected && rankList.activeFocus ? "> " : "") + modelData.name
-                        color: isSelected ? "#ffff00" : "white"
+                        color: isSelected ? "#0055ff" : "white"
                         font.pixelSize: 28; font.bold: isSelected
                     }
                 }
@@ -100,7 +104,7 @@ FocusScope {
                         gradient: Gradient {
                             orientation: Gradient.Horizontal
                             GradientStop { position: 0.0; color: "transparent" }
-                            GradientStop { position: 0.5; color: "#ffff00" }
+                            GradientStop { position: 0.5; color: "#0055ff" }
                             GradientStop { position: 1.0; color: "transparent" }
                         }
                     }
@@ -108,7 +112,7 @@ FocusScope {
                     Text {
                         anchors.centerIn: parent
                         text: (isSelected ? "> " : "") + modelData
-                        color: isSelected ? "#ffff00" : (scoreList.activeFocus ? "white" : "#666")
+                        color: isSelected ? "#0055ff" : (scoreList.activeFocus ? "white" : "#666")
                         font.pixelSize: 28; font.bold: isSelected
                     }
                 }
