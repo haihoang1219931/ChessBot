@@ -1,3 +1,4 @@
+#include <map>
 #include "SimpleChess.h"
 
 Board::Board() : inCheck(false)
@@ -108,6 +109,29 @@ void Game::move(const Move &m) {
 	previous = oldposition;
 }
 
+static const std::map<pieceName, int> pieceValues = {
+    {pieceName::PAWN, 1},
+    {pieceName::KNIGHT, 3},
+    {pieceName::BISHOP, 3},
+    {pieceName::ROOK, 5},
+    {pieceName::QUEEN, 9},
+    {pieceName::KING, 0},
+    {pieceName::EMPTY, 0}
+};
+
+int Game::evaluateBoard() const {
+    int score = 0;
+    for (unsigned i = 0; i < 8; ++i) {
+        for (unsigned j = 0; j < 8; ++j) {
+            Piece* p = getPiece(i, j);
+            if (p == nullptr || p->name == pieceName::EMPTY) continue;
+            int value = pieceValues.at(p->name);
+            if (p->color == pieceColor::WHITE) score += value;
+            else if (p->color == pieceColor::BLACK) score -= value;
+        }
+    }
+    return score;
+}
 void Game::undo() {
 	if (previous != NULL) {
 		state = previous->state;
@@ -161,7 +185,7 @@ bool Game::isInCheck() const {
 }
 
 void Game::checkIfEndPosition() {
-	unsigned bishops, knights;
+	unsigned bishops = 0, knights = 0;
 	unsigned total = 64;
 	bool movesLeft = false;
 	for (int i=0; i < 8; ++i) {
@@ -186,17 +210,22 @@ void Game::checkIfEndPosition() {
 				default: break;
 			}
 		}
-		else state = gameState::DRAW;
+        else {
+            printf("Draw line[%d]\r\n",__LINE__);
+            state = gameState::DRAW;
+        }
 	}
 	else {
-		// fifty move rule
-		if (fiftyMoveRule > 50) state = gameState::DRAW;
+	// fifty-move rule (should be 100 half-moves)
+    if (fiftyMoveRule >= 100) state = gameState::DRAW;
 
 		// insufficient material
 		else if (total == 2
 				|| (total == 3 && bishops == 1)
-				|| (total == 3 && knights == 1))
-			state = gameState::DRAW;
+                || (total == 3 && knights == 1)){
+            printf("Draw line[%d]\r\n",__LINE__);
+            state = gameState::DRAW;
+        }
 
 		// threefold repetition
 		else {
@@ -206,7 +235,10 @@ void Game::checkIfEndPosition() {
 				if (position.equals(*previous_position)) ++repeats;
 				previous_position = previous_position->previous;
 			}
-			if (repeats >= 3) state = gameState::DRAW;
+            if (repeats >= 3) {
+                printf("Draw line[%d]\r\n",__LINE__);
+                state = gameState::DRAW;
+            }
 		}
 	}
 }

@@ -88,6 +88,6 @@ class Game {
 		bool preventsCheck(const Move &m) const;
 		std::vector<Move> getLegalMoves(const unsigned &x, const unsigned &y) const;
 		std::vector<Move> getPossibleMoves(const unsigned &x, const unsigned &y) const;
-    private:
+        int evaluateBoard() const;
         unsigned turn;
 };

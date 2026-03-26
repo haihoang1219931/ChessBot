@@ -20,6 +20,7 @@ CONFIG += c++11
 #win32: LIBS += -lpthread
 
 SOURCES += \
+    ChessAlgo.cpp \
     ChessBot.cpp \
     SimpleChess.cpp \
     main.cpp 
@@ -29,5 +30,6 @@ RESOURCES += \
 QML_DESIGNER_IMPORT_PATH =
 
 HEADERS += \
+    ChessAlgo.h \
     ChessBot.h \
     SimpleChess.h

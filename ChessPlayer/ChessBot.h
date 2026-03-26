@@ -70,7 +70,7 @@ public Q_SLOTS:
     void resetGame();
 
 Q_SIGNALS:
-    void gameEnded(QString endState);
+    void gameEnded(int endState);
     void progressChanged(int value);
     void sideChanged(int side);
     void levelTypeChanged(int type);
@@ -82,6 +82,7 @@ private:
     void configureLoop();
     void testLoop();
     uint8_t playDetectMove();
+    uint8_t playRandomMove();
     uint8_t playCalculateNextMove();
     uint8_t playExecuteNextMove();
     uint8_t playInformResult();

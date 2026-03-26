@@ -5,10 +5,10 @@ import QtQuick.Layouts 1.12
 Rectangle {
     id: root
     width: 300
-    height: 200
-    color: "#f8f9fa"
-    border.color: "black"
-    border.width: 2
+    height: 120
+    color: "#88f8f9fa"
+    property int gameResult: 0
+    property var gameResultList: ["DRAW","WIN","LOST"]
     property int selection: 0
     signal gameNextStep(var nextStep);
     Keys.onLeftPressed: {
@@ -24,10 +24,10 @@ Rectangle {
 
     ColumnLayout {
         anchors.centerIn: parent
-        spacing: 30
+        spacing: 10
 
         Text {
-            text: "The game is draw"
+            text: gameResultList[gameResult]
             font.pixelSize: 24
             Layout.alignment: Qt.AlignHCenter
         }

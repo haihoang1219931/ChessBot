@@ -20,10 +20,11 @@ Rectangle {
     property string player1Time: "02:51"
     property string player2Name: "Player"
     property string player2Time: "03:28"
-    function openGameDraw() {
+    function openGameResult(result) {
         // 1. Set the source to your QML file
         if(myLoader.item === null)
         myLoader.setSource("GameResult.qml");
+        myLoader.item.gameResult = result
     }
     function closeLoaderItem() {
         myLoader.source = "";   // This automatically destroys the loaded item
@@ -119,7 +120,8 @@ Rectangle {
     }
     Loader {
         id: myLoader
-        anchors.centerIn: parent
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
         focus: true // Necessary for children to receive focus
 
         onLoaded: {
@@ -142,8 +144,6 @@ Rectangle {
                 backend.resetGame();
                 root.forceActiveFocus();
             }
-
-
         }
     }
     Component.onCompleted: {
@@ -158,7 +158,7 @@ Rectangle {
         }
         onGameEnded: {
             console.log("Game end: "+endState);
-            openGameDraw();
+            openGameResult(endState);
         }
     }
 }

@@ -1,7 +1,7 @@
 #include <QThread>
 #include "ChessBot.h"
 #include "SimpleChess.h"
-
+#include "ChessAlgo.h"
 ChessBot::ChessBot(QThread *parent) :
     QThread(parent)
 {
@@ -132,19 +132,21 @@ void ChessBot::testLoop()
 
 uint8_t ChessBot::playDetectMove()
 {
-    playCalculateNextMove();
+    playRandomMove();
     Q_EMIT gameUpdated(getModelFromGame());
-    msleep(1000);
     return STATE_DONE;
 }
 
 int random(int a, int b) {
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(a, b);
-    return dis(gen);
+    std::uniform_int_distribution<> distrib(a, b);
+    int result = distrib(gen);
+    printf("random(%d,%d)->%d\r\n",a,b,result);
+    return result;
 }
-uint8_t ChessBot::playCalculateNextMove()
+
+uint8_t ChessBot::playRandomMove()
 {
     if(m_game->state != gameState::PLAYING) {
         return STATE_DONE;
@@ -166,10 +168,19 @@ uint8_t ChessBot::playCalculateNextMove()
     return STATE_DONE;
 }
 
+uint8_t ChessBot::playCalculateNextMove()
+{
+    if(m_game->state != gameState::PLAYING) {
+        return STATE_DONE;
+    }
+    Move m = findBestMove(*m_game);
+    m_game->move(m);
+    return STATE_DONE;
+}
+
 uint8_t ChessBot::playExecuteNextMove()
 {
     // TODO: Send command to robot and wait until execution is done
-    msleep(1000);
     return STATE_DONE;
 }
 
@@ -279,15 +290,15 @@ void ChessBot::randomMove()
     if(m_game->state != gameState::PLAYING) {
         switch (m_game->state) {
         case gameState::DRAW: {
-            Q_EMIT gameEnded("DRAW");
-        }
-            break;
-        case gameState::WON_BLACK: {
-            Q_EMIT gameEnded("BLACK");
+            Q_EMIT gameEnded(0);
         }
             break;
         case gameState::WON_WHITE: {
-            Q_EMIT gameEnded("WHITE");
+            Q_EMIT gameEnded(m_side == 0?1:2);
+        }
+            break;
+        case gameState::WON_BLACK: {
+            Q_EMIT gameEnded(m_side == 1?1:2);
         }
             break;
         }
