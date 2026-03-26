@@ -35,7 +35,20 @@ ApplicationWindow {
                 if(item === 0) {
                     stack.pop()
                     stack.push(levelSelection)
+                } else if(item === 1) {
+                    stack.pop()
+                    stack.push(calibPanel)
                 }
+            }
+        }
+    }
+
+    Component {
+        id: calibPanel
+        SettingCalibChessBoard {
+            onExitPressed: {
+                stack.pop()
+                stack.push(menuSelection)
             }
         }
     }

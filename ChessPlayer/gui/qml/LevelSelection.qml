@@ -22,9 +22,9 @@ FocusScope {
     }
 
     property var rankData: [
-        { name: "Grandmaster", scores: [2700, 2500, 2300] },
-        { name: "Master",      scores: [2100, 1900, 1700] },
-        { name: "Advanced",    scores: [1500, 1300, 1100] }
+        { name: "Grandmaster", scores: [3100, 2900, 2700, 2500, 2300] },
+        { name: "Master",      scores: [2100, 1900, 1700, 1500, 1300] },
+        { name: "Advanced",    scores: [1100, 900, 700, 500] }
     ]
 
     Rectangle {
@@ -36,7 +36,9 @@ FocusScope {
 
             ListView {
                 id: rankList
-                Layout.fillWidth: true; Layout.fillHeight: true
+                Layout.preferredWidth: root.width * 2/3
+                Layout.preferredHeight: 210
+                Layout.alignment: Qt.AlignVCenter
                 model: root.rankData
                 focus: true // Default focus child
                 KeyNavigation.right: scoreList
@@ -86,7 +88,9 @@ FocusScope {
 
             ListView {
                 id: scoreList
-                Layout.fillWidth: true; Layout.fillHeight: true
+                Layout.preferredWidth: root.width * 1/3
+                Layout.preferredHeight: 210
+                Layout.alignment: Qt.AlignVCenter
                 model: root.rankData[rankList.currentIndex].scores
                 KeyNavigation.left: rankList
                 clip: true
