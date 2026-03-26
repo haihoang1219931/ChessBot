@@ -11,11 +11,14 @@ ChessBot::ChessBot(QThread *parent) :
     robotController = new QSerialPort();
 }
 
+ChessBot::~ChessBot()
+{
+    stopService();
+}
 void ChessBot::run()
 {
     printf("Dowork\r\n");
     m_stopped = false; // Reset flags
-    int i = 0;
     while(!m_stopped){
         // Check for Stop
         m_mutex->lock();
@@ -36,12 +39,9 @@ void ChessBot::run()
         }
             break;
         }
-        // Simulate work
-        QThread::msleep(1);
-//        printf("process %d\r\n",i);
-        i++;
-        m_progress = i;
-        Q_EMIT progressChanged(i%101);
+        if(m_state == STATE_EXIT) {
+            break;
+        }
     }
 
     printf("Dowork finished\r\n");
@@ -52,7 +52,6 @@ void ChessBot::playLoop()
     switch (m_statePlay) {
     case PLAY_INIT: {
         m_statePlay = PLAY_DETECT_MOVE;
-        Q_EMIT gameUpdated(getModelFromGame());
     }
         break;
     case PLAY_DETECT_MOVE: {
@@ -134,6 +133,8 @@ void ChessBot::testLoop()
 uint8_t ChessBot::playDetectMove()
 {
     playCalculateNextMove();
+    Q_EMIT gameUpdated(getModelFromGame());
+    msleep(1000);
     return STATE_DONE;
 }
 
@@ -168,6 +169,7 @@ uint8_t ChessBot::playCalculateNextMove()
 uint8_t ChessBot::playExecuteNextMove()
 {
     // TODO: Send command to robot and wait until execution is done
+    msleep(1000);
     return STATE_DONE;
 }
 
@@ -175,11 +177,6 @@ uint8_t ChessBot::playInformResult()
 {
     // TODO: Signal GUI that robot execution is done
     return STATE_DONE;
-}
-
-int ChessBot::progress()
-{
-    return m_progress;
 }
 
 uint8_t ChessBot::configureChessBoardCalib()
@@ -208,6 +205,8 @@ void ChessBot::startService() {
 
 void ChessBot::stopService() {
 
+    m_state = STATE_EXIT;
+    togglePause(false);
     if (this->isRunning()) {
         m_stopped = true;         // Signal the loop to break
         this->quit();      // Tell the event loop to exit
@@ -257,6 +256,7 @@ void ChessBot::setSide(int side)
     printf("Set side: %d\r\n",side);
     m_side = side;
     m_game->setTurn(side);
+    resetGame();
 }
 
 int ChessBot::levelType()
@@ -302,15 +302,20 @@ QVariantList ChessBot::getModelFromGame()
     QVariantList gameModel;
     for (unsigned i=0; i < 8; ++i) {
         for (unsigned j=0; j < 8; ++j) {
-            gameModel.append(QVariant::fromValue(
-               m_game->getPiece(i, j)->value()));
-//            m_game->getPiece(i, j)->print();
+            if(m_side == 0) {
+                gameModel.append(QVariant::fromValue(
+                    m_game->getPiece(i, j)->value()));
+            } else {
+                gameModel.append(QVariant::fromValue(
+                    m_game->getPiece(7-i, 7-j)->value()));
+            }
         }
     }
     return gameModel;
 }
 
 void ChessBot::resetGame(){
+    printf("Reset game side[%d]\r\n",m_side);
     m_game->resetGame();
     Q_EMIT gameUpdated(getModelFromGame());
 }

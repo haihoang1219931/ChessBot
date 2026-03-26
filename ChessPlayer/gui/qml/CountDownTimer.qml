@@ -150,7 +150,6 @@ Rectangle {
         root.levelType = backend.levelType
         root.levelScore = backend.levelScore
         root.side =  backend.side
-        backend.resetGame();
     }
     Connections {
         target: backend

@@ -20,7 +20,8 @@ typedef enum{
 typedef enum {
     STATE_PLAY,
     STATE_CONFIGURE,
-    STATE_TEST
+    STATE_TEST,
+    STATE_EXIT,
 } STATE_CHESBOT;
 
 typedef enum{
@@ -47,13 +48,12 @@ typedef enum{
 } STATE_TEST_PHASE;
 class ChessBot : public QThread {
     Q_OBJECT
-    Q_PROPERTY(int progress READ progress NOTIFY progressChanged)
     Q_PROPERTY(int levelType READ levelType NOTIFY levelTypeChanged)
     Q_PROPERTY(int levelScore READ levelScore NOTIFY levelScoreChanged)
     Q_PROPERTY(int side READ side NOTIFY sideChanged)
 public:
     explicit ChessBot(QThread *parent = nullptr);
-    int progress();
+    virtual ~ChessBot();
     int levelType();
     int levelScore();
     int side();
@@ -99,7 +99,6 @@ private:
     QSerialPort *robotController;
     QString m_commandTest;
     bool m_pause = false;
-    int m_progress;
     int m_state;
     int m_statePlay;
     int m_stateConfigure;
