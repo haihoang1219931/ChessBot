@@ -77,6 +77,9 @@ pieceColor Game::nextPlayer() const {
 
 void Game::move(const Move &m) {
 	pieceColor player = currentPlayer();
+    printf("Player[%s] Move from(%d,%d) to (%d,%d)\r\n",
+        player == pieceColor::WHITE?"WHITE":"BLACK",
+        m.from_x,m.from_y,m.to_x,m.to_y);
 	assert(state == gameState::PLAYING);
     assert(getPiece(m.from_x, m.from_y)->color == player);
 

@@ -60,7 +60,7 @@ FocusScope {
                 ctx.arc(points[j].x, points[j].y, radius, 0, 2 * Math.PI);
 
                 // Color logic: Red if editing, Yellow if just selected, White otherwise
-                ctx.fillStyle = isActive ? (isEditing ? "red" : "yellow") : "white";
+                ctx.fillStyle = isActive ? (isEditing ? "#88FF0000" : "#8800FF00") : "white";
 
                 ctx.fill();
 //                ctx.strokeStyle = "black";

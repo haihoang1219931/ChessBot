@@ -8,9 +8,10 @@
 #include <QSerialPort>
 #include <QVariant>
 #include <QVariantList>
+#include <QPoint>
 
 class Game;
-
+class ChessImageProcessing;
 typedef enum{
     STATE_INIT,
     STATE_PENDING,
@@ -25,6 +26,7 @@ typedef enum {
 } STATE_CHESBOT;
 
 typedef enum{
+    PLAY_SETUP,
     PLAY_INIT,
     PLAY_DETECT_MOVE,
     PLAY_CALCULATE_NEXT_MOVE,
@@ -57,6 +59,7 @@ public:
     int levelType();
     int levelScore();
     int side();
+    void updateCorners(QPoint c1, QPoint c2,QPoint c3, QPoint c4);
 public Q_SLOTS:
     void run() override;
     void startService();
@@ -68,6 +71,9 @@ public Q_SLOTS:
     void setSide(int side);
     void randomMove();
     void resetGame();
+    void loadCorners(QString file);
+    void connectCamera();
+    void disconnectCamera();
 
 Q_SIGNALS:
     void gameEnded(int endState);
@@ -97,6 +103,7 @@ private:
     QMutex *m_mutex;
     QWaitCondition* m_pauseCond;
     Game* m_game;
+    ChessImageProcessing* m_moveDetector;
     QSerialPort *robotController;
     QString m_commandTest;
     bool m_pause = false;

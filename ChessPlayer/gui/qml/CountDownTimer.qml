@@ -150,6 +150,7 @@ Rectangle {
         root.levelType = backend.levelType
         root.levelScore = backend.levelScore
         root.side =  backend.side
+        backend.loadCorners("trapezoid_data.json");
     }
     Connections {
         target: backend

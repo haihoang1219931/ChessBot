@@ -22,6 +22,7 @@ win32: LIBS += -lpthread
 SOURCES += \
     ChessAlgo.cpp \
     ChessBot.cpp \
+    ChessImageProcessing.cpp \
     FileIO.cpp \
     SimpleChess.cpp \
     main.cpp 
@@ -33,5 +34,6 @@ QML_DESIGNER_IMPORT_PATH =
 HEADERS += \
     ChessAlgo.h \
     ChessBot.h \
+    ChessImageProcessing.h \
     FileIO.h \
     SimpleChess.h
