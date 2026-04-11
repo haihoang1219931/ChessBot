@@ -4,6 +4,11 @@ CONFIG += c++11 no_keywords console
 QT += qml quick qml serialport
 CONFIG += c++11
 
+CONFIG += use_chess_algo
+
+#CONFIG += use_image_processing
+use_image_processing {
+DEFINES += IMAGE_PROCESS_MOVE
 unix:!macx: INCLUDEPATH += /usr/local/include/opencv4
 unix:!macx: DEPENDPATH += /usr/local/include/opencv4
 unix:!macx: LIBS += -L/usr/local/lib/  \
@@ -19,12 +24,52 @@ unix:!macx: LIBS += -L/usr/local/lib/  \
 
 win32: LIBS += -lpthread
 
+INCLUDEPATH += \
+    chessDetector
+SOURCES += chessDetector/ChessImageProcessing.cpp
+HEADERS += chessDetector/ChessImageProcessing.h
+}
+use_chess_algo{
+INCLUDEPATH += \
+    chessAlgo
 SOURCES += \
-    ChessAlgo.cpp \
+    chessAlgo/ChessController.cpp \
+    chessAlgo/BitBoardUtils.cpp \
+    chessAlgo/Board.cpp \
+    chessAlgo/Eval.cpp \
+    chessAlgo/EvalTables.cpp \
+    chessAlgo/MagicMoves.cpp \
+    chessAlgo/Move.cpp \
+    chessAlgo/MoveGen.cpp \
+    chessAlgo/MoveOrdering.cpp \
+    chessAlgo/Pawn.cpp \
+    chessAlgo/Search.cpp \
+    chessAlgo/Tables.cpp \
+    chessAlgo/TT.cpp \
+    chessAlgo/Utils.cpp
+
+HEADERS += \
+    chessAlgo/ChessController.h \
+    chessAlgo/BitBoardUtils.hpp \
+    chessAlgo/Board.hpp \
+    chessAlgo/Eval.hpp \
+    chessAlgo/EvalTables.hpp \
+    chessAlgo/MagicMoves.hpp \
+    chessAlgo/Move.hpp \
+    chessAlgo/MoveGen.hpp \
+    chessAlgo/MoveOrdering.hpp \
+    chessAlgo/Pawn.hpp \
+    chessAlgo/Piece.hpp \
+    chessAlgo/Search.hpp \
+    chessAlgo/Tables.hpp \
+    chessAlgo/TT.hpp \
+    chessAlgo/TTEntry.hpp \
+    chessAlgo/Types.hpp \
+    chessAlgo/Utils.hpp
+}
+SOURCES += \
     ChessBot.cpp \
-    ChessImageProcessing.cpp \
     FileIO.cpp \
-    SimpleChess.cpp \
     main.cpp 
 
 RESOURCES += \
@@ -32,8 +77,7 @@ RESOURCES += \
 QML_DESIGNER_IMPORT_PATH =
 
 HEADERS += \
-    ChessAlgo.h \
     ChessBot.h \
-    ChessImageProcessing.h \
-    FileIO.h \
-    SimpleChess.h
+    FileIO.h
+
+

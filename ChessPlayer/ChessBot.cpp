@@ -5,44 +5,28 @@
 #include <QVector>
 #include <QFile>
 #include "ChessBot.h"
-#include "SimpleChess.h"
-#include "ChessAlgo.h"
-#ifndef SIMULATE_MOVE
+#include "chessAlgo/ChessController.h"
+
+#ifdef IMAGE_PROCESS_MOVE
     #include "ChessImageProcessing.h"
     static cv::VideoCapture cap;
     static cv::Mat imageBefore,imageAfter;
     static bool readFrame(cv::Mat& outImg);
 #endif
 
-void print(const Game&g) {
-    printf("========================\r\n");
-    for(int i=0; i< 8; i++) {
-        for(int j=0; j< 8; j++) {
-            g.getPiece(i,j)->print();
-            printf(" ");
-        }
-        printf("\r\n");
-    }
-    printf("\r\n");
-}
-int random(int a, int b) {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> distrib(a, b);
-    int result = distrib(gen);
-    printf("random(%d,%d)->%d\r\n",a,b,result);
-    return result;
-}
 
 ChessBot::ChessBot(QThread *parent) :
     QThread(parent)
 {
     m_mutex = new QMutex;
     m_pauseCond = new QWaitCondition;
-    m_game = new Game();
+    m_chessController = new ChessController();
+#ifdef IMAGE_PROCESS_MOVE
     m_moveDetector = new ChessImageProcessing();
+#endif
     robotController = new QSerialPort();
     loadCorners("trapezoid_data.json");
+#ifdef IMAGE_PROCESS_MOVE
     std::vector<cv::Rect> moves;
     cv::Mat src1 = cv::imread("1.jpg");
     cv::Mat src2 = cv::imread("2.jpg");
@@ -54,13 +38,14 @@ ChessBot::ChessBot(QThread *parent) :
             printf("Move(%d,%d)\r\n",chessMoves[i].x,chessMoves[i].y);
         }
     }
+#endif
 }
 
 ChessBot::~ChessBot()
 {
     stopService();
 }
-
+#ifdef IMAGE_PROCESS_MOVE
 bool readFrame(cv::Mat& outImg)
 {
     bool readResult = false;
@@ -73,9 +58,10 @@ bool readFrame(cv::Mat& outImg)
     }
     return readResult;
 }
+#endif
 void ChessBot::connectCamera()
 {
-#ifndef SIMULATE_MOVE
+#ifdef IMAGE_PROCESS_MOVE
     cap.open(0);
     if (!cap.isOpened()) {
         printf("Error: Could not open camera.\r\n");
@@ -85,7 +71,7 @@ void ChessBot::connectCamera()
 
 void ChessBot::disconnectCamera()
 {
-#ifndef SIMULATE_MOVE
+#ifdef IMAGE_PROCESS_MOVE
     if(cap.isOpened()) {
         cap.release();
     }
@@ -128,9 +114,11 @@ void ChessBot::playLoop()
 {
     switch (m_statePlay) {
     case PLAY_SETUP: {
+#ifdef IMAGE_PROCESS_MOVE
         readFrame(imageBefore);
         printf("First image [%d,%d]\r\n",
                imageBefore.rows,imageBefore.cols);
+#endif
         m_statePlay = PLAY_PROCESS_DONE;
     }
         break;
@@ -158,7 +146,6 @@ void ChessBot::playLoop()
         break;
     case PLAY_INFORM_RESULT: {
         if(playInformResult()== STATE_DONE){
-            Q_EMIT gameUpdated(getModelFromGame());
             m_statePlay = PLAY_PROCESS_DONE;
         }
     }
@@ -217,7 +204,7 @@ void ChessBot::testLoop()
 uint8_t ChessBot::playDetectMove()
 {
     printf("playDetectMove\r\n");
-#ifdef SIMULATE_MOVE
+#ifndef IMAGE_PROCESS_MOVE
     playRandomMove();
 #else
     if(!readFrame(imageAfter)){
@@ -264,39 +251,19 @@ uint8_t ChessBot::playDetectMove()
         print(*m_game);
     }
 #endif
-    Q_EMIT gameUpdated(getModelFromGame());
     return STATE_DONE;
 }
 
 uint8_t ChessBot::playRandomMove()
 {
-    if(m_game->state != gameState::PLAYING) {
-        return STATE_DONE;
-    }
-    // get all pieces that are allowed to move
-    std::vector<Piece*> moveable_pieces;
-    pieceColor player = m_game->currentPlayer();
-    m_game->calculateAllPossibleMoves(player);
-    for (unsigned i=0; i < 8; ++i) {
-        for (unsigned j=0; j < 8; ++j) {
-            Piece* p = m_game->getPiece(i, j);
-            if (p->color == player && !p->legalMoves.empty())
-                moveable_pieces.push_back(p);
-        }
-    }
-    // pick one and make a random legal move with it
-    Piece* p = moveable_pieces.at( random(0, moveable_pieces.size()-1) );
-    m_game->move(p->legalMoves.at( random(0, p->legalMoves.size()-1) ));
+    QStringList randomMoves = m_chessController->findBestMoveCoordinates();
+    m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1]);
     return STATE_DONE;
 }
 
 uint8_t ChessBot::playCalculateNextMove()
 {
-    if(m_game->state != gameState::PLAYING) {
-        return STATE_DONE;
-    }
-    Move m = findBestMove(*m_game);
-    m_game->move(m);
+
     return STATE_DONE;
 }
 
@@ -309,7 +276,9 @@ uint8_t ChessBot::playExecuteNextMove()
 uint8_t ChessBot::playInformResult()
 {
     // TODO: Signal GUI that robot execution is done
+#ifdef IMAGE_PROCESS_MOVE
     readFrame(imageBefore);
+#endif
     return STATE_DONE;
 }
 
@@ -382,14 +351,15 @@ void ChessBot::setLevel(int level)
 {
     printf("Set level: %d\r\n",level);
     m_levelScore = level;
-    m_levelType = level/1000+1;
+    m_levelType = level/400+1;
+    m_chessController->setEngineLevel(m_levelType);
 }
 
 void ChessBot::setSide(int side)
 {
     printf("Set side: %d\r\n",side);
     m_side = side;
-    m_game->setTurn(side);
+    m_chessController->setPlayerColor(side);
     resetGame();
     m_state = STATE_PLAY;
     m_statePlay = PLAY_SETUP;
@@ -448,6 +418,7 @@ void ChessBot::loadCorners(QString fileName)
 
         }
     }
+#ifdef IMAGE_PROCESS_MOVE
     if(points.size() == 4){
         m_moveDetector->corners().clear();
         for(QPoint corner: points){
@@ -457,6 +428,7 @@ void ChessBot::loadCorners(QString fileName)
     }
     int threshold = 80;
     m_moveDetector->setThreshold(threshold);
+#endif
 }
 
 void ChessBot::updateCorners(QPoint c1, QPoint c2,QPoint c3, QPoint c4)
@@ -465,46 +437,32 @@ void ChessBot::updateCorners(QPoint c1, QPoint c2,QPoint c3, QPoint c4)
 }
 void ChessBot::randomMove()
 {
-    if(m_game->state != gameState::PLAYING) {
-        switch (m_game->state) {
-        case gameState::DRAW: {
+    QString gameState = m_chessController->buildResultText();
+    if(gameState != "") {
+        if(gameState == "DRAW_STALEMATE" ||
+                gameState == "DRAW_PIECE") {
             Q_EMIT gameEnded(0);
-        }
-            break;
-        case gameState::WON_WHITE: {
+        } else if(gameState == "WHITE_WIN") {
             Q_EMIT gameEnded(m_side == 0?1:2);
-        }
-            break;
-        case gameState::WON_BLACK: {
+        } else if(gameState == "BLACK_WIN") {
             Q_EMIT gameEnded(m_side == 1?1:2);
         }
-            break;
-        }
-
     } else {
         processNextMove();
     }
 }
 
-QVariantList ChessBot::getModelFromGame()
+ChessController* ChessBot::chessController()
 {
-    QVariantList gameModel;
-    for (unsigned i=0; i < 8; ++i) {
-        for (unsigned j=0; j < 8; ++j) {
-            if(m_side == 1) {
-                gameModel.append(QVariant::fromValue(
-                    m_game->getPiece(i, j)->value()));
-            } else {
-                gameModel.append(QVariant::fromValue(
-                    m_game->getPiece(7-i, 7-j)->value()));
-            }
-        }
-    }
-    return gameModel;
+    return m_chessController;
+}
+
+QObject* ChessBot::chessControllerObject() const
+{
+    return m_chessController;
 }
 
 void ChessBot::resetGame(){
     printf("Reset game side[%d]\r\n",m_side);
-    m_game->resetGame();
-    Q_EMIT gameUpdated(getModelFromGame());
+    m_chessController->newGame();
 }

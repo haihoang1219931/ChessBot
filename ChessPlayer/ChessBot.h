@@ -10,8 +10,10 @@
 #include <QVariantList>
 #include <QPoint>
 
-class Game;
+class ChessController;
+#ifdef IMAGE_PROCESS_MOVE
 class ChessImageProcessing;
+#endif
 typedef enum{
     STATE_INIT,
     STATE_PENDING,
@@ -53,6 +55,7 @@ class ChessBot : public QThread {
     Q_PROPERTY(int levelType READ levelType NOTIFY levelTypeChanged)
     Q_PROPERTY(int levelScore READ levelScore NOTIFY levelScoreChanged)
     Q_PROPERTY(int side READ side NOTIFY sideChanged)
+    Q_PROPERTY(QObject* chessController READ chessControllerObject CONSTANT)
 public:
     explicit ChessBot(QThread *parent = nullptr);
     virtual ~ChessBot();
@@ -60,6 +63,8 @@ public:
     int levelScore();
     int side();
     void updateCorners(QPoint c1, QPoint c2,QPoint c3, QPoint c4);
+    QObject* chessControllerObject() const;
+    ChessController* chessController();
 public Q_SLOTS:
     void run() override;
     void startService();
@@ -77,11 +82,9 @@ public Q_SLOTS:
 
 Q_SIGNALS:
     void gameEnded(int endState);
-    void progressChanged(int value);
     void sideChanged(int side);
     void levelTypeChanged(int type);
     void levelScoreChanged(int score);
-    void gameUpdated(QVariantList newModel);
 
 private:
     void playLoop();
@@ -96,14 +99,15 @@ private:
     uint8_t configureSide();
     uint8_t configureLevel();
     uint8_t testRobot();
-    QVariantList getModelFromGame();
 
 private:
     bool m_stopped = false;
     QMutex *m_mutex;
     QWaitCondition* m_pauseCond;
-    Game* m_game;
+    ChessController* m_chessController;
+#ifdef IMAGE_PROCESS_MOVE
     ChessImageProcessing* m_moveDetector;
+#endif
     QSerialPort *robotController;
     QString m_commandTest;
     bool m_pause = false;

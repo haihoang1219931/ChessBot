@@ -115,6 +115,7 @@ Rectangle {
                 width: 300
                 height: 300
                 anchors.centerIn: parent
+                controller: backend ? backend.chessController : null
             }
         }
     }
@@ -154,9 +155,6 @@ Rectangle {
     }
     Connections {
         target: backend
-        onGameUpdated: {
-            chessboard.updateChessBoard(newModel)
-        }
         onGameEnded: {
             console.log("Game end: "+endState);
             openGameResult(endState);
