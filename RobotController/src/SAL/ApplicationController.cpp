@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <math.h>
 
+#define ROBOT_VERSION "1.0.0"
 ApplicationController::ApplicationController()
 {
     for(int i=0;i< MAX_BUTTON; i++) {
@@ -40,7 +41,7 @@ void ApplicationController::loop() {
         }
         case MACHINE_EXECUTE_COMMAND: {
             if(executeCommandSequenceLoop() == COMMAND_SEQUENCE_STATE_DONE)
-                m_machineState = MACHINE_EXECUTE_COMMAND_DONE;
+                m_machineState = MACHINE_EXECUTE_POSITION_STANDBY;
             break;
         }
         case MACHINE_EXECUTE_POSITION_STANDBY: {
@@ -48,7 +49,7 @@ void ApplicationController::loop() {
             break;
         }
         case MACHINE_EXECUTE_COMMAND_DONE: {
-            this->printf("_%04d DON",m_comCommandID);
+            this->printf("_%04d EXECUTE DONE\r\n",m_comCommandID);
             setMachineState(MACHINE_WAIT_COMMAND);        
             break;
         }
@@ -57,7 +58,7 @@ void ApplicationController::loop() {
 
 void ApplicationController::readCommand()
 {
-    // printf("readCommand\r\n");
+    memset(m_commandRead,0,sizeof(m_commandRead));
     int incomingBytes = readSerial(m_commandRead,sizeof(m_commandRead));
     if(incomingBytes>0) executeCommand(m_commandRead);
 }
@@ -238,7 +239,11 @@ void ApplicationController::setMachineState(MACHINE_STATE machineState) {
 
 void ApplicationController::executeCommand(char* command) {
     this->printf("Command: [%s]\r\n",command);
-    if(command[0] == '_') {
+    if(command[0] == 'v') {
+        this->printf("[v]%s",ROBOT_VERSION);
+    } else if(strlen(command)>=3 && command[0] == 'c'&&command[1] == 'm'&&command[2] == 'd') {
+        this->printf("[cmd]%04d",m_comCommandID);
+    } else if(command[0] == '_') {
         if(strlen(command)>=5){
             char commandID[8];
             commandID[0] = command[1];
@@ -247,11 +252,11 @@ void ApplicationController::executeCommand(char* command) {
             commandID[3] = command[4];
             commandID[4] = 0;
             int comCommandID = atoi(commandID); // command from PC, must response
-            if(m_comCommandID > comCommandID) {
-                this->printf("_%04d NOK",comCommandID);
+            if (m_comCommandID == comCommandID) {
+                this->printf("[_%04d]%s",comCommandID,
+                    m_machineState == MACHINE_WAIT_COMMAND?"DONE":"WAIT");
             } else {
-                m_comCommandID = comCommandID;
-                this->printf("_%04d ACK",comCommandID);
+                this->printf("[_%04d]INVALID",comCommandID);
             }
         }
     }
@@ -277,53 +282,63 @@ void ApplicationController::executeCommand(char* command) {
         }        
     }
     else if(command[0] == 'e') {
+        m_comCommandID ++;
         this->enableEngine(true);
+        m_machineState = MACHINE_EXECUTE_COMMAND_DONE;
     }
     else if(command[0] == 'd') {
+        m_comCommandID ++;
         this->enableEngine(false);
+        m_machineState = MACHINE_EXECUTE_COMMAND_DONE;
     }
     else if(command[0] == 'r' && strlen(command)>=2) {
-        if(command[1] == 'a')
+        if(command[1] == 'a') {
             goToReadyPosition();
-        else if(command[1] == 's')
+        } else if(command[1] == 's') {
+            m_comCommandID ++;
             goToSpetialPosition();
+        }
     }
     else if(command[0] == 'm' && strlen(command)>=2) {
-        if(command[1] == 'l')
+        if(command[1] == 'l') {
+            m_comCommandID ++;
             calculateSequenceMoveStraight(0,0,7,0);
-        else if(command[1] == 'c')
+        } else if(command[1] == 'c') {
+            m_comCommandID ++;
             calculateSequenceMoveStraight(0,0,7,0);
+        }
     }
     else if(command[0] == 'h') {
         if(strlen(command)>=2 && command[1] == 'a') {
+            m_comCommandID ++;
             goToHome(MAX_MOTOR);
         }
         else if(strlen(command)>=2 && command[1] >= '0' && command[1] <= '5')
         {
+            m_comCommandID ++;
             goToHome(command[1]-'0');
         }
     }
-    else if(command[0] == 'c' && strlen(command)>=3) {
+    else if(command[0] == 'c' && strlen(command)>=5) {
+        m_comCommandID ++;
         executeSequence(MOVE_NORMAL, command[2]-'0',command[1]-'0',
-                0,7);
-    }else if(command[0] == 'c' && strlen(command)>=2 && command[1] == 'n' ) {
-        executeSequence(MOVE_CASTLE, 3, 0,
-                0,0);
-    }else if(command[0] == 'c' && strlen(command)>=2 && command[1] == 'l' ) {
-        executeSequence(MOVE_CASTLE, 3, 0,
-                7,0);
-    }else if(command[0] == 'a' && strlen(command)>=2 && command[1] == 't' ) {
-        executeSequence(MOVE_ATTACK, 0, 0,
-                4,4);
-    }else if(command[0] == 'p' && command[1] == 'p' ) {
-        executeSequence(MOVE_PASTPAWN, 2, 4,
-                3,5);
-    }else if(command[0] == 'p' && strlen(command)>=3 && command[1] == 'r' && command[2] == 'a' ) {
-        executeSequence(MOVE_PROMOTE, 2, 6,
-                3, 7, 'q');
-    }else if(command[0] == 'p' && strlen(command)>=3 && command[1] == 'r' && command[2] == 'n' ) {
-        executeSequence(MOVE_PROMOTE, 2, 6,
-                2, 7);
+                command[4]-'0',command[3]-'0');
+    }else if(command[0] == 'c' && strlen(command)>=5) {
+        m_comCommandID ++;
+        executeSequence(MOVE_CASTLE, command[2]-'0',command[1]-'0',
+                command[4]-'0',command[3]-'0');
+    }else if(command[0] == 'a' && strlen(command)>=5) {
+        m_comCommandID ++;
+        executeSequence(MOVE_ATTACK, command[2]-'0',command[1]-'0',
+                command[4]-'0',command[3]-'0');
+    }else if(command[0] == 'p' && strlen(command)>=6 && command[1] == 'p') {
+        m_comCommandID ++;
+        executeSequence(MOVE_PASTPAWN, command[3]-'0',command[2]-'0',
+                command[5]-'0',command[4]-'0');
+    }else if(command[0] == 'p' && strlen(command)>=6) {
+        m_comCommandID ++;
+        executeSequence(MOVE_PROMOTE, command[3]-'0',command[2]-'0',
+                command[5]-'0',command[4]-'0',command[1]);
     }else if(command[0] == 'p' && strlen(command)>=2 && command[1] >= '0' && command[1] <= '5')
     {
         int motorID = command[1]-'0';
@@ -714,7 +729,7 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
                               stop,stop,stop};
         int captureStep[6] = {0,490,490,
                                490,0,0};
-        int numStep = 1;
+        int numStep = 6;
         for(int seqStep = 0; seqStep < numStep; seqStep++)
         {
             m_sequenceCommand[m_numCommand].x = position[seqStep].x;
