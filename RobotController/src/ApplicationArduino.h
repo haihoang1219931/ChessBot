@@ -42,7 +42,7 @@ public:
   int16_t readA13();
 private:
   va_list m_args;
-  char m_buffer[128];    
+  char m_buffer[256];    
   char m_command[64];
   uint8_t m_incomingByte;
   // uint8_t m_buttonPin[MAX_BUTTON];

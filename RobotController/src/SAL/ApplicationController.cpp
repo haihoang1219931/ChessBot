@@ -40,7 +40,7 @@ void ApplicationController::loop() {
         }
         case MACHINE_EXECUTE_COMMAND: {
             if(executeCommandSequenceLoop() == COMMAND_SEQUENCE_STATE_DONE)
-                m_machineState = MACHINE_EXECUTE_POSITION_STANDBY;
+                m_machineState = MACHINE_EXECUTE_COMMAND_DONE;
             break;
         }
         case MACHINE_EXECUTE_POSITION_STANDBY: {
@@ -527,7 +527,7 @@ void ApplicationController::goToSpetialPosition() {
     jointSteps[MOTOR_ARM2] = m_robot->angleToStep(MOTOR_ARM2,90+m_robot->homeAngle(MOTOR_ARM2));
     jointSteps[MOTOR_ARM3] = 0;
     jointSteps[MOTOR_ARM4] = 0;
-    jointSteps[MOTOR_ARM5] = m_robot->angleToStep(MOTOR_ARM5,45);
+    jointSteps[MOTOR_ARM5] = m_robot->angleToStep(MOTOR_ARM5,0);
     m_robot->setMoveTarget(jointSteps);
     m_robot->moveToTarget(MAX_MOTOR);
     setMachineState(MACHINE_EXECUTE_POSITION);    
@@ -708,13 +708,13 @@ void ApplicationController::clearSequenceMove() {
 }
 void ApplicationController::appendSequenceMove(Point start, Point stop, bool straightMove) {
     if(!straightMove) {
-        float upAngles[6] = {0.0f,45.0f,0.0f,
-                              0.0f,45.0f,0.0f};
+        float upAngles[6] = {0.0f,40.0f,0.0f,
+                              0.0f,40.0f,0.0f};
         Point position[6] = {start,start,start,
                               stop,stop,stop};
-        int captureStep[6] = {0,415,415,
-                               415,0,0};
-        int numStep = 6;
+        int captureStep[6] = {0,490,490,
+                               490,0,0};
+        int numStep = 1;
         for(int seqStep = 0; seqStep < numStep; seqStep++)
         {
             m_sequenceCommand[m_numCommand].x = position[seqStep].x;
@@ -725,7 +725,7 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
             m_numCommand++;
         }
     } else {
-        float upAngles[4] = {0.0f,45.0f,45.0f,
+        float upAngles[4] = {0.0f,40.0f,40.0f,
                               0.0f};
         Point position[4] = {start,start,stop,stop};
         int captureStep[4] = {0,415,0,0};

@@ -341,16 +341,16 @@ float Robot::delayDecel(float stepCount, float delayCur) {
   float nextDelay = delayCur * (4.0f*stepCount + 1.0f) / (4.0f*stepCount - 1.0f);
   return nextDelay;
 }
-void Robot::calculateTotalTime(int numStepAccel, int numStepTotal, float minsleep,
+void Robot::calculateTotalTime(int numStepAccel, int numStepTotal, float minsleep, float homeStepTime,
                                float* totalDelay, float* startDelay) {
     if(numStepTotal < numStepAccel * 2) {
-        float totalTime = (float)(numStepTotal)*minsleep;
+        float totalTime = (float)(numStepTotal)*homeStepTime;
 #ifdef DEBUG_CALCULATE_TIME
-        printf("numstep[%d/%d] totalTime %.02f\r\n",
+        m_app->printf("numstep[%d/%d] totalTime %.02f\r\n",
                numStepAccel,numStepTotal,totalTime);
 #endif
         *totalDelay = totalTime;
-        *startDelay = minsleep;
+        *startDelay = homeStepTime;
     } else {
         float delayTime = minsleep;
         float accelTime = delayTime;
@@ -361,7 +361,7 @@ void Robot::calculateTotalTime(int numStepAccel, int numStepTotal, float minslee
         }
         totalTime += accelTime*2 + (float)(numStepTotal - 2 * numStepAccel)*minsleep;
 #ifdef DEBUG_CALCULATE_TIME
-        printf("numstep[%d/%d] totalTime %.02f\r\n",
+        m_app->printf("numstep[%d/%d] totalTime %.02f\r\n",
                numStepAccel,numStepTotal,totalTime);
 #endif
         *totalDelay = totalTime;
@@ -388,14 +388,15 @@ void Robot::initMove(int motorIDFirst, int motorIDLast)
         m_motorParamList[i].startStep = m_motorParamList[i].currentStep;
         m_motorParamList[i].direction = (m_motorParamList[i].targetStep > m_motorParamList[i].currentStep) ? 1 : -1;   
         float numStep = (float)abs(m_motorParamList[i].targetStep - m_motorParamList[i].currentStep);
+        m_app->printf("calculateTotalTime M[%d]\r\n", i);
         calculateTotalTime(m_motorParamList[i].numStepAccel, numStep,
-                                m_motorParamList[i].minPulsePerStep,
+                                (float)m_motorParamList[i].minPulsePerStep, (float)m_motorParamList[i].homeStepTime,
                              &m_timeDelay[i],&m_startDelay[i]);
         if(m_timeDelay[i] > maxTime) maxTime = m_timeDelay[i];
 #ifdef DEBUG_INITMOVE
-        m_app->printf("Motor[%d] numStep[%f][%d->%d] minPulsePerStep[%d] time[%d] => Max[%d]\r\n",
+        m_app->printf("Motor[%d] numStep[%d][%d->%d] minPulsePerStep[%d] time[%d] => Max[%d]\r\n",
                       i,
-                      numStep, m_motorParamList[i].currentStep, m_moveTarget.jointSteps[i].steps,
+                      (int)numStep, m_motorParamList[i].currentStep, m_moveTarget.jointSteps[i].steps,
                       m_motorParamList[i].minPulsePerStep, (int)m_timeDelay[i],
                       (int)maxTime);
 #endif
@@ -406,20 +407,22 @@ void Robot::initMove(int motorIDFirst, int motorIDLast)
         if(!m_motorParamList[i].active) continue;
         int numStep = abs(m_motorParamList[i].targetStep - m_motorParamList[i].currentStep);
         if(numStep == 0) continue;
-        float startDelay = maxTime/m_timeDelay[i]*(numStep < 2*m_motorParamList[i].numStepAccel?
-                    m_motorParamList[i].minPulsePerStep: m_startDelay[i]);
-        float numStepAccel = numStep < 2*m_motorParamList[i].numStepAccel?
+        int startDelay = (int)(maxTime/m_timeDelay[i]*m_startDelay[i]);
+        int numStepAccel = numStep < 2*m_motorParamList[i].numStepAccel?
                     0:m_motorParamList[i].numStepAccel;
+        int numStepCruise = numStep < 2*m_motorParamList[i].numStepAccel?
+                    numStep: numStep - 2*numStepAccel;
+        uint8_t moveType = (uint8_t) (numStep < 2*m_motorParamList[i].numStepAccel?
+                    MOTOR_EXECUTE_CRUISE_SPEED:MOTOR_EXECUTE_INCREASE_SPEED);
         m_motorList[i]->setupTarget(
-            (int)(numStepAccel),
-            (int)(numStep - 2*numStepAccel),
-            (int)(numStepAccel),
+            numStepAccel,
+            numStepCruise,
+            numStepAccel,
             m_motorParamList[i].direction,
-                    numStep < 2*m_motorParamList[i].numStepAccel?
-                    MOTOR_EXECUTE_CRUISE_SPEED:MOTOR_EXECUTE_INCREASE_SPEED,
-                    startDelay, m_motorParamList[i].minPulsePerStep);
+            moveType,
+            startDelay, m_motorParamList[i].minPulsePerStep);
 #ifdef DEBUG_INITMOVE
-        m_app->printf("Motor[%d] numStep[%d] delayTime[%d]\r\n",
+        m_app->printf("=== Motor[%d] numStep[%d] delayTime[%d]\r\n",
                       i, numStep, (int)startDelay);
 #endif
     }

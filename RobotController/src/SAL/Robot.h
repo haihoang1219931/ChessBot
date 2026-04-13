@@ -51,7 +51,7 @@ public:
     void executeSmoothMotion(int motorID);
     void resetPulse(int motorID);
     float delayDecel(float stepCount, float delayCur);
-    void calculateTotalTime(int numStepAccel, int numStepTotal, float minsleep,
+    void calculateTotalTime(int numStepAccel, int numStepTotal, float minsleep, float homeStepTime,
                             float* totalDelay, float* startDelay);
 
 private:

@@ -169,9 +169,9 @@ typedef struct{
     int homeStepTime;
     float minAngle;
     float maxAngle;
-    int minPulsePerStep;
+    uint32_t minPulsePerStep;
     float frequency;
-    int numStepAccel;
+    uint32_t numStepAccel;
     int currentStep;
     int startStep;
     int targetStep;
