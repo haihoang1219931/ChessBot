@@ -14,7 +14,9 @@ public:
     int loop();
     void setState(ROBOT_STATE newState);
     void initDirection(int motorID, int direction);
-    void requestGoHome(int motorID = MAX_MOTOR);
+    void requestCalib(int motorID = MAX_MOTOR);
+    int executeCalib();
+    void requestGoHome(int motorID = MAX_MOTOR);    
     int executeGohome();
     void requestGoPosition(int motorID, int targetStep, int stepTime, bool isRelativeMove);
     void setMoveTarget(int* jointSteps);
@@ -31,6 +33,7 @@ public:
     float stepToAngle(int motorID, int step, int angleType = ANGLE_DEGREE);
     void currentStep(int* listCurrentStep, int* numMotor);
     void currentAngle(float* listCurrentAngle, int* numMotor, int angleType = ANGLE_DEGREE);
+    void calibAngle(float* listCalibAngle, int* numMotor, int angleType = ANGLE_DEGREE);
     void armLength(float* listArmLength, int* numMotor);
     int currentDirection(int motorID);
     
@@ -43,6 +46,7 @@ public:
     void updateInitAngle(int motorID, float initAngle);
     float armLength(int motorID);
     int currentStep(int motorID);
+    int calibStep(int motorID);
     void updateCurrentStep(int motorID);
     int minStep(int motorID);
     int maxStep(int motorID);

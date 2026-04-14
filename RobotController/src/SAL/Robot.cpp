@@ -36,9 +36,16 @@ void Robot::setState(ROBOT_STATE newState) {
 int Robot::loop() {
     // m_elapsedTime = m_app->getSystemTime() - m_startTime;
 #ifdef DEBUG_ROBOT
-    m_app->printf("Robot time[%ld]\r\n", m_elapsedTime);
+    m_app->printf("Robot m_state: %d\r\n", m_state);
 #endif
     switch(m_state) {
+    case ROBOT_EXECUTE_CALIBRATION: {
+        if (executeCalib() == ROBOT_MOVE_DONE)
+        {
+            m_state = ROBOT_EXECUTE_DONE;
+        }
+    }
+        break;
     case ROBOT_EXECUTE_GO_HOME: {
         if (executeGohome() == ROBOT_MOVE_DONE)
         {
@@ -64,6 +71,69 @@ void Robot::initDirection(int motorID, int direction)
 {
     m_motorParamList[motorID].direction = direction;
     m_app->initDirection(motorID, direction);
+}
+
+void Robot::requestCalib(int motorID) {
+    m_app->printf("CALIBRATION\r\n");
+    m_app->enableHardwareTimer(false);
+    m_requestMotorID = motorID;
+    int startID = motorID == MAX_MOTOR ? 0 : motorID;
+    int stopID = motorID == MAX_MOTOR ? MAX_MOTOR-1 : motorID;
+    m_app->printf("Request calib from [%d-%d]\r\n",startID,stopID);
+    for(int motor=startID; motor<= stopID; motor++)
+    {
+        m_motorParamList[motor].currentStep = 0;
+        if(m_motorParamList[motor].active) {
+            m_motorList[motor]->setupTarget(
+                0,0xFFFF,0,
+                -1,
+                MOTOR_EXECUTE_HOME,
+                m_motorParamList[motor].homeStepTime, 0);
+        }
+    }
+    // m_startTime = m_app->getSystemTime();
+    setState(ROBOT_EXECUTE_CALIBRATION);
+    m_app->printf("Request calib from [%d-%d] done\r\n",startID,stopID);
+    m_app->enableHardwareTimer(true);
+}
+
+int Robot::executeCalib() {
+    bool allMotorsAtHome = true;
+#ifdef DEBUG_ROBOT
+    m_app->printf("Robot executeCalib M[%d]\r\n",m_requestMotorID);
+#endif
+    int startID = m_requestMotorID == MAX_MOTOR ?
+                                            MOTOR_CAPTURE : m_requestMotorID;
+    int stopID = m_requestMotorID == MAX_MOTOR ?
+                                            MAX_MOTOR : m_requestMotorID+1;
+    for(int motor = startID; motor< stopID; motor++)
+    {
+        if(!m_motorParamList[motor].active) continue;
+        if(!m_app->isLimitReached(motor, MOTOR_LIMIT_HOME))
+        {
+#ifdef DEBUG_ROBOT
+            m_app->printf("Robot M[%d] P[%d] T[%d]\r\n",
+                        motor,
+                        m_motorParamList[motor].currentStep,
+                        m_motorParamList[motor].targetStep);
+            m_app->printf("Robot M[%d] calib\r\n",motor);
+#endif
+            allMotorsAtHome = false;
+        }
+    }
+    if(allMotorsAtHome) {
+        for(int motor = startID; motor< stopID; motor++) {
+            if(!m_motorParamList[motor].active) continue;
+            int homeStep = angleToStep(motor, m_motorParamList[motor].homeAngle);
+            m_motorParamList[motor].calibStep = -m_motorParamList[motor].currentStep + homeStep;
+            m_motorParamList[motor].currentStep = homeStep;
+            m_app->printf("Calib is homed M[%d] step[%d]\r\n",
+                      motor,m_motorParamList[motor].calibStep);
+            
+        }
+        m_app->harwareStop(m_requestMotorID);
+    }
+    return allMotorsAtHome ? ROBOT_MOVE_DONE : m_state;
 }
 
 void Robot::requestGoHome(int motorID) {
@@ -175,6 +245,20 @@ void Robot::currentAngle(float* listCurrentAngle, int* numMotor, int angleType)
     }
 }
 
+void Robot::calibAngle(float* listCalibAngle, int* numMotor, int angleType)
+{
+    *numMotor = MAX_MOTOR;
+    for(int i=MOTOR_CAPTURE; i< MAX_MOTOR; i++)
+    {
+        listCalibAngle[i] = stepToAngle(i,
+            m_motorParamList[i].calibStep + (int)(m_motorParamList[i].homeAngle * m_motorParamList[i].scale),
+            angleType);
+        m_app->printf("Robot calibAngle M[%d] step[%d] angle[%.02f]\r\n",
+                      i,m_motorParamList[i].calibStep,
+                      listCalibAngle[i]);
+    }
+}
+
 void Robot::armLength(float* listArmLength, int* numMotor)
 {
     *numMotor = MAX_MOTOR;
@@ -264,6 +348,11 @@ float Robot::armLength(int motorID)
 int Robot::currentStep(int motorID)
 {
     return m_motorParamList[motorID].currentStep;
+}
+
+int Robot::calibStep(int motorID)
+{
+    return m_motorParamList[motorID].calibStep;
 }
 
 void Robot::updateCurrentStep(int motorID)

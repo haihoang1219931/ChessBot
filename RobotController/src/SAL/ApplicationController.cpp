@@ -32,16 +32,17 @@ void ApplicationController::loop() {
         case MACHINE_WAIT_COMMAND: {            
             break;
         }
+        case MACHINE_EXECUTE_CALIBRATION:
         case MACHINE_EXECUTE_HOME:
         case MACHINE_EXECUTE_POSITION:
         {
-            if(m_robot->loop() == ROBOT_MOVE_DONE)
-                m_machineState = MACHINE_EXECUTE_COMMAND_DONE;
+            if(m_robot->loop() == ROBOT_EXECUTE_DONE)
+                setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
             break;
         }
         case MACHINE_EXECUTE_COMMAND: {
             if(executeCommandSequenceLoop() == COMMAND_SEQUENCE_STATE_DONE)
-                m_machineState = MACHINE_EXECUTE_POSITION_STANDBY;
+                setMachineState(MACHINE_EXECUTE_POSITION_STANDBY);
             break;
         }
         case MACHINE_EXECUTE_POSITION_STANDBY: {
@@ -284,19 +285,17 @@ void ApplicationController::executeCommand(char* command) {
     else if(command[0] == 'e') {
         m_comCommandID ++;
         this->enableEngine(true);
-        m_machineState = MACHINE_EXECUTE_COMMAND_DONE;
+        setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
     }
     else if(command[0] == 'd') {
         m_comCommandID ++;
         this->enableEngine(false);
-        m_machineState = MACHINE_EXECUTE_COMMAND_DONE;
+        setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
     }
     else if(command[0] == 'r' && strlen(command)>=2) {
         if(command[1] == 'a') {
-            goToReadyPosition();
-        } else if(command[1] == 's') {
             m_comCommandID ++;
-            goToSpetialPosition();
+            goToReadyPosition();
         }
     }
     else if(command[0] == 'm' && strlen(command)>=2) {
@@ -317,6 +316,69 @@ void ApplicationController::executeCommand(char* command) {
         {
             m_comCommandID ++;
             goToHome(command[1]-'0');
+        }
+    }
+    else if(command[0] == 'l' && strlen(command)>=2) {        
+        if( command[1] == 'l' && strlen(command)>=20) {
+            // llcbr0c1y12345x67890
+            m_comCommandID ++;
+            if(command[2] == 'c' && command[3] == 'b') {
+                char xStr[8], yStr[8];
+                yStr[0] = command[9];
+                yStr[1] = command[10];
+                yStr[2] = command[11];
+                yStr[3] = command[12];
+                yStr[4] = command[13];
+                yStr[5] = 0;
+
+                xStr[0] = command[15];
+                xStr[1] = command[16];
+                xStr[2] = command[17];
+                xStr[3] = command[18];
+                xStr[4] = command[19];
+                xStr[5] = 0;
+
+                m_chessBoard->setCalibChessBoardPoint(command[5]-'0',command[7]-'0',
+                    {(float)atof(yStr)/10.0f,(float)atof(xStr)/10.0f,0,true});
+            } else if(command[2] == 'd' && (command[3] == 'p' || command[3] == 'b')) {
+                // lldpr0c1y12345x67890
+                // lldbr0c1y12345x67890
+                char xStr[8], yStr[8];
+                yStr[0] = command[9];
+                yStr[1] = command[10];
+                yStr[2] = command[11];
+                yStr[3] = command[12];
+                yStr[4] = command[13];
+                yStr[5] = 0;
+
+                xStr[0] = command[15];
+                xStr[1] = command[16];
+                xStr[2] = command[17];
+                xStr[3] = command[18];
+                xStr[4] = command[19];
+                xStr[5] = 0;
+
+                m_chessBoard->setCalibDropZonePoint(command[5]-'0',command[7]-'0',
+                    command[3]=='p'?ZONE_PLAYER:ZONE_BOT,
+                    {(float)atof(yStr)/10.0f,(float)atof(xStr)/10.0f,0,true});
+            }
+        } else if( command[1] == 's') {
+            m_comCommandID ++;
+            Point calPosistion = calibPos();
+            this->printf("RS %d %d\r\n", 
+                (int)(calPosistion.x*10.0f), 
+                (int)(calPosistion.y*10.0f));
+        } else if( command[1] == 'r') {
+            m_comCommandID ++;
+            goToCalibPosition();
+        } else if(command[1] == 'a') {
+            m_comCommandID ++;
+            calibToHome(MAX_MOTOR);
+        }
+        else if(command[1] >= '0' && command[1] <= '5')
+        {
+            m_comCommandID ++;
+            calibToHome(command[1]-'0');
         }
     }
     else if(command[0] == 'c' && strlen(command)>=5) {
@@ -485,6 +547,25 @@ void ApplicationController::calculateJoints(float xPos, float yPos, float upAngl
     this->printf("calculateJoints upAngleInDegree[%f]\r\n",upAngleInDegree);
 }
 
+Point ApplicationController::calibPos()
+{
+    Point resultPos;
+    float a1 = m_robot->armLength(MOTOR_ARM1);
+    float listCalibAngle[MAX_MOTOR];
+    int numMotor;
+    m_robot->calibAngle(listCalibAngle,&numMotor,ANGLE_RAD);
+    float a2 = 0;
+    float q2Offset = 0;
+    calculatePolygonEdge(listCalibAngle[MOTOR_ARM5]/M_PI*180.0f,&a2,&q2Offset);
+    float xPosFK = 0, yPosFK = 0;
+    float q1 = listCalibAngle[MOTOR_ARM1] - M_PI/2.0f;
+    float q2 = M_PI/2.0f - q2Offset;
+    forwardKinematic(a1,a2,q1,q2,&xPosFK,&yPosFK);
+    resultPos.x = xPosFK;
+    resultPos.y = yPosFK;
+    return resultPos;
+}
+
 Command ApplicationController::calculateNextPointInLine(Point currPos, Point targetPos, float numPointInCommand)
 {
     Command nextPoint;
@@ -522,6 +603,11 @@ void ApplicationController::goToHome(int motorID)
     setMachineState(MACHINE_EXECUTE_HOME);
 }
 
+void ApplicationController::calibToHome(int motorID)
+{
+    m_robot->requestCalib(motorID);
+    setMachineState(MACHINE_EXECUTE_CALIBRATION);
+}
 void ApplicationController::goToReadyPosition() {
     int jointSteps[MAX_MOTOR];
     jointSteps[MOTOR_CAPTURE] = 0;
@@ -535,14 +621,14 @@ void ApplicationController::goToReadyPosition() {
     setMachineState(MACHINE_EXECUTE_POSITION);
 }
 
-void ApplicationController::goToSpetialPosition() {
+void ApplicationController::goToCalibPosition() {
     int jointSteps[MAX_MOTOR];
     jointSteps[MOTOR_CAPTURE] = 0;
-    jointSteps[MOTOR_ARM1] = m_robot->angleToStep(MOTOR_ARM1,120);
-    jointSteps[MOTOR_ARM2] = m_robot->angleToStep(MOTOR_ARM2,90+m_robot->homeAngle(MOTOR_ARM2));
+    jointSteps[MOTOR_ARM1] = m_robot->calibStep(MOTOR_ARM1);
+    jointSteps[MOTOR_ARM2] = m_robot->calibStep(MOTOR_ARM2);
     jointSteps[MOTOR_ARM3] = 0;
     jointSteps[MOTOR_ARM4] = 0;
-    jointSteps[MOTOR_ARM5] = m_robot->angleToStep(MOTOR_ARM5,0);
+    jointSteps[MOTOR_ARM5] = m_robot->calibStep(MOTOR_ARM5);
     m_robot->setMoveTarget(jointSteps);
     m_robot->moveToTarget(MAX_MOTOR);
     setMachineState(MACHINE_EXECUTE_POSITION);    
@@ -647,7 +733,7 @@ void ApplicationController::calculateSequenceAttack(int startCol, int startRow,
 {
     // get free drop point
     // append move from stop -> drop -> start -> stop -> standby
-    Point dropPoint = m_chessBoard->getFreeDropPoint(ZONE_MACHINE);
+    Point dropPoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
     Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
     Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
 
@@ -660,7 +746,7 @@ void ApplicationController::calculateSequencePastPawn(int startCol, int startRow
                      int stopCol, int stopRow)
 {
     // append move from attack pawn -> drop -> start -> stop -> standby
-    Point dropPoint = m_chessBoard->getFreeDropPoint(ZONE_MACHINE);
+    Point dropPoint = m_chessBoard->getFreeDropPoint(ZONE_PLAYER);
     Point pawnPoint = m_chessBoard->convertPoint(startRow,stopCol);
     Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
     Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
@@ -673,15 +759,15 @@ void ApplicationController::calculateSequencePromotePiece(int startCol, int star
                      int stopCol, int stopRow, char promotePiece)
 {
     // append move from attack piece -> drop -> promote -> stop -> start -> drop -> standby
-    Point promotePiecePoint = m_chessBoard->getFreeDropPoint(ZONE_GUEST,promotePiece);
-    Point dropPiecePoint = m_chessBoard->getFreeDropPoint(ZONE_GUEST);
+    Point promotePiecePoint = m_chessBoard->getFreeDropPoint(ZONE_BOT,promotePiece);
+    Point dropPiecePoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
     Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
     Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
 
     clearSequenceMove();
     if(startCol != stopCol){
         // pawn attack piece, move attack piece -> drop
-        Point dropPoint = m_chessBoard->getFreeDropPoint(ZONE_MACHINE);
+        Point dropPoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
         appendSequenceMove(stopPoint, dropPoint);
     }
     appendSequenceMove(promotePiecePoint, stopPoint);

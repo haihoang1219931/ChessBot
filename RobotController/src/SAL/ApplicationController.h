@@ -35,8 +35,9 @@ public:
     int executeCommandNormal();
     int executeCommandLine();
     void goToHome(int motorID);
+    void calibToHome(int motorID);
     void goToReadyPosition();
-    void goToSpetialPosition();
+    void goToCalibPosition();
     void executeSequence(MOVE_TYPE moveType,
                          int startCol, int startRow,
                          int stopCol, int stopRow,
@@ -55,6 +56,7 @@ public:
                                  int rookCol, int rookRow);
     void calculatePolygonEdge(float upAngleInDegree, float* edge, float* angle);
     void calculateJoints(float xPos, float yPos, float upAngleInDegree, int* jointSteps);
+    Point calibPos();
     Command calculateNextPointInLine(Point currPos, Point targetPos, float numPointInCommand);
     Point currentPos();
     float distance(float x1, float y1, float x2, float y2);
