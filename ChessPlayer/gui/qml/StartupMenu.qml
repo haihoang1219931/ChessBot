@@ -115,4 +115,7 @@ FocusScope {
             }
         }
     }
+    Component.onCompleted :{
+        backend.initRobotCommunication();
+    }
 }

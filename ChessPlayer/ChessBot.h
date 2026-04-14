@@ -6,9 +6,11 @@
 #include <QWaitCondition>
 #include <QThread>
 #include <QSerialPort>
+#include <QSerialPortInfo>
 #include <QVariant>
 #include <QVariantList>
 #include <QPoint>
+#include <QVector>
 
 class ChessController;
 #ifdef IMAGE_PROCESS_MOVE
@@ -21,6 +23,7 @@ typedef enum{
 } STATE_ACTION;
 
 typedef enum {
+    STATE_INIT_COM,
     STATE_PLAY,
     STATE_CONFIGURE,
     STATE_TEST,
@@ -44,6 +47,16 @@ typedef enum{
     CONFIGURE_INFORM_RESULT,
     CONFIGURE_DONE
 } STATE_CONFIGURE_PHASE;
+
+typedef enum{
+    INIT_DETECT_PORT,
+    INIT_GET_VERSION,
+    INIT_CHECK_CALIB_FILE,
+    INIT_REQUEST_CALIB_CHESSBOARD,
+    INIT_REQUEST_CALIB_RIGHT_DROPZONE,
+    INIT_REQUEST_CALIB_LEFT_DROPZONE,
+    INIT_DONE
+} STATE_INIT_PHASE;
 
 typedef enum{
     TEST_ROBOT,
@@ -71,6 +84,7 @@ public Q_SLOTS:
     void stopService();
     void togglePause(bool paused);
     void sendTestCommand(QString command);
+    void initRobotCommunication();
     void processNextMove();
     void setLevel(int level);
     void setSide(int side);
@@ -99,6 +113,10 @@ private:
     uint8_t configureSide();
     uint8_t configureLevel();
     uint8_t testRobot();
+    void initRobot();
+    bool detectArduinoPort(int baudRate = 38400);
+    bool getArduinoVersion();
+    QPoint readCalibrationPoint(const QString &command);
 
 private:
     bool m_stopped = false;
@@ -115,9 +133,16 @@ private:
     int m_statePlay;
     int m_stateConfigure;
     int m_stateTest;
+    int m_stateInit;
     int m_levelType;
     int m_levelScore;
     int m_side;
+    QString m_arduinoVersion;
+    QVector<QVector<QPoint>> m_chessboardCalib;    // 8x8 chessboard
+    QVector<QVector<QPoint>> m_dropzoneRightCalib; // 8x2 right
+    QVector<QVector<QPoint>> m_dropzoneLeftCalib;  // 8x2 left
+    int m_calibRow;
+    int m_calibCol;
 };
 
 #endif // CHESSBOT_H
