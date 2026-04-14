@@ -157,16 +157,22 @@ void ChessBoard::promotePiece(uint8_t piece) {
 }
 
 void ChessBoard::setCalibChessBoardPoint(int row, int col, Point point) {
-    m_cellCalibsChessBoard[row][col] = point;
+    m_cellCalibsChessBoard[row][col].x = point.x;
+    m_cellCalibsChessBoard[row][col].y = point.y;
+    m_cellCalibsChessBoard[row][col].z = point.z;
     m_cellCalibsChessBoard[row][col].calibbed = true;
 }
 
 void ChessBoard::setCalibDropZonePoint(int row, int col, ZONE_TYPE zone, Point point) {
     if(zone == ZONE_BOT) {
-        m_cellCalibsDropZoneBot[row][col] = point;
+        m_cellCalibsDropZoneBot[row][col].x = point.x;
+        m_cellCalibsDropZoneBot[row][col].y = point.y;
+        m_cellCalibsDropZoneBot[row][col].z = point.z;
         m_cellCalibsDropZoneBot[row][col].calibbed = true;
     } else {
-        m_cellCalibsDropZonePlayer[row][col] = point;
+        m_cellCalibsDropZonePlayer[row][col].x = point.x;
+        m_cellCalibsDropZonePlayer[row][col].y = point.y;
+        m_cellCalibsDropZonePlayer[row][col].z = point.z;
         m_cellCalibsDropZonePlayer[row][col].calibbed = true;
     }
 }

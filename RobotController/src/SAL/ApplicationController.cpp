@@ -319,55 +319,64 @@ void ApplicationController::executeCommand(char* command) {
         }
     }
     else if(command[0] == 'l' && strlen(command)>=2) {        
-        if( command[1] == 'l' && strlen(command)>=20) {
+        if( command[1] == 'c' && strlen(command)>=5) {
+            m_comCommandID ++;
+            int rowId,colId;
+            if(sscanf(command, "lccbr%dc%d", &rowId, &colId) == 2) {
+                // lccbr0c1
+                Point chessBoardPoint = m_chessBoard->convertPoint(rowId,colId);
+                this->printf("CB r[%d] c[%d] x[%d] y[%d]\r\n", 
+                    rowId, 
+                    colId,
+                    (int)(chessBoardPoint.x*10.0f), 
+                    (int)(chessBoardPoint.y*10.0f));
+            } else if(sscanf(command, "lcdpr%dc%d", &rowId, &colId) == 2) {
+                // lcdpr0c1
+                Point dropZonePoint = m_chessBoard->convertDropPoint(rowId,colId,ZONE_PLAYER);
+                this->printf("DP r[%d] c[%d] x[%d] y[%d]\r\n", 
+                    rowId,
+                    colId,
+                    (int)(dropZonePoint.x*10.0f), 
+                    (int)(dropZonePoint.y*10.0f));
+            } else if(sscanf(command, "lcdbpr%dc%d", &rowId, &colId) == 2) {
+                // lcdbpr0c1
+                Point dropZonePoint = m_chessBoard->convertDropPoint(rowId,colId,ZONE_BOT);
+                this->printf("DP r[%d] c[%d] x[%d] y[%d]\r\n", 
+                    rowId,
+                    colId,
+                    (int)(dropZonePoint.x*10.0f), 
+                    (int)(dropZonePoint.y*10.0f));
+            }
+            setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+        } if( command[1] == 'l' && strlen(command)>=5) {
             // llcbr0c1y12345x67890
             m_comCommandID ++;
             if(command[2] == 'c' && command[3] == 'b') {
-                char xStr[8], yStr[8];
-                yStr[0] = command[9];
-                yStr[1] = command[10];
-                yStr[2] = command[11];
-                yStr[3] = command[12];
-                yStr[4] = command[13];
-                yStr[5] = 0;
-
-                xStr[0] = command[15];
-                xStr[1] = command[16];
-                xStr[2] = command[17];
-                xStr[3] = command[18];
-                xStr[4] = command[19];
-                xStr[5] = 0;
-
-                m_chessBoard->setCalibChessBoardPoint(command[5]-'0',command[7]-'0',
-                    {(float)atof(yStr)/10.0f,(float)atof(xStr)/10.0f,0,true});
+                int rowId,colId,xPos,yPos;
+                if(sscanf(command, "llcbr%dc%dx%dy%d", &rowId, &colId, &xPos, &yPos) == 4) {
+                    m_chessBoard->setCalibChessBoardPoint(rowId,colId,
+                    {(float)xPos/10.0f,(float)yPos/10.0f,0,true});
+                }
             } else if(command[2] == 'd' && (command[3] == 'p' || command[3] == 'b')) {
-                // lldpr0c1y12345x67890
-                // lldbr0c1y12345x67890
-                char xStr[8], yStr[8];
-                yStr[0] = command[9];
-                yStr[1] = command[10];
-                yStr[2] = command[11];
-                yStr[3] = command[12];
-                yStr[4] = command[13];
-                yStr[5] = 0;
-
-                xStr[0] = command[15];
-                xStr[1] = command[16];
-                xStr[2] = command[17];
-                xStr[3] = command[18];
-                xStr[4] = command[19];
-                xStr[5] = 0;
-
-                m_chessBoard->setCalibDropZonePoint(command[5]-'0',command[7]-'0',
-                    command[3]=='p'?ZONE_PLAYER:ZONE_BOT,
-                    {(float)atof(yStr)/10.0f,(float)atof(xStr)/10.0f,0,true});
+                // lldpr0c1x12345y67890
+                // lldbr0c1x12345y67890
+                int rowId,colId,xPos,yPos;
+                if(sscanf(command, "lldpr%dc%dx%dy%d", &rowId, &colId, &xPos, &yPos) == 4) {
+                    m_chessBoard->setCalibDropZonePoint(rowId,colId,ZONE_PLAYER,
+                    {(float)xPos/10.0f,(float)yPos/10.0f,0,true});
+                } else if(sscanf(command, "lldbr%dc%dx%dy%d", &rowId, &colId, &xPos, &yPos) == 4) {
+                    m_chessBoard->setCalibDropZonePoint(rowId,colId,ZONE_BOT,
+                    {(float)xPos/10.0f,(float)yPos/10.0f,0,true});
+                }
             }
+            setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
         } else if( command[1] == 's') {
             m_comCommandID ++;
             Point calPosistion = calibPos();
             this->printf("RS %d %d\r\n", 
                 (int)(calPosistion.x*10.0f), 
                 (int)(calPosistion.y*10.0f));
+            setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
         } else if( command[1] == 'r') {
             m_comCommandID ++;
             goToCalibPosition();
@@ -718,9 +727,9 @@ void ApplicationController::calculateSequenceMoveNormal(int startCol, int startR
 {
     // append move from start -> stop -> standy
     Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
-    printf("start[%d,%d] to Point(%f,%f)\r\n",
+    printf("start[%d,%d] to Point(%d,%d)\r\n",
            startRow,startCol,
-           startPoint.x,startPoint.y);
+           (int)(startPoint.x*10), (int)(startPoint.y*10));
     Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
     clearSequenceMove();
     appendSequenceMove(startPoint, stopPoint);
