@@ -1,81 +1,77 @@
 import QtQuick 2.0
-import "qrc:/qml/ChessSupport.js" as ChessSupport
 Item {
     id: root
-    property real chessRotation: 0
-    Grid {
-        id: grid
-        columns: 8
-        rows: 8
-        rotation: chessRotation
-        Repeater {
-            id: repeater
-            delegate: Rectangle {
-                width: root.width / grid.columns
-                height: root.height / grid.rows
-                color: (modelData.row+modelData.col)%2 === 0? "#90652C" : "#DEB887"
-                Rectangle {
-                    anchors.fill: parent
-                    color: "transparent"
-                    MouseArea {
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onEntered: {
-                            parent.color = "yellow"
-                        }
-                        onExited: {
-                            parent.color = "transparent"
-                        }
-                        onClicked: {
-                            var itemClicked = repeaterChessPiece.model[index];
-                            var rowClicked = modelData.row;
-                            var colClicked = modelData.col;
-                            console.log("itemClicked:"+itemClicked+"("+rowClicked+","+colClicked+") Clicked: " +
-                                        repeater.model[rowClicked*8+colClicked].clicked + " Sugguest "+repeater.model[rowClicked*8+colClicked].suggest);
-                            if(repeater.model[rowClicked*8+colClicked].sugguest) {
-                                var chessPieceModel = ChessSupport.updateChessPiece(repeaterChessPiece.model,
-                                                                                    repeater.model,rowClicked,colClicked);
-                            }
+    property var controller
 
-                            var chessBoardModel;
-                            chessBoardModel = ChessSupport.updateSugguestMoves(repeater.model,rowClicked,colClicked);
-                            repeater.model = chessBoardModel;
-                        }
-                    }
-                }
-//                Rectangle {
-//                    anchors.verticalCenter: parent.verticalCenter
-//                    anchors.horizontalCenter: parent.horizontalCenter
-//                    color: "transparent"
-//                    border.color: modelData.suggest?"gray":"transparent"
-//                    border.width: 10
-//                    width: ChessSupport.isOppositeSide(repeaterChessPiece.model[index],chessClicked)?parent.width:20
-//                    height: ChessSupport.isOppositeSide(repeaterChessPiece.model[index],chessClicked)?parent.height:20
-//                    radius: width/2
-//                }
-            }
+    function pieceText(code) {
+        switch (code) {
+        case "wK": return "\u2654"
+        case "wQ": return "\u2655"
+        case "wR": return "\u2656"
+        case "wB": return "\u2657"
+        case "wN": return "\u2658"
+        case "wP": return "\u2659"
+        case "bK": return "\u265A"
+        case "bQ": return "\u265B"
+        case "bR": return "\u265C"
+        case "bB": return "\u265D"
+        case "bN": return "\u265E"
+        case "bP": return "\u265F"
+        default: return ""
         }
     }
+
+    function pieceColor(code) {
+        if (!code || code.length < 1) return "transparent"
+        return code.charAt(0) === "w" ? "#ffffff" : "#111111"
+    }
+
     Grid {
-        id: gridChessPiece
-        columns: 8
+        id: chessGrid
+        anchors.centerIn: parent
         rows: 8
-        rotation: chessRotation
+        columns: 8
+
+        property real boardSize: Math.min(parent.width - 40, parent.height - 40)
+        property real tileSize: boardSize / 8
+
         Repeater {
-            id: repeaterChessPiece
-            delegate: Text {
-                width: root.width / grid.columns
-                height: root.height / grid.rows
-                rotation: -chessRotation
-                text: ChessSupport.charCode(modelData)
-                font.pointSize : root.width / grid.columns * 0.6
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
+            model: 64
+
+            Rectangle {
+                property int boardIndex: controller && controller.playerColor === 1 ? (63 - index) : index
+
+                width: chessGrid.tileSize
+                height: chessGrid.tileSize
+
+                color: {
+                    var rank = Math.floor(index / 8)
+                    var file = index % 8
+                    var light = ((rank + file) % 2) === 0
+                    if (!controller) return light ? "#f2d9b0" : "#8a5b34"
+                    if (controller.selectedSquare === boardIndex) return "#d35400"
+                    if (controller.checkedKingSquare === boardIndex) return "#bb1f1f"
+                    if (controller.isValidDestination(boardIndex)) return "#2e8b57"
+                    return light ? "#f2d9b0" : "#8a5b34"
+                }
+
+                border.width: 1
+                border.color: "#4f2f17"
+
+                Text {
+                    anchors.centerIn: parent
+                    text: pieceText(controller && controller.board ? controller.board[boardIndex] : "")
+                    color: pieceColor(controller && controller.board ? controller.board[boardIndex] : "")
+                    font.pixelSize: parent.width * 0.55
+                    font.bold: true
+                    font.family: "Times New Roman"
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: if (controller) controller.clickSquare(boardIndex)
+                }
             }
         }
-    }
-    Component.onCompleted: {
-        repeater.model = ChessSupport.createChessBoardModel();
-        repeaterChessPiece.model = ChessSupport.createChessPiecesModel();
     }
 }

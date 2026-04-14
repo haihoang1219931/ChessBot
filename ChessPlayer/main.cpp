@@ -53,12 +53,18 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include "ChessBot.h"
+#include "FileIO.h"
+#include "ChessController.h"
 int main(int argc, char *argv[])
 {
+    QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
     QGuiApplication app(argc, argv);
     QQmlApplicationEngine engine;
     ChessBot backend; // Instantiate your class
+    FileIO fileio;
     engine.rootContext()->setContextProperty("backend", &backend);
+    engine.rootContext()->setContextProperty("fileio", &fileio);
+    engine.rootContext()->setContextProperty("chessController", backend.chessController());
     engine.load(QUrl(QStringLiteral("qrc:/qml/main.qml")));
     if (engine.rootObjects().isEmpty())
             return -1;

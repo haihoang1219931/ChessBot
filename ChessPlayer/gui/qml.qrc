@@ -8,5 +8,11 @@
         <file>qml/Emoji.qml</file>
         <file>qml/SideButton.qml</file>
         <file>fonts/chess_merida_unicode.ttf</file>
+        <file>qml/StartupMenu.qml</file>
+        <file>qml/ChessSupport.js</file>
+        <file>qml/GameResult.qml</file>
+        <file>qml/MenuBotIcon.qml</file>
+        <file>qml/MenuSettingIcon.qml</file>
+        <file>qml/SettingCalibChessBoard.qml</file>
     </qresource>
 </RCC>

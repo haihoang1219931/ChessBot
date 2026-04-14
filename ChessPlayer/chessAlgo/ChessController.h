@@ -1,0 +1,85 @@
+#pragma once
+
+#include <QObject>
+#include <QStringList>
+#include <QSet>
+#include <memory>
+#include <vector>
+
+#include "Board.hpp"
+#include "Move.hpp"
+
+class ChessController : public QObject
+{
+    Q_OBJECT
+    Q_PROPERTY(QStringList board READ board NOTIFY boardChanged)
+    Q_PROPERTY(int selectedSquare READ selectedSquare NOTIFY selectedSquareChanged)
+    Q_PROPERTY(QString sideToMove READ sideToMove NOTIFY sideToMoveChanged)
+    Q_PROPERTY(QString status READ status NOTIFY statusChanged)
+    Q_PROPERTY(QStringList moveHistory READ moveHistory NOTIFY moveHistoryChanged)
+    Q_PROPERTY(bool promotionPending READ promotionPending NOTIFY promotionPendingChanged)
+    Q_PROPERTY(int checkedKingSquare READ checkedKingSquare NOTIFY checkedKingSquareChanged)
+    Q_PROPERTY(int engineLevel READ engineLevel NOTIFY engineLevelChanged)
+    Q_PROPERTY(int playerColor READ playerColor NOTIFY playerColorChanged)
+
+public:
+    explicit ChessController(QObject* parent = nullptr);
+
+    QStringList board() const;
+    int selectedSquare() const;
+    QString sideToMove() const;
+    QString status() const;
+    QStringList moveHistory() const;
+    bool promotionPending() const;
+    int checkedKingSquare() const;
+    int engineLevel() const;
+    int playerColor() const;
+    QString buildResultText() const;
+
+    Q_INVOKABLE void newGame();
+    Q_INVOKABLE void clickSquare(int uiIndex);
+    Q_INVOKABLE bool moveByUiSquares(int startUiIndex, int stopUiIndex);
+    Q_INVOKABLE bool moveByCoordinates(const QString& startSquare, const QString& stopSquare);
+    Q_INVOKABLE QStringList findBestMoveCoordinates() const;
+    Q_INVOKABLE bool isValidDestination(int uiIndex) const;
+    Q_INVOKABLE void choosePromotion(const QString& pieceLetter);
+    Q_INVOKABLE void setEngineLevel(int level);
+    Q_INVOKABLE void setPlayerColor(int color);
+
+Q_SIGNALS:
+    void boardChanged();
+    void selectedSquareChanged();
+    void sideToMoveChanged();
+    void statusChanged();
+    void moveHistoryChanged();
+    void promotionPendingChanged();
+    void checkedKingSquareChanged();
+    void engineLevelChanged();
+    void playerColorChanged();
+
+private:
+    void refreshBoardModel();
+    void refreshSelectionMoves();
+    void refreshCheckState();
+    void clearSelection();
+    void playEngineMove();
+    bool tryFindLegalMove(int originSquare, int destinationSquare, Move& outMove, QChar promotionSuffix = QChar());
+    QString pieceCodeAtSquare(int square) const;
+    static bool tryParseCoordinate(const QString& coordinate, int& uiIndex);
+
+    static int uiIndexToSquare(int uiIndex);
+    static int squareToUiIndex(int square);
+
+private:
+    std::shared_ptr<Board> m_board;
+    int m_selectedUiSquare;
+    QSet<int> m_validDestinationUiSquares;
+    QStringList m_boardModel;
+    QString m_status;
+    QStringList m_moveHistory;
+    bool m_promotionPending;
+    int m_checkedKingSquare;
+    std::vector<Move> m_pendingPromotionMoves;
+    int m_engineDepth;
+    int m_playerColor; // 0 = White, 1 = Black
+};

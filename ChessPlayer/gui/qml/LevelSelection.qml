@@ -9,7 +9,7 @@ FocusScope {
     focus: true
 
     signal itemSelected(string rank, string score)
-
+    signal exitPressed()
     onItemSelected: (rank, score) => {
         console.log("SELECTED: " + rank + " with score: " + score);
     }
@@ -22,9 +22,9 @@ FocusScope {
     }
 
     property var rankData: [
-        { name: "Grandmaster", scores: ["2700", "2500", "2300"] },
-        { name: "Master",      scores: ["2100", "1900", "1700"] },
-        { name: "Advanced",    scores: ["1500", "1300", "1100"] }
+        { name: "Grandmaster", scores: [3100, 2900, 2700, 2500, 2300] },
+        { name: "Master",      scores: [2100, 1900, 1700, 1500, 1300] },
+        { name: "Advanced",    scores: [1100, 900, 700, 500] }
     ]
 
     Rectangle {
@@ -36,10 +36,16 @@ FocusScope {
 
             ListView {
                 id: rankList
-                Layout.fillWidth: true; Layout.fillHeight: true
+                Layout.preferredWidth: root.width * 2/3
+                Layout.preferredHeight: 210
+                Layout.alignment: Qt.AlignVCenter
                 model: root.rankData
                 focus: true // Default focus child
                 KeyNavigation.right: scoreList
+                Keys.onEscapePressed: {
+                    root.exitPressed()
+                }
+
                 clip: true
                 highlightFollowsCurrentItem: true
 
@@ -54,7 +60,7 @@ FocusScope {
                         gradient: Gradient {
                             orientation: Gradient.Horizontal
                             GradientStop { position: 0.0; color: "transparent" }
-                            GradientStop { position: 0.5; color: "#ffff00" }
+                            GradientStop { position: 0.5; color: "#0055ff" }
                             GradientStop { position: 1.0; color: "transparent" }
                         }
                     }
@@ -64,7 +70,7 @@ FocusScope {
                         gradient: Gradient {
                             orientation: Gradient.Horizontal
                             GradientStop { position: 0.0; color: "transparent" }
-                            GradientStop { position: 0.5; color: "#ffff00" }
+                            GradientStop { position: 0.5; color: "#0055ff" }
                             GradientStop { position: 1.0; color: "transparent" }
                         }
                     }
@@ -72,7 +78,7 @@ FocusScope {
                     Text {
                         anchors.centerIn: parent
                         text: (isSelected && rankList.activeFocus ? "> " : "") + modelData.name
-                        color: isSelected ? "#ffff00" : "white"
+                        color: isSelected ? "#0055ff" : "white"
                         font.pixelSize: 28; font.bold: isSelected
                     }
                 }
@@ -82,7 +88,9 @@ FocusScope {
 
             ListView {
                 id: scoreList
-                Layout.fillWidth: true; Layout.fillHeight: true
+                Layout.preferredWidth: root.width * 1/3
+                Layout.preferredHeight: 210
+                Layout.alignment: Qt.AlignVCenter
                 model: root.rankData[rankList.currentIndex].scores
                 KeyNavigation.left: rankList
                 clip: true
@@ -100,7 +108,7 @@ FocusScope {
                         gradient: Gradient {
                             orientation: Gradient.Horizontal
                             GradientStop { position: 0.0; color: "transparent" }
-                            GradientStop { position: 0.5; color: "#ffff00" }
+                            GradientStop { position: 0.5; color: "#0055ff" }
                             GradientStop { position: 1.0; color: "transparent" }
                         }
                     }
@@ -108,7 +116,7 @@ FocusScope {
                     Text {
                         anchors.centerIn: parent
                         text: (isSelected ? "> " : "") + modelData
-                        color: isSelected ? "#ffff00" : (scoreList.activeFocus ? "white" : "#666")
+                        color: isSelected ? "#0055ff" : (scoreList.activeFocus ? "white" : "#666")
                         font.pixelSize: 28; font.bold: isSelected
                     }
                 }

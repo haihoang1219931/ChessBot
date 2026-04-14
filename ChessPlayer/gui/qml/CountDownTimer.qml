@@ -8,23 +8,30 @@ Rectangle {
     height: 480
     color: "black"
     signal goback()
+    signal startGame()
+    signal gobackLevelSelection()
     Keys.onEscapePressed: root.goback()
+    Keys.onReturnPressed: root.startGame()
+    Keys.onSpacePressed: backend.randomMove()
+    property int levelType: 1
+    property int levelScore: 200
+    property int side: 0
+    property string player1Name: "Bot"
+    property string player1Time: "02:51"
+    property string player2Name: "Player"
+    property string player2Time: "03:28"
+    function openGameResult(result) {
+        // 1. Set the source to your QML file
+        if(myLoader.item === null)
+        myLoader.setSource("GameResult.qml");
+        myLoader.item.gameResult = result
+    }
+    function closeLoaderItem() {
+        myLoader.source = "";   // This automatically destroys the loaded item
+        root.forceActiveFocus(); // Restore focus to the main UI
+    }
     Column {
         anchors.fill: parent
-        ProgressBar {
-            height: 30
-            value: backend.progress / 100
-        }
-
-        Row {
-            Button { text: "Start"; onClicked: backend.startService() }
-            Button { text: "Stop"; onClicked: backend.stopService() }
-            Button {
-                text: checked ? "Resume" : "Pause"
-                checkable: true
-                onToggled: backend.togglePause(checked)
-            }
-        }
         // --- TOP OVERLAY SECTION ---
         Rectangle {
             id: topBar
@@ -34,6 +41,8 @@ Rectangle {
 
             Row {
                 anchors.left: parent.left
+                anchors.top: parent.top
+                height: parent.height
                 anchors.leftMargin: 20
                 spacing: 8
 
@@ -44,10 +53,11 @@ Rectangle {
                 }
 
                 Text {
-                    text: "level 1 (200)"
+                    text: "level "+levelType+" ("+levelScore+")"
                     color: "white"
                     font.pixelSize: 24
                     font.weight: Font.DemiBold
+                    anchors.verticalCenter: parent.verticalCenter
                 }
             }
         }
@@ -62,15 +72,14 @@ Rectangle {
                 anchors.fill: parent
                 color: "#001e3e"
 
-                Text {
-                    anchors.right: parent.right
-                    anchors.rightMargin: 50
+                Column {
                     anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 50
-                    text: "02:53"
-                    color: "#66ccff"
-                    font.pixelSize: 80
-                    font.bold: true
+                    anchors.right: parent.right
+                    anchors.bottomMargin: 10
+                    anchors.rightMargin: 10
+                    spacing: -5
+                    Text { text: player2Name; color: "white"; font.pixelSize: 52 }
+                    Text { text: player2Time; color: "white"; font.pixelSize: 52; font.bold: true }
                 }
             }
 
@@ -95,12 +104,60 @@ Rectangle {
                 }
 
                 Column {
-                    x: 60
+                    x: 5
                     spacing: -5
-                    Text { text: "Julie"; color: "white"; font.pixelSize: 52 }
-                    Text { text: "05:39"; color: "white"; font.pixelSize: 96; font.bold: true }
+                    Text { text: player1Name; color: "white"; font.pixelSize: 52 }
+                    Text { text: player1Time; color: "white"; font.pixelSize: 52; font.bold: true }
                 }
             }
+            ChessBoard {
+                id: chessboard
+                width: 300
+                height: 300
+                anchors.centerIn: parent
+                controller: backend ? backend.chessController : null
+            }
+        }
+    }
+    Loader {
+        id: myLoader
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        focus: true // Necessary for children to receive focus
+
+        onLoaded: {
+            // 2. Force focus to the loaded item immediately after it's ready
+            item.forceActiveFocus();
+        }
+    }
+
+    Connections {
+        target: myLoader.item // Connects to the loaded object
+        ignoreUnknownSignals: true // Prevents errors before source is loaded
+
+        onGameNextStep: {
+            myLoader.source = ""; // Close it
+            if(nextStep === 1) {
+                console.log("gobackLevelSelection");
+                gobackLevelSelection();
+            } else {
+                console.log("resetGame");
+                backend.resetGame();
+                root.forceActiveFocus();
+            }
+        }
+    }
+    Component.onCompleted: {
+        root.levelType = backend.levelType
+        root.levelScore = backend.levelScore
+        root.side =  backend.side
+        backend.loadCorners("trapezoid_data.json");
+    }
+    Connections {
+        target: backend
+        onGameEnded: {
+            console.log("Game end: "+endState);
+            openGameResult(endState);
         }
     }
 }

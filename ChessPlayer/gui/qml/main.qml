@@ -24,9 +24,35 @@ ApplicationWindow {
         onCurrentItemChanged: if (currentItem) currentItem.forceActiveFocus()
 
         Component.onCompleted: {
-            stack.push(levelSelection)
+            stack.push(menuSelection)
         }
     }
+
+    Component {
+        id: menuSelection
+        StartupMenu {
+            onEnterItem: {
+                if(item === 0) {
+                    stack.pop()
+                    stack.push(levelSelection)
+                } else if(item === 1) {
+                    stack.pop()
+                    stack.push(calibPanel)
+                }
+            }
+        }
+    }
+
+    Component {
+        id: calibPanel
+        SettingCalibChessBoard {
+            onExitPressed: {
+                stack.pop()
+                stack.push(menuSelection)
+            }
+        }
+    }
+
     Component {
         id: emoji
         Emoji {
@@ -43,6 +69,11 @@ ApplicationWindow {
             onItemSelected: {
                 stack.pop()
                 stack.push(sideSelection)
+                backend.setLevel(score)
+            }
+            onExitPressed: {
+                stack.pop()
+                stack.push(menuSelection)
             }
         }
     }
@@ -56,7 +87,8 @@ ApplicationWindow {
             }
             onSideConfirmed: {
                 stack.pop();
-                stack.push(timer)
+                stack.push(timer);
+                backend.setSide(side==="White"?0:1);
             }
         }
     }
@@ -66,6 +98,10 @@ ApplicationWindow {
             onGoback: {
                 stack.pop()
                 stack.push(sideSelection)
+            }
+            onGobackLevelSelection: {
+                stack.pop()
+                stack.push(levelSelection)
             }
         }
     }
