@@ -18,8 +18,8 @@ public:
     void updateDropZone(uint8_t piece, int row, int col, ZONE_TYPE zone);
     void moveGuestPieceOut(uint8_t piece);
     void promotePiece(uint8_t piece);
-
-private:
+    void setCalibChessBoardPoint(int row, int col, Point point);
+    void setCalibDropZonePoint(int row, int col, ZONE_TYPE zone, Point point);
     Point convertDropPoint(int row, int col, ZONE_TYPE zone);
 
 private:
@@ -27,10 +27,11 @@ private:
     float m_chessBoardPosY;
     float m_chessBoardRect;
     float m_dropZoneSpace;
-
-    uint8_t m_dropZoneMap[8][2];
-    uint8_t m_dropZoneMapGuest[8][2];
-
+    Point m_cellCalibsChessBoard[8][8];
+    Point m_cellCalibsDropZonePlayer[8][8];
+    Point m_cellCalibsDropZoneBot[8][8];
+    uint8_t m_dropZoneMapPlayer[8][2];
+    uint8_t m_dropZoneMapBot[8][2];
 };
 
 #endif // CHESSBOARD_H

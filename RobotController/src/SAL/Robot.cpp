@@ -36,9 +36,16 @@ void Robot::setState(ROBOT_STATE newState) {
 int Robot::loop() {
     // m_elapsedTime = m_app->getSystemTime() - m_startTime;
 #ifdef DEBUG_ROBOT
-    m_app->printf("Robot time[%ld]\r\n", m_elapsedTime);
+    m_app->printf("Robot m_state: %d\r\n", m_state);
 #endif
     switch(m_state) {
+    case ROBOT_EXECUTE_CALIBRATION: {
+        if (executeCalib() == ROBOT_MOVE_DONE)
+        {
+            m_state = ROBOT_EXECUTE_DONE;
+        }
+    }
+        break;
     case ROBOT_EXECUTE_GO_HOME: {
         if (executeGohome() == ROBOT_MOVE_DONE)
         {
@@ -64,6 +71,69 @@ void Robot::initDirection(int motorID, int direction)
 {
     m_motorParamList[motorID].direction = direction;
     m_app->initDirection(motorID, direction);
+}
+
+void Robot::requestCalib(int motorID) {
+    m_app->printf("CALIBRATION\r\n");
+    m_app->enableHardwareTimer(false);
+    m_requestMotorID = motorID;
+    int startID = motorID == MAX_MOTOR ? 0 : motorID;
+    int stopID = motorID == MAX_MOTOR ? MAX_MOTOR-1 : motorID;
+    m_app->printf("Request calib from [%d-%d]\r\n",startID,stopID);
+    for(int motor=startID; motor<= stopID; motor++)
+    {
+        m_motorParamList[motor].currentStep = 0;
+        if(m_motorParamList[motor].active) {
+            m_motorList[motor]->setupTarget(
+                0,0xFFFF,0,
+                -1,
+                MOTOR_EXECUTE_HOME,
+                m_motorParamList[motor].homeStepTime, 0);
+        }
+    }
+    // m_startTime = m_app->getSystemTime();
+    setState(ROBOT_EXECUTE_CALIBRATION);
+    m_app->printf("Request calib from [%d-%d] done\r\n",startID,stopID);
+    m_app->enableHardwareTimer(true);
+}
+
+int Robot::executeCalib() {
+    bool allMotorsAtHome = true;
+#ifdef DEBUG_ROBOT
+    m_app->printf("Robot executeCalib M[%d]\r\n",m_requestMotorID);
+#endif
+    int startID = m_requestMotorID == MAX_MOTOR ?
+                                            MOTOR_CAPTURE : m_requestMotorID;
+    int stopID = m_requestMotorID == MAX_MOTOR ?
+                                            MAX_MOTOR : m_requestMotorID+1;
+    for(int motor = startID; motor< stopID; motor++)
+    {
+        if(!m_motorParamList[motor].active) continue;
+        if(!m_app->isLimitReached(motor, MOTOR_LIMIT_HOME))
+        {
+#ifdef DEBUG_ROBOT
+            m_app->printf("Robot M[%d] P[%d] T[%d]\r\n",
+                        motor,
+                        m_motorParamList[motor].currentStep,
+                        m_motorParamList[motor].targetStep);
+            m_app->printf("Robot M[%d] calib\r\n",motor);
+#endif
+            allMotorsAtHome = false;
+        }
+    }
+    if(allMotorsAtHome) {
+        for(int motor = startID; motor< stopID; motor++) {
+            if(!m_motorParamList[motor].active) continue;
+            int homeStep = angleToStep(motor, m_motorParamList[motor].homeAngle);
+            m_motorParamList[motor].calibStep = -m_motorParamList[motor].currentStep + homeStep;
+            m_motorParamList[motor].currentStep = homeStep;
+            m_app->printf("Calib is homed M[%d] step[%d]\r\n",
+                      motor,m_motorParamList[motor].calibStep);
+            
+        }
+        m_app->harwareStop(m_requestMotorID);
+    }
+    return allMotorsAtHome ? ROBOT_MOVE_DONE : m_state;
 }
 
 void Robot::requestGoHome(int motorID) {
@@ -175,6 +245,20 @@ void Robot::currentAngle(float* listCurrentAngle, int* numMotor, int angleType)
     }
 }
 
+void Robot::calibAngle(float* listCalibAngle, int* numMotor, int angleType)
+{
+    *numMotor = MAX_MOTOR;
+    for(int i=MOTOR_CAPTURE; i< MAX_MOTOR; i++)
+    {
+        listCalibAngle[i] = stepToAngle(i,
+            m_motorParamList[i].calibStep + (int)(m_motorParamList[i].homeAngle * m_motorParamList[i].scale),
+            angleType);
+        m_app->printf("Robot calibAngle M[%d] step[%d] angle[%.02f]\r\n",
+                      i,m_motorParamList[i].calibStep,
+                      listCalibAngle[i]);
+    }
+}
+
 void Robot::armLength(float* listArmLength, int* numMotor)
 {
     *numMotor = MAX_MOTOR;
@@ -266,6 +350,11 @@ int Robot::currentStep(int motorID)
     return m_motorParamList[motorID].currentStep;
 }
 
+int Robot::calibStep(int motorID)
+{
+    return m_motorParamList[motorID].calibStep;
+}
+
 void Robot::updateCurrentStep(int motorID)
 {
 //    m_app->printf("R M[%d] currStep[%d/%d] dir[%d]\r\n",
@@ -341,16 +430,16 @@ float Robot::delayDecel(float stepCount, float delayCur) {
   float nextDelay = delayCur * (4.0f*stepCount + 1.0f) / (4.0f*stepCount - 1.0f);
   return nextDelay;
 }
-void Robot::calculateTotalTime(int numStepAccel, int numStepTotal, float minsleep,
+void Robot::calculateTotalTime(int numStepAccel, int numStepTotal, float minsleep, float homeStepTime,
                                float* totalDelay, float* startDelay) {
     if(numStepTotal < numStepAccel * 2) {
-        float totalTime = (float)(numStepTotal)*minsleep;
+        float totalTime = (float)(numStepTotal)*homeStepTime;
 #ifdef DEBUG_CALCULATE_TIME
-        printf("numstep[%d/%d] totalTime %.02f\r\n",
+        m_app->printf("numstep[%d/%d] totalTime %.02f\r\n",
                numStepAccel,numStepTotal,totalTime);
 #endif
         *totalDelay = totalTime;
-        *startDelay = minsleep;
+        *startDelay = homeStepTime;
     } else {
         float delayTime = minsleep;
         float accelTime = delayTime;
@@ -361,7 +450,7 @@ void Robot::calculateTotalTime(int numStepAccel, int numStepTotal, float minslee
         }
         totalTime += accelTime*2 + (float)(numStepTotal - 2 * numStepAccel)*minsleep;
 #ifdef DEBUG_CALCULATE_TIME
-        printf("numstep[%d/%d] totalTime %.02f\r\n",
+        m_app->printf("numstep[%d/%d] totalTime %.02f\r\n",
                numStepAccel,numStepTotal,totalTime);
 #endif
         *totalDelay = totalTime;
@@ -369,6 +458,7 @@ void Robot::calculateTotalTime(int numStepAccel, int numStepTotal, float minslee
     }
 }
 
+#define DEBUG_INITMOVE
 void Robot::initMove(int motorIDFirst, int motorIDLast)
 {
 #ifdef DEBUG_INITMOVE
@@ -387,16 +477,17 @@ void Robot::initMove(int motorIDFirst, int motorIDLast)
         m_motorParamList[i].startStep = m_motorParamList[i].currentStep;
         m_motorParamList[i].direction = (m_motorParamList[i].targetStep > m_motorParamList[i].currentStep) ? 1 : -1;   
         float numStep = (float)abs(m_motorParamList[i].targetStep - m_motorParamList[i].currentStep);
+        m_app->printf("calculateTotalTime M[%d]\r\n", i);
         calculateTotalTime(m_motorParamList[i].numStepAccel, numStep,
-                                m_motorParamList[i].minPulsePerStep,
+                                (float)m_motorParamList[i].minPulsePerStep, (float)m_motorParamList[i].homeStepTime,
                              &m_timeDelay[i],&m_startDelay[i]);
         if(m_timeDelay[i] > maxTime) maxTime = m_timeDelay[i];
 #ifdef DEBUG_INITMOVE
-        m_app->printf("Motor[%d] numStep[%f][%d->%d] minPulsePerStep[%d] time[%f] => Max[%f]\r\n",
+        m_app->printf("Motor[%d] numStep[%d][%d->%d] minPulsePerStep[%d] time[%d] => Max[%d]\r\n",
                       i,
-                      numStep, m_motorParamList[i].currentStep, m_moveTarget.jointSteps[i].steps,
-                      m_motorParamList[i].minPulsePerStep, m_timeDelay[i],
-                      maxTime);
+                      (int)numStep, m_motorParamList[i].currentStep, m_moveTarget.jointSteps[i].steps,
+                      m_motorParamList[i].minPulsePerStep, (int)m_timeDelay[i],
+                      (int)maxTime);
 #endif
     }
 
@@ -405,21 +496,23 @@ void Robot::initMove(int motorIDFirst, int motorIDLast)
         if(!m_motorParamList[i].active) continue;
         int numStep = abs(m_motorParamList[i].targetStep - m_motorParamList[i].currentStep);
         if(numStep == 0) continue;
-        float startDelay = maxTime/m_timeDelay[i]*(numStep < 2*m_motorParamList[i].numStepAccel?
-                    m_motorParamList[i].minPulsePerStep: m_startDelay[i]);
-        float numStepAccel = numStep < 2*m_motorParamList[i].numStepAccel?
+        int startDelay = (int)(maxTime/m_timeDelay[i]*m_startDelay[i]);
+        int numStepAccel = numStep < 2*m_motorParamList[i].numStepAccel?
                     0:m_motorParamList[i].numStepAccel;
+        int numStepCruise = numStep < 2*m_motorParamList[i].numStepAccel?
+                    numStep: numStep - 2*numStepAccel;
+        uint8_t moveType = (uint8_t) (numStep < 2*m_motorParamList[i].numStepAccel?
+                    MOTOR_EXECUTE_CRUISE_SPEED:MOTOR_EXECUTE_INCREASE_SPEED);
         m_motorList[i]->setupTarget(
-            (int)(numStepAccel),
-            (int)(numStep - 2*numStepAccel),
-            (int)(numStepAccel),
+            numStepAccel,
+            numStepCruise,
+            numStepAccel,
             m_motorParamList[i].direction,
-                    numStep < 2*m_motorParamList[i].numStepAccel?
-                    MOTOR_EXECUTE_CRUISE_SPEED:MOTOR_EXECUTE_INCREASE_SPEED,
-                    startDelay, m_motorParamList[i].minPulsePerStep);
+            moveType,
+            startDelay, m_motorParamList[i].minPulsePerStep);
 #ifdef DEBUG_INITMOVE
-        m_app->printf("Motor[%d] numStep[%d] delayTime[%f]\r\n",
-                      i, numStep, startDelay);
+        m_app->printf("=== Motor[%d] numStep[%d] delayTime[%d]\r\n",
+                      i, numStep, (int)startDelay);
 #endif
     }
 

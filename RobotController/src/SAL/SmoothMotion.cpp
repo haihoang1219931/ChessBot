@@ -1,5 +1,7 @@
 #include "SmoothMotion.h"
 #include "Robot.h"
+#include "../ApplicationArduino.h"
+extern ApplicationArduino app;
 SmoothMotion::SmoothMotion(uint8_t id, Robot* robot):
   m_robot(robot),
   m_id(id),
@@ -31,8 +33,16 @@ void SmoothMotion::setupTarget(
   resetCruiseSteps();
   resetDecelSteps();
   changeStateControl(m_moveType);
+  app.printf("Setup target M[%d]",m_id);
+  app.printf(" stepsAccel=%d", (int)m_numStepAccel);
+  app.printf(" stepsCruise=%d", (int)m_numStepCruise);
+  app.printf(" stepsDecel=%d", (int)m_numStepDecel);
+  app.printf(" direction=%d", direction);
+  app.printf(" moveType=%d", (int)m_moveType);
+  app.printf(" m_numWaitPulse=%d", (int)m_numWaitPulse);
+  app.printf(" minWaitPulse=%d\r\n", (int)m_minWaitPulse);
 }
-
+// #define DEBUG_COUNT_STEP
 float SmoothMotion::delayAccel(float stepCount, float delayCur) {
 #ifndef DEBUG_COUNT_STEP
   float nextDelay = delayCur * (4.0f*stepCount - 1.0f) / (4.0f*stepCount + 1.0f);
@@ -102,19 +112,26 @@ void SmoothMotion::homing()
     increaseCruiseSteps();
 }
 void SmoothMotion::increaseSpeed() {
+#ifdef DEBUG_COUNT_STEP
+  app.printf(" M[%d]", m_id);
+  app.printf(" Accel stepCount=%d", m_stepCountAccel);
+  app.printf(" delay=%d\r\n", (int)m_numWaitPulse);
+#endif
   if(m_stepCountAccel >= m_numStepAccel){
     changeStateControl(MOTOR_EXECUTE_CRUISE_SPEED);
     return;
   }
   m_statePulse = pulseLoop();
   if(m_statePulse != STATE_DONE) return;
-  resetPulse();
-  increaseAccelSteps();
+    resetPulse();
+    increaseAccelSteps();
   m_numWaitPulse = delayAccel(m_stepCountAccel,m_numWaitPulse);
-
 }
 
 void SmoothMotion::cruiseSpeed() {
+#ifdef DEBUG_COUNT_STEP
+  app.printf("Cruise stepCount=%d delay=%d\r\n", m_stepCountCruise, (int)m_numWaitPulse);
+#endif
   if(m_stepCountCruise >= m_numStepCruise){
     changeStateControl(m_moveType == MOTOR_EXECUTE_INCREASE_SPEED?
                            MOTOR_EXECUTE_DECREASE_SPEED:MOTOR_EXECUTE_DONE);
@@ -122,8 +139,8 @@ void SmoothMotion::cruiseSpeed() {
   }
   m_statePulse = pulseLoop();
   if(m_statePulse != STATE_DONE) return;
-  resetPulse();
-  increaseCruiseSteps();
+    resetPulse();
+    increaseCruiseSteps();
 }
 
 void SmoothMotion::decreaseSpeed() {
@@ -133,6 +150,7 @@ void SmoothMotion::decreaseSpeed() {
   }
   m_statePulse = pulseLoop();
   if(m_statePulse != STATE_DONE) return;
+  resetPulse();
   increaseDecelSteps();
   m_numWaitPulse = delayDecel(m_numStepDecel - m_stepCountDecel,m_numWaitPulse);
 }

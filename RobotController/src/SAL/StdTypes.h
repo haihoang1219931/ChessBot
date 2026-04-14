@@ -87,6 +87,7 @@ typedef enum {
 
 typedef enum{
     ROBOT_INIT,
+    ROBOT_EXECUTE_CALIBRATION,
     ROBOT_EXECUTE_GO_HOME,
     ROBOT_EXECUTE_POSITION,
     ROBOT_EXECUTE_SEQUENCE,
@@ -104,6 +105,7 @@ typedef enum{
 typedef enum {
     MACHINE_INIT,
     MACHINE_WAIT_COMMAND,
+    MACHINE_EXECUTE_CALIBRATION,
     MACHINE_EXECUTE_HOME,
     MACHINE_EXECUTE_POSITION,
     MACHINE_EXECUTE_POSITION_STANDBY,
@@ -125,8 +127,8 @@ typedef enum {
 }MOVE_TYPE;
 
 typedef enum {
-    ZONE_MACHINE,
-    ZONE_GUEST
+    ZONE_BOT,
+    ZONE_PLAYER
 }ZONE_TYPE;
 
 typedef enum {
@@ -149,10 +151,17 @@ typedef enum {
     COMMAND_SEQUENCE_STATE_DONE,
 }COMMAND_SEQUENCE_STATE;
 
+typedef enum {
+    CALIB_SEQUENCE_STATE_INIT,
+    CALIB_SEQUENCE_STATE_EXECUTE,
+    CALIB_SEQUENCE_STATE_DONE,
+}CALIB_SEQUENCE_STATE;
+
 typedef struct{
     float x;
     float y;
     float z;
+    bool calibbed;
 }Point;
 
 typedef struct {
@@ -169,10 +178,11 @@ typedef struct{
     int homeStepTime;
     float minAngle;
     float maxAngle;
-    int minPulsePerStep;
+    uint32_t minPulsePerStep;
     float frequency;
-    int numStepAccel;
+    uint32_t numStepAccel;
     int currentStep;
+    int calibStep;
     int startStep;
     int targetStep;
     int direction;
