@@ -504,11 +504,96 @@ void ChessBot::initRobot()
         
     case INIT_DONE: {
         qDebug("=== Robot Initialization Complete ===");
+        // Save calibration data to file
+        saveCalibrationData("trapezoid_data.json");
         m_state = STATE_CONFIGURE;
         togglePause(true);
     }
         break;
     }
+}
+
+bool ChessBot::saveCalibrationData(const QString &fileName)
+{
+    qDebug("Saving calibration data to: %s", fileName.toStdString().c_str());
+    
+    QJsonObject root;
+    
+    // Read existing file to preserve camera calibration points
+    QFile existingFile(fileName);
+    if (existingFile.exists() && existingFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QByteArray fileData = existingFile.readAll();
+        existingFile.close();
+        
+        QJsonDocument existingDoc = QJsonDocument::fromJson(fileData);
+        if (existingDoc.isObject()) {
+            QJsonObject existingRoot = existingDoc.object();
+            // Preserve camera calibration points if they exist
+            if (existingRoot.contains("camera_calibration")) {
+                root["camera_calibration"] = existingRoot["camera_calibration"];
+                qDebug("Preserved existing camera calibration points");
+            }
+        }
+    } else {
+        qDebug("No existing calibration file found, creating new one");
+    }
+    
+    // Save chessboard calibration (8x8)
+    QJsonArray chessboardArray;
+    for (int row = 0; row < 8; row++) {
+        for (int col = 0; col < 8; col++) {
+            QJsonObject pointObj;
+            pointObj["row"] = row;
+            pointObj["col"] = col;
+            pointObj["x"] = m_chessboardCalib[row][col].x();
+            pointObj["y"] = m_chessboardCalib[row][col].y();
+            chessboardArray.append(pointObj);
+        }
+    }
+    root["chessboard"] = chessboardArray;
+    
+    // Save right dropzone calibration (8x2)
+    QJsonArray rightDropzoneArray;
+    for (int row = 0; row < 8; row++) {
+        for (int col = 0; col < 2; col++) {
+            QJsonObject pointObj;
+            pointObj["row"] = row;
+            pointObj["col"] = col;
+            pointObj["x"] = m_dropzoneRightCalib[row][col].x();
+            pointObj["y"] = m_dropzoneRightCalib[row][col].y();
+            rightDropzoneArray.append(pointObj);
+        }
+    }
+    root["dropzone_right"] = rightDropzoneArray;
+    
+    // Save left dropzone calibration (8x2)
+    QJsonArray leftDropzoneArray;
+    for (int row = 0; row < 8; row++) {
+        for (int col = 0; col < 2; col++) {
+            QJsonObject pointObj;
+            pointObj["row"] = row;
+            pointObj["col"] = col;
+            pointObj["x"] = m_dropzoneLeftCalib[row][col].x();
+            pointObj["y"] = m_dropzoneLeftCalib[row][col].y();
+            leftDropzoneArray.append(pointObj);
+        }
+    }
+    root["dropzone_left"] = leftDropzoneArray;
+    
+    // Create JSON document and write to file
+    QJsonDocument doc(root);
+    QFile file(fileName);
+    
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qDebug("Failed to open file for writing: %s", fileName.toStdString().c_str());
+        return false;
+    }
+    
+    file.write(doc.toJson());
+    file.close();
+    
+    qDebug("Calibration data saved successfully to: %s", fileName.toStdString().c_str());
+    return true;
 }
 
 void ChessBot::startService() {
@@ -616,14 +701,26 @@ void ChessBot::loadCorners(QString fileName)
     file.close();
 
     QJsonDocument doc = QJsonDocument::fromJson(jsonData);
+    QJsonArray jsonArray;
 
-    // Ensure the root of the JSON is an array
-    if (!doc.isArray()) {
-        qDebug("JSON format error: Root is not an array.");
+    // Handle both old format (array) and new format (object with camera_calibration key)
+    if (doc.isArray()) {
+        // Old format: root is an array
+        jsonArray = doc.array();
+    } else if (doc.isObject()) {
+        // New format: get camera_calibration from object
+        QJsonObject root = doc.object();
+        if (root.contains("camera_calibration")) {
+            jsonArray = root["camera_calibration"].toArray();
+        } else {
+            qDebug("JSON format error: No camera_calibration found in object.");
+            return;
+        }
+    } else {
+        qDebug("JSON format error: Root is neither an array nor an object.");
         return;
     }
 
-    QJsonArray jsonArray = doc.array();
     int cornerID = 0;
     for (const QJsonValue &value : jsonArray) {
         if (value.isObject()) {

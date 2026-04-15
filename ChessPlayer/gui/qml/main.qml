@@ -37,7 +37,25 @@ ApplicationWindow {
                     stack.push(levelSelection)
                 } else if(item === 1) {
                     stack.pop()
+                    stack.push(settingsMenu)
+                }
+            }
+        }
+    }
+
+    Component {
+        id: settingsMenu
+        SettingsMenu {
+            onExitPressed: {
+                stack.pop()
+                stack.push(menuSelection)
+            }
+            onSelectCalibration: {
+                stack.pop()
+                if (calibType === "camera") {
                     stack.push(calibPanel)
+                } else if (calibType === "chessboard") {
+                    stack.push(calibrationPointsPanel)
                 }
             }
         }
@@ -48,7 +66,17 @@ ApplicationWindow {
         SettingCalibChessBoard {
             onExitPressed: {
                 stack.pop()
-                stack.push(menuSelection)
+                stack.push(settingsMenu)
+            }
+        }
+    }
+
+    Component {
+        id: calibrationPointsPanel
+        SettingCalibrationPoints {
+            onExitPressed: {
+                stack.pop()
+                stack.push(settingsMenu)
             }
         }
     }

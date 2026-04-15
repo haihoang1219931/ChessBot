@@ -117,6 +117,7 @@ private:
     bool detectArduinoPort(int baudRate = 38400);
     bool getArduinoVersion();
     QPoint readCalibrationPoint(const QString &command);
+    bool saveCalibrationData(const QString &fileName);
 
 private:
     bool m_stopped = false;
