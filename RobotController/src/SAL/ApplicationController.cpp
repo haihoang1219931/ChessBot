@@ -370,10 +370,10 @@ void ApplicationController::executeCommand(char* command) {
                     colId,
                     (int)(dropZonePoint.x*10.0f), 
                     (int)(dropZonePoint.y*10.0f));
-            } else if(sscanf(command, "lcdbpr%dc%d", &rowId, &colId) == 2) {
+            } else if(sscanf(command, "lcdbr%dc%d", &rowId, &colId) == 2) {
                 // lcdbpr0c1
                 Point dropZonePoint = m_chessBoard->convertDropPoint(rowId,colId,ZONE_BOT);
-                this->printf("DP r[%d] c[%d] x[%d] y[%d]\r\n", 
+                this->printf("DB r[%d] c[%d] x[%d] y[%d]\r\n", 
                     rowId,
                     colId,
                     (int)(dropZonePoint.x*10.0f), 

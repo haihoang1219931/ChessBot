@@ -366,8 +366,8 @@ QPoint ChessBot::readCalibrationPoint(const QString &command)
             
             // Extract x and y values from response
             // Expected format: "CB r[0] c[1] x[123] y[456]" (or DP/DB instead of CB)
-            QRegExp xPattern("x\\[(\\d+)\\]");
-            QRegExp yPattern("y\\[(\\d+)\\]");
+            QRegExp xPattern("x\\[(-?\\d+)\\]");
+            QRegExp yPattern("y\\[(-?\\d+)\\]");
             
             int xPos = xPattern.indexIn(trimmedResponse);
             int yPos = yPattern.indexIn(trimmedResponse);
