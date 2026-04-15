@@ -229,15 +229,17 @@ int ApplicationArduino::readSerial(char* output, int length) {
   }
   if(m_incomingByte > 0) {
     m_command[m_incomingByte] = '\0';
+#if defined(DEBUG_SERIAL) && defined(DEBUG_COMMAND)
     Serial.print(m_command);
+#endif
     for(int i=0; i< m_incomingByte; i++) {
       output[i] = m_command[i];
-#ifdef DEBUG_SERIAL
+#if defined(DEBUG_SERIAL) && defined(DEBUG_COMMAND)
       Serial.print(output[i],HEX);
       Serial.print(" ");
 #endif
     }
-#ifdef DEBUG_SERIAL
+#if defined(DEBUG_SERIAL) && defined(DEBUG_COMMAND)
     Serial.print("\r\n new command\r\n");
 #endif
   }
@@ -279,7 +281,9 @@ bool ApplicationArduino::isLimitReached(int motorID, MOTOR_LIMIT_TYPE limitType)
 }
 
 void ApplicationArduino::enableEngine(bool enable) {
+#ifdef DEBUG_COMMAND
   this->printf("%s engine\r\n",enable?"ENABLE":"DISABLE");
+#endif
   if(enable) {
     digitalWrite(enPin1, LOW);
     digitalWrite(enPin2, LOW);
@@ -291,7 +295,7 @@ void ApplicationArduino::enableEngine(bool enable) {
     digitalWrite(enPin5, HIGH);
     digitalWrite(enPinCapture, HIGH);
   }
-  
+  m_engineEnabled = enable;
 }
 
 void ApplicationArduino::initDirection(int motorID, int direction)

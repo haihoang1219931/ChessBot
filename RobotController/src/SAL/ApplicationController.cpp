@@ -17,6 +17,7 @@ ApplicationController::ApplicationController()
     m_chessBoard = new ChessBoard();
     m_machineState = MACHINE_WAIT_COMMAND;
     m_appTimer = 0;
+    m_engineEnabled = false;
 }
 
 ApplicationController::~ApplicationController() {
@@ -50,7 +51,9 @@ void ApplicationController::loop() {
             break;
         }
         case MACHINE_EXECUTE_COMMAND_DONE: {
+#ifdef DEBUG_COMMAND
             this->printf("_%04d EXECUTE DONE\r\n",m_comCommandID);
+#endif
             setMachineState(MACHINE_WAIT_COMMAND);        
             break;
         }
@@ -96,8 +99,10 @@ int ApplicationController::executeCommandSequenceLoop()
 int ApplicationController::executeCommandLoop()
 {
     int commandType = m_sequenceCommand[m_curCommandId].type;
-//    printf("executeCommandLoop state[%d] m_curCommandId[%d]\r\n",
-//           commandType,m_curCommandId);
+#ifdef DEBUG_COMMAND
+   printf("executeCommandLoop state[%d] m_curCommandId[%d]\r\n",
+          commandType,m_curCommandId);
+#endif
     switch (commandType) {
     case COMMAND_NORMAL: {
         executeCommandNormal();
@@ -234,16 +239,20 @@ void ApplicationController::getChessBoardParams(float* listParam, int* numParam)
 void ApplicationController::setMachineState(MACHINE_STATE machineState) {
     if(machineState != m_machineState) {
         m_machineState = machineState;
+#ifdef DEBUG_COMMAND        
         this->printf("APP STATE: %d\r\n",m_machineState);
+#endif
     }
 }
 
 void ApplicationController::executeCommand(char* command) {
+#ifdef DEBUG_COMMAND
     this->printf("Command: [%s]\r\n",command);
+#endif
     if(command[0] == 'v') {
-        this->printf("[v]%s",ROBOT_VERSION);
+        this->printf("[v]%s\r\n",ROBOT_VERSION);
     } else if(strlen(command)>=3 && command[0] == 'c'&&command[1] == 'm'&&command[2] == 'd') {
-        this->printf("[cmd]%04d",m_comCommandID);
+        this->printf("[cmd]%04d\r\n",m_comCommandID);
     } else if(command[0] == '_') {
         if(strlen(command)>=5){
             char commandID[8];
@@ -254,68 +263,91 @@ void ApplicationController::executeCommand(char* command) {
             commandID[4] = 0;
             int comCommandID = atoi(commandID); // command from PC, must response
             if (m_comCommandID == comCommandID) {
-                this->printf("[_%04d]%s",comCommandID,
+                this->printf("[_%04d]%s\r\n",comCommandID,
                     m_machineState == MACHINE_WAIT_COMMAND?"DONE":"WAIT");
             } else {
-                this->printf("[_%04d]INVALID",comCommandID);
+                this->printf("[_%04d]INVALID\r\n",comCommandID);
             }
         }
     }
     else if(command[0] == 'b' && strlen(command)>=2 && command[1]>='0') {
         if(command[1]-'0' < MAX_BUTTON) {
             int buttonID = command[1]-'0';
-            this->printf("B%c %s\r\n",command[1],
+            this->printf("[B%c] %s\r\n",command[1],
                 m_buttonList[buttonID]->buttonState() == BUTTON_NOMAL?
                 "NORMAL":"PRESSED");
         }
         else {
-            this->printf("B%c INVALID\r\n",command[1]);
+            this->printf("[B%c] INVALID\r\n",command[1]);
         }        
     }
     else if(command[0] == 's' && strlen(command)>=2 && command[1]>='0') {
         if(command[1]-'0' < MAX_MOTOR) {
             int motorID = command[1]-'0';
-            this->printf("M%c %d\r\n",command[1],
+            this->printf("[M%c] %d\r\n",command[1],
                 m_robot->currentStep(motorID));
         }
         else {
-            this->printf("B%c INVALID\r\n",command[1]);
+            this->printf("[M%c] INVALID\r\n",command[1]);
         }        
     }
-    else if(command[0] == 'e') {
-        m_comCommandID ++;
-        this->enableEngine(true);
-        setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+    else if(command[0] == 'e' && strlen(command)>=2) {
+        if(command[1] == 'e') {
+            this->enableEngine(true);
+            setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+            this->printf("[ee] Engine enabled\r\n");
+        } else if(command[1] == 'd'){
+            this->enableEngine(false);
+            setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+            this->printf("[ed] Engine disabled\r\n");
+        } else if(command[1] == 's') {
+            this->printf("[es] %s\r\n", m_engineEnabled?"Enabled":"Disabled");
+            setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+        }
     }
     else if(command[0] == 'd') {
         m_comCommandID ++;
         this->enableEngine(false);
         setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+        this->printf("[d] Engine disabled\r\n");
     }
     else if(command[0] == 'r' && strlen(command)>=2) {
         if(command[1] == 'a') {
             m_comCommandID ++;
             goToReadyPosition();
+            this->printf("[r] Ready position confirmed\r\n");
         }
     }
     else if(command[0] == 'm' && strlen(command)>=2) {
         if(command[1] == 'l') {
             m_comCommandID ++;
             calculateSequenceMoveStraight(0,0,7,0);
+            this->printf("[m] Straight move confirmed\r\n");
         } else if(command[1] == 'c') {
             m_comCommandID ++;
             calculateSequenceMoveStraight(0,0,7,0);
+            this->printf("[m] Straight move confirmed\r\n");
         }
     }
-    else if(command[0] == 'h') {
-        if(strlen(command)>=2 && command[1] == 'a') {
+    else if(command[0] == 'h' && strlen(command)>=2) {
+        if(command[1] == 'a') {
             m_comCommandID ++;
             goToHome(MAX_MOTOR);
-        }
-        else if(strlen(command)>=2 && command[1] >= '0' && command[1] <= '5')
+            this->printf("[ha] Home position confirmed\r\n");
+        } else if(command[1] == 's') {
+            bool allAtHome = true;
+            for(int motorID=0; motorID< MAX_MOTOR; motorID++) {
+                if(!m_robot->isLimitReached(motorID,MOTOR_LIMIT_HOME)) {
+                    allAtHome = false;
+                    break;
+                }
+            }
+            this->printf("[hs] %s\r\n", allAtHome ? "TRUE" : "FALSE");
+        } else if(command[1] >= '0' && command[1] <= '5')
         {
             m_comCommandID ++;
             goToHome(command[1]-'0');
+            this->printf("[h%c] Home position confirmed\r\n", command[1]);
         }
     }
     else if(command[0] == 'l' && strlen(command)>=2) {        
@@ -380,36 +412,45 @@ void ApplicationController::executeCommand(char* command) {
         } else if( command[1] == 'r') {
             m_comCommandID ++;
             goToCalibPosition();
+            this->printf("[lr] Go to calib position confirmed\r\n");
         } else if(command[1] == 'a') {
             m_comCommandID ++;
             calibToHome(MAX_MOTOR);
+            this->printf("[la] Calib to home position confirmed\r\n");
         }
         else if(command[1] >= '0' && command[1] <= '5')
         {
             m_comCommandID ++;
             calibToHome(command[1]-'0');
+            this->printf("[l%d] Calib to home position confirmed\r\n", command[1]-'0');
         }
     }
     else if(command[0] == 'c' && strlen(command)>=5) {
         m_comCommandID ++;
         executeSequence(MOVE_NORMAL, command[2]-'0',command[1]-'0',
                 command[4]-'0',command[3]-'0');
+        this->printf("[%s] Move sequence normal confirmed\r\n", command);
     }else if(command[0] == 'c' && strlen(command)>=5) {
         m_comCommandID ++;
         executeSequence(MOVE_CASTLE, command[2]-'0',command[1]-'0',
                 command[4]-'0',command[3]-'0');
+        this->printf("[%s] Move sequence castle confirmed\r\n", command);
     }else if(command[0] == 'a' && strlen(command)>=5) {
         m_comCommandID ++;
         executeSequence(MOVE_ATTACK, command[2]-'0',command[1]-'0',
                 command[4]-'0',command[3]-'0');
+        this->printf("[%s] Move sequence attack confirmed\r\n", command);
     }else if(command[0] == 'p' && strlen(command)>=6 && command[1] == 'p') {
         m_comCommandID ++;
         executeSequence(MOVE_PASTPAWN, command[3]-'0',command[2]-'0',
                 command[5]-'0',command[4]-'0');
+        this->printf("[%s] Move sequence past pawn confirmed\r\n", command);
     }else if(command[0] == 'p' && strlen(command)>=6) {
         m_comCommandID ++;
         executeSequence(MOVE_PROMOTE, command[3]-'0',command[2]-'0',
                 command[5]-'0',command[4]-'0',command[1]);
+        this->printf("[%s] Move sequence promote confirmed\r\n", command);
+
     }else if(command[0] == 'p' && strlen(command)>=2 && command[1] >= '0' && command[1] <= '5')
     {
         int motorID = command[1]-'0';
@@ -430,14 +471,15 @@ void ApplicationController::executeCommand(char* command) {
         int stepTime = atoi(stepTimeStr);
 
         bool isRelative = command[13] == 'r';
-
+        m_comCommandID ++;
         m_robot->requestGoPosition(motorID,
                 m_robot->angleToStep(motorID, angle),
                 stepTime, isRelative);
         setMachineState(MACHINE_EXECUTE_COMMAND);
+        this->printf("[m%d] Go to position confirmed\r\n", motorID);
     }
     else {
-        this->printf("Unknown Command\r\n");
+        this->printf("[%s] Unknown Command\r\n", command);
     }
 }
 
@@ -553,7 +595,9 @@ void ApplicationController::calculateJoints(float xPos, float yPos, float upAngl
     jointSteps[MOTOR_ARM5] = m_robot->angleToStep(
                 MOTOR_ARM5,
                 upAngleInDegree);
+#ifndef DEBUG_KINEMATIC
     this->printf("calculateJoints upAngleInDegree[%f]\r\n",upAngleInDegree);
+#endif
 }
 
 Point ApplicationController::calibPos()
@@ -647,9 +691,10 @@ void ApplicationController::executeSequence(
         int startCol, int startRow,
         int stopCol, int stopRow,
         char promotePiece) {
+#ifdef DEBUG_COMMAND
     this->printf("Go to Pos [%d,%d] to [%d,%d] \r\n",
                  startCol, startRow, stopCol, stopRow);
-
+#endif
     // Attack: Move piece out -> Move attack piece -> Return to prepare
     // No attack: Move attack piece -> Return to prepare
     // Castle: Move king -> Move rook -> Return to prepare
@@ -708,7 +753,9 @@ void ApplicationController::calculateSequenceMoveStraight(int startCol, int star
 
 void ApplicationController::calculateSequenceMove(int startCol, int startRow, int upAngleInDegree, bool isCapture)
 {
+#ifdef DEBUG_COMMAND
     printf("ApplicationController::calculateSequenceMove\r\n");
+#endif
     Point targetPoint = m_chessBoard->convertPoint(startRow,startCol);
     int jointSteps[MAX_MOTOR];
     clearSequenceMove();
@@ -727,9 +774,11 @@ void ApplicationController::calculateSequenceMoveNormal(int startCol, int startR
 {
     // append move from start -> stop -> standy
     Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
+#ifdef DEBUG_COMMAND
     printf("start[%d,%d] to Point(%d,%d)\r\n",
            startRow,startCol,
            (int)(startPoint.x*10), (int)(startPoint.y*10));
+#endif
     Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
     clearSequenceMove();
     appendSequenceMove(startPoint, stopPoint);

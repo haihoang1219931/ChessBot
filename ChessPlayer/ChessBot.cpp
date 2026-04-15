@@ -35,7 +35,7 @@ ChessBot::ChessBot(QThread *parent) :
         std::vector<cv::Point> chessMoves;
         m_moveDetector->convertChessMove(moves, chessMoves);
         for(int i = 0; i< chessMoves.size(); i++) {
-            printf("Move(%d,%d)\r\n",chessMoves[i].x,chessMoves[i].y);
+            qDebug("Move(%d,%d)\r\n",chessMoves[i].x,chessMoves[i].y);
         }
     }
 #endif
@@ -64,7 +64,7 @@ void ChessBot::connectCamera()
 #ifdef IMAGE_PROCESS_MOVE
     cap.open(0);
     if (!cap.isOpened()) {
-        printf("Error: Could not open camera.\r\n");
+        qDebug("Error: Could not open camera.\r\n");
     }
 #endif
 }
@@ -80,7 +80,7 @@ void ChessBot::disconnectCamera()
 
 void ChessBot::run()
 {
-    printf("Dowork\r\n");
+    qDebug("Dowork\r\n");
     m_stopped = false; // Reset flags
     
     // Create QSerialPort in worker thread to avoid threading issues
@@ -122,7 +122,7 @@ void ChessBot::run()
     delete robotController;
     robotController = nullptr;
 
-    printf("Dowork finished\r\n");
+    qDebug("Dowork finished\r\n");
 }
 
 void ChessBot::playLoop()
@@ -131,7 +131,7 @@ void ChessBot::playLoop()
     case PLAY_SETUP: {
 #ifdef IMAGE_PROCESS_MOVE
         readFrame(imageBefore);
-        printf("First image [%d,%d]\r\n",
+        qDebug("First image [%d,%d]\r\n",
                imageBefore.rows,imageBefore.cols);
 #endif
         m_statePlay = PLAY_PROCESS_DONE;
@@ -218,7 +218,7 @@ void ChessBot::testLoop()
 
 uint8_t ChessBot::playDetectMove()
 {
-    printf("playDetectMove\r\n");
+    qDebug("playDetectMove\r\n");
 #ifndef IMAGE_PROCESS_MOVE
     playRandomMove();
 #else
@@ -246,7 +246,7 @@ uint8_t ChessBot::playDetectMove()
                 chessMoves[i].x = 7 - chessMoves[i].x;
                 chessMoves[i].y = 7 - chessMoves[i].y;
             }
-            printf("(%d,%d) name[%d] color[%d]\r\n",
+            qDebug("(%d,%d) name[%d] color[%d]\r\n",
                    chessMoves[i].x,chessMoves[i].y,
                    m_game->getPiece(chessMoves[i].x,chessMoves[i].y)->name,
                    m_game->getPiece(chessMoves[i].x,chessMoves[i].y)->color);
@@ -254,11 +254,11 @@ uint8_t ChessBot::playDetectMove()
                (int)m_game->getPiece(chessMoves[i].x,chessMoves[i].y)->color == (int)pieceColor::EMPTY+m_side+1){
                 startMove.x=chessMoves[i].x;
                 startMove.y=chessMoves[i].y;
-                printf("startMove (%d,%d)\r\n",startMove.x,startMove.y);
+                qDebug("startMove (%d,%d)\r\n",startMove.x,startMove.y);
             } else {
                 stopMove.x=chessMoves[i].x;
                 stopMove.y=chessMoves[i].y;
-                printf("stopMove (%d,%d)\r\n",stopMove.x,stopMove.y);
+                qDebug("stopMove (%d,%d)\r\n",stopMove.x,stopMove.y);
             }
         }
         m_game->move(Move(startMove.x,startMove.y,
@@ -322,12 +322,12 @@ QPoint ChessBot::readCalibrationPoint(const QString &command)
     QPoint point(-1, -1);
     
     if (!robotController->isOpen()) {
-        printf("Serial port is not open.\r\n");
+        qDebug("Serial port is not open.\r\n");
         return point;
     }
     
     // Send calibration request command
-    printf("Sending calibration command: %s\r\n", command.toStdString().c_str());
+    qDebug("Sending calibration command: %s\r\n", command.toStdString().c_str());
     robotController->write(command.toLatin1());
     robotController->waitForBytesWritten(500);
     
@@ -340,14 +340,14 @@ QPoint ChessBot::readCalibrationPoint(const QString &command)
     } else if (command.startsWith("lcdbr")) {
         expectedPrefix = "DB";
     } else {
-        printf("Unknown command type: %s\r\n", command.toStdString().c_str());
+        qDebug("Unknown command type: %s\r\n", command.toStdString().c_str());
         return point;
     }
     
     // Wait for response and handle multiple responses
     if (robotController->waitForReadyRead(2000)) {
         QByteArray combinedResponse = robotController->readAll();
-        printf("Raw response received: %s\r\n", combinedResponse.constData());
+        qDebug("Raw response received: %s\r\n", combinedResponse.constData());
         
         // Split response into lines/messages (handle multiple responses)
         QString responseStr = QString::fromLatin1(combinedResponse);
@@ -356,11 +356,11 @@ QPoint ChessBot::readCalibrationPoint(const QString &command)
         // Find the first valid response
         for (const QString &response : responses) {
             QString trimmedResponse = response.trimmed();
-            printf("Processing response line: %s\r\n", trimmedResponse.toStdString().c_str());
+            qDebug("Processing response line: %s\r\n", trimmedResponse.toStdString().c_str());
             
             // Check if response starts with expected prefix
             if (!trimmedResponse.startsWith(expectedPrefix)) {
-                printf("Skipping invalid response (wrong prefix): %s\r\n", trimmedResponse.toStdString().c_str());
+                qDebug("Skipping invalid response (wrong prefix): %s\r\n", trimmedResponse.toStdString().c_str());
                 continue;
             }
             
@@ -379,18 +379,18 @@ QPoint ChessBot::readCalibrationPoint(const QString &command)
                 
                 if (okX && okY) {
                     point = QPoint(x, y);
-                    printf("Valid calibration point received: (%d, %d)\r\n", x, y);
+                    qDebug("Valid calibration point received: (%d, %d)\r\n", x, y);
                     QThread::msleep(100); // Small delay between requests
                     return point;
                 }
             }
             
-            printf("Failed to parse coordinates from response: %s\r\n", trimmedResponse.toStdString().c_str());
+            qDebug("Failed to parse coordinates from response: %s\r\n", trimmedResponse.toStdString().c_str());
         }
         
-        printf("No valid response found with expected format (prefix: %s)\r\n", expectedPrefix.toStdString().c_str());
+        qDebug("No valid response found with expected format (prefix: %s)\r\n", expectedPrefix.toStdString().c_str());
     } else {
-        printf("No response to calibration command: %s\r\n", command.toStdString().c_str());
+        qDebug("No response to calibration command: %s\r\n", command.toStdString().c_str());
     }
     
     QThread::msleep(100); // Small delay between requests
@@ -401,11 +401,11 @@ void ChessBot::initRobot()
 {
     switch (m_stateInit) {
     case INIT_DETECT_PORT: {
-        printf("[Step 1] Detecting Arduino port...\r\n");
+        qDebug("[Step 1] Detecting Arduino port...\r\n");
         if (detectArduinoPort()) {
             m_stateInit = INIT_GET_VERSION;
         } else {
-            printf("Failed to detect Arduino port. Initialization aborted.\r\n");
+            qDebug("Failed to detect Arduino port. Initialization aborted.\r\n");
             m_state = STATE_EXIT;
             togglePause(true);
         }
@@ -413,11 +413,11 @@ void ChessBot::initRobot()
         break;
         
     case INIT_GET_VERSION: {
-        printf("[Step 2] Getting Arduino version...\r\n");
+        qDebug("[Step 2] Getting Arduino version...\r\n");
         if (getArduinoVersion()) {
             m_stateInit = INIT_CHECK_CALIB_FILE;
         } else {
-            printf("Failed to get Arduino version. Initialization aborted.\r\n");
+            qDebug("Failed to get Arduino version. Initialization aborted.\r\n");
             m_state = STATE_EXIT;
             togglePause(true);
         }
@@ -425,11 +425,11 @@ void ChessBot::initRobot()
         break;
         
     case INIT_CHECK_CALIB_FILE: {
-        printf("[Step 3] Checking for calibration file...\r\n");
-        QFile calibFile("trapezoid_data.json");
+        qDebug("[Step 3] Checking for calibration file...\r\n");
+        QFile calibFile("calib.json");
         
         if (!calibFile.exists()) {
-            printf("Calibration file not found. Requesting calibration data from Arduino...\r\n");
+            qDebug("Calibration file not found. Requesting calibration data from Arduino...\r\n");
             m_chessboardCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(8));
             m_dropzoneRightCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(2));
             m_dropzoneLeftCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(2));
@@ -437,7 +437,7 @@ void ChessBot::initRobot()
             m_calibCol = 0;
             m_stateInit = INIT_REQUEST_CALIB_CHESSBOARD;
         } else {
-            printf("Calibration file found. Skipping calibration request.\r\n");
+            qDebug("Calibration file found. Skipping calibration request.\r\n");
             m_stateInit = INIT_DONE;
         }
     }
@@ -446,7 +446,7 @@ void ChessBot::initRobot()
     case INIT_REQUEST_CALIB_CHESSBOARD: {
         if (m_calibRow < 8) {
             if (m_calibCol < 8) {
-                QString command = QString("lccbr%dc%d").arg(m_calibRow).arg(m_calibCol);
+                QString command = QString::asprintf("lccbr%c%d", m_calibRow, m_calibCol);
                 QPoint point = readCalibrationPoint(command);
                 m_chessboardCalib[m_calibRow][m_calibCol] = point;
                 m_calibCol++;
@@ -455,7 +455,7 @@ void ChessBot::initRobot()
                 m_calibRow++;
             }
         } else {
-            printf("Chessboard calibration complete.\r\n");
+            qDebug("Chessboard calibration complete.\r\n");
             m_calibRow = 0;
             m_calibCol = 0;
             m_stateInit = INIT_REQUEST_CALIB_RIGHT_DROPZONE;
@@ -466,7 +466,7 @@ void ChessBot::initRobot()
     case INIT_REQUEST_CALIB_RIGHT_DROPZONE: {
         if (m_calibRow < 8) {
             if (m_calibCol < 2) {
-                QString command = QString("lcdpr%dc%d").arg(m_calibRow).arg(m_calibCol);
+                QString command = QString::asprintf("lcdpr%dc%d", m_calibRow, m_calibCol);
                 QPoint point = readCalibrationPoint(command);
                 m_dropzoneRightCalib[m_calibRow][m_calibCol] = point;
                 m_calibCol++;
@@ -475,7 +475,7 @@ void ChessBot::initRobot()
                 m_calibRow++;
             }
         } else {
-            printf("Right dropzone calibration complete.\r\n");
+            qDebug("Right dropzone calibration complete.\r\n");
             m_calibRow = 0;
             m_calibCol = 0;
             m_stateInit = INIT_REQUEST_CALIB_LEFT_DROPZONE;
@@ -486,7 +486,7 @@ void ChessBot::initRobot()
     case INIT_REQUEST_CALIB_LEFT_DROPZONE: {
         if (m_calibRow < 8) {
             if (m_calibCol < 2) {
-                QString command = QString("lcdbr%dc%d").arg(m_calibRow).arg(m_calibCol);
+                QString command = QString::asprintf("lcdbr%dc%d", m_calibRow, m_calibCol);
                 QPoint point = readCalibrationPoint(command);
                 m_dropzoneLeftCalib[m_calibRow][m_calibCol] = point;
                 m_calibCol++;
@@ -495,15 +495,15 @@ void ChessBot::initRobot()
                 m_calibRow++;
             }
         } else {
-            printf("Left dropzone calibration complete.\r\n");
-            printf("All calibration data collected successfully.\r\n");
+            qDebug("Left dropzone calibration complete.\r\n");
+            qDebug("All calibration data collected successfully.\r\n");
             m_stateInit = INIT_DONE;
         }
     }
         break;
         
     case INIT_DONE: {
-        printf("=== Robot Initialization Complete ===\r\n");
+        qDebug("=== Robot Initialization Complete ===\r\n");
         m_state = STATE_CONFIGURE;
         togglePause(true);
     }
@@ -549,6 +549,7 @@ void ChessBot::sendTestCommand(QString command)
 }
 
 void ChessBot::initRobotCommunication() {
+    qDebug("ChessBot::initRobotCommunication\r\n");
     m_state = STATE_INIT_COM;
     m_stateInit = INIT_DETECT_PORT;
     m_calibRow = 0;
@@ -566,7 +567,7 @@ void ChessBot::processNextMove()
 
 void ChessBot::setLevel(int level)
 {
-    printf("Set level: %d\r\n",level);
+    qDebug("Set level: %d\r\n",level);
     m_levelScore = level;
     m_levelType = level/400+1;
     m_chessController->setEngineLevel(m_levelType);
@@ -574,7 +575,7 @@ void ChessBot::setLevel(int level)
 
 void ChessBot::setSide(int side)
 {
-    printf("Set side: %d\r\n",side);
+    qDebug("Set side: %d\r\n",side);
     m_side = side;
     m_chessController->setPlayerColor(side);
     resetGame();
@@ -606,7 +607,7 @@ void ChessBot::loadCorners(QString fileName)
 
     // Open the file in read-only mode
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        printf("Could not open file for reading: %s\r\n",fileName.toStdString().c_str());
+        qDebug("Could not open file for reading: %s\r\n",fileName.toStdString().c_str());
         return;
     }
 
@@ -618,7 +619,7 @@ void ChessBot::loadCorners(QString fileName)
 
     // Ensure the root of the JSON is an array
     if (!doc.isArray()) {
-        printf("JSON format error: Root is not an array.\r\n");
+        qDebug("JSON format error: Root is not an array.\r\n");
         return;
     }
 
@@ -629,7 +630,7 @@ void ChessBot::loadCorners(QString fileName)
             QJsonObject obj = value.toObject();
             // Extract x and y, then append as a QPoint
             points.append(QPoint(obj["x"].toInt(), obj["y"].toInt()));
-            printf("corner[%d] (%d,%d)\r\n",cornerID,
+            qDebug("corner[%d] (%d,%d)\r\n",cornerID,
                    obj["x"].toInt(),obj["y"].toInt());
             cornerID++;
 
@@ -680,27 +681,27 @@ QObject* ChessBot::chessControllerObject() const
 }
 
 void ChessBot::resetGame(){
-    printf("Reset game side[%d]\r\n",m_side);
+    qDebug("Reset game side[%d]\r\n",m_side);
     m_chessController->newGame();
 }
 
 bool ChessBot::detectArduinoPort(int baudRate)
 {
-    printf("Detecting Arduino port at %d baudrate...\r\n", baudRate);
+    qDebug("Detecting Arduino port at %d baudrate...\r\n", baudRate);
     
     // Get all available serial ports
     QList<QSerialPortInfo> ports = QSerialPortInfo::availablePorts();
     
     if (ports.isEmpty()) {
-        printf("No COM ports found.\r\n");
+        qDebug("No COM ports found.\r\n");
         return false;
     }
     
-    printf("Found %d available COM port(s):\r\n", ports.size());
+    qDebug("Found %d available COM port(s):\r\n", ports.size());
     
     // Try each port
     for (const QSerialPortInfo &portInfo : ports) {
-        printf("Trying port: %s (%s)\r\n", 
+        qDebug("Trying port: %s (%s)\r\n",
                portInfo.portName().toStdString().c_str(),
                portInfo.description().toStdString().c_str());
         
@@ -713,47 +714,48 @@ bool ChessBot::detectArduinoPort(int baudRate)
         robotController->setFlowControl(QSerialPort::NoFlowControl);
         
         if (robotController->open(QIODevice::ReadWrite)) {
-            printf("Opened port: %s\r\n", portInfo.portName().toStdString().c_str());
+            qDebug("Opened port: %s\r\n", portInfo.portName().toStdString().c_str());
             
-            // Send version request
-            robotController->write("v");
-            robotController->waitForBytesWritten(500);
-            
-            // Wait for response with timeout
-            if (robotController->waitForReadyRead(1000)) {
-                QByteArray response = robotController->readAll();
-                printf("Response received: %s\r\n", response.constData());
-                
-                // Check if response contains "[v]"
-                if (response.contains("[v]")) {
-                    printf("Arduino detected on port: %s\r\n", 
-                           portInfo.portName().toStdString().c_str());
-                    m_arduinoVersion = QString::fromLatin1(response);
-                    return true;
+            for(int i=0; i< 10; i++) {
+                // Send version request
+                robotController->write("v");
+                robotController->waitForBytesWritten(500);
+
+                // Wait for response with timeout
+                if (robotController->waitForReadyRead(1000)) {
+                    QByteArray response = robotController->readAll();
+                    qDebug("Response received: %s\r\n", response.constData());
+
+                    // Check if response contains "[v]"
+                    if (response.contains("[v]")) {
+                        qDebug("Arduino detected on port: %s\r\n",
+                               portInfo.portName().toStdString().c_str());
+                        m_arduinoVersion = QString::fromLatin1(response);
+                        return true;
+                    }
+                } else {
+                    qDebug("No response from port: %s\r\n", portInfo.portName().toStdString().c_str());
                 }
-            } else {
-                printf("No response from port: %s\r\n", portInfo.portName().toStdString().c_str());
             }
-            
             robotController->close();
         } else {
-            printf("Failed to open port: %s\r\n", portInfo.portName().toStdString().c_str());
+            qDebug("Failed to open port: %s\r\n", portInfo.portName().toStdString().c_str());
         }
     }
     
-    printf("Arduino not detected on any port.\r\n");
+    qDebug("Arduino not detected on any port.\r\n");
     return false;
 }
 
 bool ChessBot::getArduinoVersion()
 {
     if (!robotController->isOpen()) {
-        printf("Serial port is not open.\r\n");
+        qDebug("Serial port is not open.\r\n");
         return false;
     }
     
     // Send version request
-    printf("Sending version request...\r\n");
+    qDebug("Sending version request...\r\n");
     robotController->write("v");
     robotController->waitForBytesWritten(500);
     
@@ -762,21 +764,21 @@ bool ChessBot::getArduinoVersion()
     QTime timer;
     timer.start();
     
-    printf("Collecting responses for 2 seconds...\r\n");
+    qDebug("Collecting responses for 2 seconds...\r\n");
     while (timer.elapsed() < 2000) {
         if (robotController->waitForReadyRead(100)) {
             QByteArray chunk = robotController->readAll();
             allResponses.append(chunk);
-            printf("Received chunk: %s\r\n", chunk.constData());
+            qDebug("Received chunk: %s\r\n", chunk.constData());
         }
     }
     
     if (allResponses.isEmpty()) {
-        printf("No response from Arduino.\r\n");
+        qDebug("No response from Arduino.\r\n");
         return false;
     }
     
-    printf("Total responses: %s\r\n", allResponses.constData());
+    qDebug("Total responses: %s\r\n", allResponses.constData());
     
     // Split responses into lines and find the valid one with "[v]"
     QString responseStr = QString::fromLatin1(allResponses);
@@ -784,7 +786,7 @@ bool ChessBot::getArduinoVersion()
     
     for (const QString &response : responses) {
         QString trimmedResponse = response.trimmed();
-        printf("Processing response: %s\r\n", trimmedResponse.toStdString().c_str());
+        qDebug("Processing response: %s\r\n", trimmedResponse.toStdString().c_str());
         
         // Check if response contains "[v]"
         if (trimmedResponse.contains("[v]")) {
@@ -802,12 +804,12 @@ bool ChessBot::getArduinoVersion()
                     trimmedResponse.mid(startPos, endPos - startPos).toLatin1()
                 );
                 m_arduinoVersion = version;
-                printf("Valid Arduino Version found: %s\r\n", version.toStdString().c_str());
+                qDebug("Valid Arduino Version found: %s\r\n", version.toStdString().c_str());
                 return true;
             }
         }
     }
     
-    printf("No valid response found with '[v]' pattern\r\n");
+    qDebug("No valid response found with '[v]' pattern\r\n");
     return false;
 }

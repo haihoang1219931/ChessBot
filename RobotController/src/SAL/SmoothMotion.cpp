@@ -33,6 +33,7 @@ void SmoothMotion::setupTarget(
   resetCruiseSteps();
   resetDecelSteps();
   changeStateControl(m_moveType);
+#if defined(DEBUG_COMMAND)
   app.printf("Setup target M[%d]",m_id);
   app.printf(" stepsAccel=%d", (int)m_numStepAccel);
   app.printf(" stepsCruise=%d", (int)m_numStepCruise);
@@ -41,6 +42,7 @@ void SmoothMotion::setupTarget(
   app.printf(" moveType=%d", (int)m_moveType);
   app.printf(" m_numWaitPulse=%d", (int)m_numWaitPulse);
   app.printf(" minWaitPulse=%d\r\n", (int)m_minWaitPulse);
+#endif
 }
 // #define DEBUG_COUNT_STEP
 float SmoothMotion::delayAccel(float stepCount, float delayCur) {

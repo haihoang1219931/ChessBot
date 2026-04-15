@@ -125,11 +125,13 @@ Point ChessBoard::convertDropPoint(int row, int col, ZONE_TYPE zone) {
                 m_cellCalibsDropZonePlayer[row][col]:
                 m_cellCalibsDropZoneBot[row][col];
     }
+#ifdef DEBUG_COMMAND
     printf("Drop[%s] (%d,%d) = [%.02f,%.02f]\r\n",
            zone == ZONE_PLAYER?"Player":"Bot",
            row,col,
            convertValue.x,convertValue.y);
-    return convertValue;
+#endif
+           return convertValue;
 }
 
 void ChessBoard::updateDropZone(uint8_t piece, int row, int col, ZONE_TYPE zone)

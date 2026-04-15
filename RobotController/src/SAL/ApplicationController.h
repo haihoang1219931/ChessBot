@@ -100,6 +100,7 @@ public:
     Point m_tarPos;
     int m_appTimer;
     float m_minSpace;
+    bool m_engineEnabled;
 };
 
 #endif // APPLICATIONCONTROLLER_H
