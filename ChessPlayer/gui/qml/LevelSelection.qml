@@ -3,7 +3,7 @@ import QtQuick.Layouts 1.12
 
 FocusScope {
     id: root
-    width: 640
+    width: 800
     height: 480
     // 3. FocusScope needs focus: true to accept focus from StackView
     focus: true

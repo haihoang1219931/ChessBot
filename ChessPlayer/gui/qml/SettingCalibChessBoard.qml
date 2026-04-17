@@ -2,7 +2,7 @@ import QtQuick 2.0
 import QtMultimedia 5.12
 FocusScope {
     id: root
-    width: 640; height: 480
+    width: 800; height: 480
     signal exitPressed()
     property string filePath: "trapezoid_data.json"
     // Trapezoid points: [Bottom-Left, Bottom-Right, Top-Right, Top-Left]

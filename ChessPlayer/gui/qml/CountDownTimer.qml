@@ -4,7 +4,7 @@ import QtQuick.Controls 2.12
 
 Rectangle {
     id: root
-    width: 640
+    width: 800
     height: 480
     color: "black"
     signal goback()
@@ -112,8 +112,8 @@ Rectangle {
             }
             ChessBoard {
                 id: chessboard
-                width: 300
-                height: 300
+                width: 400
+                height: 400
                 anchors.centerIn: parent
                 controller: backend ? backend.chessController : null
             }

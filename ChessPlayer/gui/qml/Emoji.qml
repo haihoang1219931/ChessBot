@@ -2,7 +2,7 @@ import QtQuick 2.12
 
 FocusScope {
     id: robotFace
-    width: 640; height: 480
+    width: 800; height: 480
     focus: true
     property var listEmotion: ["neutral", "happy", "sad", "angry", "surprise"]
     property int emotionID: 0

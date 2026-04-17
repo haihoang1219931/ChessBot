@@ -6,7 +6,7 @@ import QtQuick.Layouts 1.12
 ApplicationWindow {
     id: wroot
     visible: true
-    width: 640
+    width: 800
     height: 480
     title: qsTr("ChessPlayer")
     color: "#050505"

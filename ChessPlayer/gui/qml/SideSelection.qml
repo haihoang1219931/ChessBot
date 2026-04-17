@@ -3,7 +3,7 @@ import QtQuick 2.12
 // Use FocusScope to trap focus inside this component
 FocusScope {
     id: root
-    width: 640; height: 480
+    width: 800; height: 480
     focus: true // Signals that this scope wants focus
 
     signal sideConfirmed(string side)

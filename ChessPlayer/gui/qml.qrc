@@ -14,5 +14,7 @@
         <file>qml/MenuBotIcon.qml</file>
         <file>qml/MenuSettingIcon.qml</file>
         <file>qml/SettingCalibChessBoard.qml</file>
+        <file>qml/SettingCalibrationPoints.qml</file>
+        <file>qml/SettingsMenu.qml</file>
     </qresource>
 </RCC>

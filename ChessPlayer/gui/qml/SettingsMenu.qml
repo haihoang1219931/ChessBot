@@ -3,7 +3,7 @@ import QtQuick.Layouts 1.12
 
 FocusScope {
     id: root
-    width: 640
+    width: 800
     height: 480
     signal exitPressed()
     signal selectCalibration(string calibType)
