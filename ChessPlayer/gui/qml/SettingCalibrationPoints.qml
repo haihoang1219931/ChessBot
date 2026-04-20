@@ -91,7 +91,90 @@ FocusScope {
         }
     }
 
-    // Helper function for the corner markings
+    property bool infoPopupVisible: false
+    property bool confirmDialogVisible: false
+    property int confirmButtonSelected: 0
+    property int highlightDirection: 0 // 0:none, 1:up, 2:right, 3:down, 4:left
+
+    function navigateSelection(key) {
+        if (confirmDialogVisible || infoPopupVisible) return;
+
+        if (selectedZone === 0) {
+            if (key === Qt.Key_Left) {
+                if (selectedCol > 0) selectedCol--;
+                else { selectedZone = 2; selectedCol = 1; }
+            } else if (key === Qt.Key_Right) {
+                if (selectedCol < 7) selectedCol++;
+                else { selectedZone = 1; selectedCol = 0; }
+            } else if (key === Qt.Key_Up) {
+                if (selectedRow > 0) selectedRow--;
+            } else if (key === Qt.Key_Down) {
+                if (selectedRow < 7) selectedRow++;
+            }
+        } else if (selectedZone === 1) {
+            if (key === Qt.Key_Left) {
+                if (selectedCol > 0) selectedCol--;
+                else { selectedZone = 0; selectedCol = 7; }
+            } else if (key === Qt.Key_Right) {
+                if (selectedCol < 1) selectedCol++;
+            } else if (key === Qt.Key_Up) {
+                if (selectedRow > 0) selectedRow--;
+            } else if (key === Qt.Key_Down) {
+                if (selectedRow < 7) selectedRow++;
+            }
+        } else if (selectedZone === 2) {
+            if (key === Qt.Key_Right) {
+                if (selectedCol < 1) selectedCol++;
+                else { selectedZone = 0; selectedCol = 0; }
+            } else if (key === Qt.Key_Left) {
+                if (selectedCol > 0) selectedCol--;
+            } else if (key === Qt.Key_Up) {
+                if (selectedRow > 0) selectedRow--;
+            } else if (key === Qt.Key_Down) {
+                if (selectedRow < 7) selectedRow++;
+            }
+        }
+    }
+
+    function saveCalibrationFile() {
+        var payload = {};
+        var existing = fileio.read(calibrationFile);
+        if (existing !== "") {
+            var parsed = JSON.parse(existing);
+            for (var key in parsed) {
+                if (key !== "chessboard" && key !== "dropzone_left" && key !== "dropzone_right") {
+                    payload[key] = parsed[key];
+                }
+            }
+        }
+
+        payload.chessboard = [];
+        for (var r = 0; r < 8; r++) {
+            for (var c = 0; c < 8; c++) {
+                var p = chessboardCalib[r][c];
+                payload.chessboard.push({row: r, col: c, x: p.x, y: p.y});
+            }
+        }
+
+        payload.dropzone_right = [];
+        for (var r = 0; r < 8; r++) {
+            for (var c = 0; c < 2; c++) {
+                var p = dropzoneRightCalib[r][c];
+                payload.dropzone_right.push({row: r, col: c, x: p.x, y: p.y});
+            }
+        }
+
+        payload.dropzone_left = [];
+        for (var r = 0; r < 8; r++) {
+            for (var c = 0; c < 2; c++) {
+                var p = dropzoneLeftCalib[r][c];
+                payload.dropzone_left.push({row: r, col: c, x: p.x, y: p.y});
+            }
+        }
+
+        fileio.write(calibrationFile, JSON.stringify(payload));
+    }
+
     function drawBrackets(ctx, w, h) {
         ctx.reset();
         ctx.strokeStyle = "#888";
@@ -107,43 +190,170 @@ FocusScope {
         // Bottom Right
         ctx.beginPath(); ctx.moveTo(w - l, h); ctx.lineTo(w, h); ctx.lineTo(w, h - l); ctx.stroke();
     }
+
+    function drawPopupIndicator(ctx, w, h) {
+        ctx.reset();
+        var cx = w / 2;
+        var cy = h / 2;
+        var radius = 40;
+
+        ctx.fillStyle = "#181818";
+        ctx.strokeStyle = "#999";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+
+        function drawTriangle(direction, active) {
+            var size = active ? 18 : 12;
+            var color = active ? "#00ff00" : "#888";
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            if (direction === 1) {
+                ctx.moveTo(cx - size, cy - radius - 15);
+                ctx.lineTo(cx + size, cy - radius - 15);
+                ctx.lineTo(cx, cy - radius + 5);
+            } else if (direction === 2) {
+                ctx.moveTo(cx + radius + 15, cy - size);
+                ctx.lineTo(cx + radius + 15, cy + size);
+                ctx.lineTo(cx + radius - 5, cy);
+            } else if (direction === 3) {
+                ctx.moveTo(cx - size, cy + radius + 15);
+                ctx.lineTo(cx + size, cy + radius + 15);
+                ctx.lineTo(cx, cy + radius - 5);
+            } else if (direction === 4) {
+                ctx.moveTo(cx - radius - 15, cy - size);
+                ctx.lineTo(cx - radius - 15, cy + size);
+                ctx.lineTo(cx - radius + 5, cy);
+            }
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        drawTriangle(1, highlightDirection === 1);
+        drawTriangle(2, highlightDirection === 2);
+        drawTriangle(3, highlightDirection === 3);
+        drawTriangle(4, highlightDirection === 4);
+    }
+
     Rectangle {
         id: rectChessBoard
         anchors.fill: parent
         radius: 20
         color: "#e8e8e8"
         border.color: "#aaa"; border.width: 1
-        Keys.onEscapePressed: {
-            exitPressed()
+        focus: true
+
+        Keys.onPressed: {
+            if (confirmDialogVisible) {
+                if (event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
+                    confirmButtonSelected = 1 - confirmButtonSelected;
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    if (confirmButtonSelected === 0) {
+                        saveCalibrationFile();
+                    }
+                    confirmDialogVisible = false;
+                    infoPopupVisible = false;
+                    event.accepted = true;
+                    root.exitPressed();
+                } else if (event.key === Qt.Key_Escape) {
+                    confirmDialogVisible = false;
+                    event.accepted = true;
+                }
+            } else if (infoPopupVisible) {
+                if (event.key === Qt.Key_Left) {
+                    highlightDirection = 4;
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Right) {
+                    highlightDirection = 2;
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Up) {
+                    highlightDirection = 1;
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Down) {
+                    highlightDirection = 3;
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Escape) {
+                    infoPopupVisible = false;
+                    highlightDirection = 0;
+                    event.accepted = true;
+                }
+            } else {
+                if (event.key === Qt.Key_Left || event.key === Qt.Key_Right || event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+                    navigateSelection(event.key);
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    infoPopupVisible = true;
+                    highlightDirection = 0;
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Escape) {
+                    confirmDialogVisible = true;
+                    confirmButtonSelected = 0;
+                    event.accepted = true;
+                }
+            }
         }
+
+        Keys.onReleased: {
+            if (infoPopupVisible && (event.key === Qt.Key_Left || event.key === Qt.Key_Right || event.key === Qt.Key_Up || event.key === Qt.Key_Down)) {
+                highlightDirection = 0;
+            }
+        }
+
         // Main horizontal container
         RowLayout {
             anchors.fill: parent
             anchors.margins: 40
             spacing: 30
 
-            // --- LEFT COLUMN: ROUND BUTTONS AND 1x5/1x8 DROP ZONES ---
-            ColumnLayout {
-                spacing: 20
+            // --- LEFT COLUMN: DROP ZONE LEFT ---
+            Item {
+                width: 100; height: 400
+                GridLayout {
+                    anchors.fill: parent
+                    columns: 2; rows: 8
+                    columnSpacing: 0; rowSpacing: 0
 
-                // Left Technical Container
-                Item {
-                    width: 100; height: 400 // Fixed sizes for Qt 5.12 stability
-                    GridLayout {
-                        anchors.centerIn: parent
-                        columns: 2; rows: 8
-                        columnSpacing: 0; rowSpacing: 0
-                        Repeater {
-                            model: 16
-                            Rectangle { width: 50; height: 50; color: "transparent"; border.color: "#bbb" }
+                    Repeater {
+                        model: 16
+                        Rectangle {
+                            width: 50
+                            height: 50
+                            property int rowIdx: Math.floor(index / 2)
+                            property int colIdx: index % 2
+                            property bool isSelected: selectedZone === 2 && selectedRow === rowIdx && selectedCol === colIdx
+                            color: isSelected ? "#ffaa00" : "#2a2a2a"
+                            border.color: isSelected ? "#ffffff" : "#666666"
+                            border.width: isSelected ? 2 : 1
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: dropzoneLeftCalib[rowIdx] && dropzoneLeftCalib[rowIdx][colIdx] ? dropzoneLeftCalib[rowIdx][colIdx].x.toFixed(0) + "\n" + dropzoneLeftCalib[rowIdx][colIdx].y.toFixed(0) : "?"
+                                color: "#ffffff"
+                                font.pixelSize: 8
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                wrapMode: Text.WordWrap
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    selectedZone = 2;
+                                    selectedRow = rowIdx;
+                                    selectedCol = colIdx;
+                                }
+                            }
                         }
                     }
-                    Canvas {
-                        anchors.fill: parent
-                        onPaint: {
-                            var ctx = getContext("2d");
-                            drawBrackets(ctx, width, height);
-                        }
+                }
+                Canvas {
+                    anchors.fill: parent
+                    onPaint: {
+                        var ctx = getContext("2d");
+                        drawBrackets(ctx, width, height);
                     }
                 }
             }
@@ -162,12 +372,33 @@ FocusScope {
 
                     Repeater {
                         model: 64
-                        Button {
+                        Rectangle {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            // Basic Checkerboard logic
-                            background: Rectangle {
-                                color: (Math.floor(index / 8) + index % 8) % 2 === 0 ? "#ffffff" : "#222222"
+                            property int rowIdx: Math.floor(index / 8)
+                            property int colIdx: index % 8
+                            property bool isSelected: selectedZone === 0 && selectedRow === rowIdx && selectedCol === colIdx
+                            property bool isBlack: (rowIdx + colIdx) % 2 === 1
+                            color: isSelected ? "#00ff00" : (isBlack ? "#222222" : "#ffffff")
+                            border.color: isSelected ? "#ffffff" : "#333333"
+                            border.width: isSelected ? 2 : 1
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: chessboardCalib[rowIdx] && chessboardCalib[rowIdx][colIdx] ? chessboardCalib[rowIdx][colIdx].x.toFixed(0) + "," + chessboardCalib[rowIdx][colIdx].y.toFixed(0) : "?"
+                                color: isBlack ? "#eeeeee" : "#111111"
+                                font.pixelSize: 8
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    selectedZone = 0;
+                                    selectedRow = rowIdx;
+                                    selectedCol = colIdx;
+                                }
                             }
                         }
                     }
@@ -180,12 +411,41 @@ FocusScope {
                 height: 400
 
                 GridLayout {
-                    anchors.centerIn: parent
+                    anchors.fill: parent
                     columns: 2; rows: 8
                     columnSpacing: 0; rowSpacing: 0
+
                     Repeater {
                         model: 16
-                        Rectangle { width: 50; height: 50; color: "transparent"; border.color: "#bbb" }
+                        Rectangle {
+                            width: 50
+                            height: 50
+                            property int rowIdx: Math.floor(index / 2)
+                            property int colIdx: index % 2
+                            property bool isSelected: selectedZone === 1 && selectedRow === rowIdx && selectedCol === colIdx
+                            color: isSelected ? "#ff00ff" : "#2a2a2a"
+                            border.color: isSelected ? "#ffffff" : "#666666"
+                            border.width: isSelected ? 2 : 1
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: dropzoneRightCalib[rowIdx] && dropzoneRightCalib[rowIdx][colIdx] ? dropzoneRightCalib[rowIdx][colIdx].x.toFixed(0) + "\n" + dropzoneRightCalib[rowIdx][colIdx].y.toFixed(0) : "?"
+                                color: "#ffffff"
+                                font.pixelSize: 8
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                wrapMode: Text.WordWrap
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    selectedZone = 1;
+                                    selectedRow = rowIdx;
+                                    selectedCol = colIdx;
+                                }
+                            }
+                        }
                     }
                 }
                 Canvas {
@@ -197,6 +457,166 @@ FocusScope {
                 }
             }
         }
+
+        Rectangle {
+            anchors.fill: parent
+            color: "#00000088"
+            visible: infoPopupVisible || confirmDialogVisible
+            z: 10
+
+            // Info popup
+            Rectangle {
+                visible: infoPopupVisible
+                anchors.centerIn: parent
+                width: 380
+                height: 320
+                radius: 16
+                color: "#212121"
+                border.color: "#00ff00"
+                border.width: 2
+                z: 11
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    spacing: 12
+
+                    Text {
+                        text: "Calibration Position"
+                        font.pixelSize: 18
+                        color: "#ffffff"
+                        font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    Text {
+                        text: "X: " + getCurrentPoint().x.toFixed(1) + " mm"
+                        color: "#dddddd"
+                        font.pixelSize: 14
+                    }
+                    Text {
+                        text: "Y: " + getCurrentPoint().y.toFixed(1) + " mm"
+                        color: "#dddddd"
+                        font.pixelSize: 14
+                    }
+
+                    Canvas {
+                        id: indicatorCanvas
+                        width: parent.width
+                        height: 180
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        onPaint: {
+                            var ctx = getContext("2d");
+                            drawPopupIndicator(ctx, width, height);
+                        }
+                    }
+
+                    Text {
+                        text: "Use arrow keys to light the matching direction. Press Esc to close."
+                        color: "#aaaaaa"
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
+                    }
+                }
+
+                Connections {
+                    target: root
+                    onHighlightDirectionChanged: indicatorCanvas.requestPaint()
+                    onInfoPopupVisibleChanged: if (infoPopupVisible) indicatorCanvas.requestPaint()
+                }
+            }
+
+            // Confirm dialog
+            Rectangle {
+                visible: confirmDialogVisible
+                anchors.centerIn: parent
+                width: 420
+                height: 180
+                radius: 16
+                color: "#232323"
+                border.color: "#888"
+                border.width: 1
+                z: 11
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 18
+                    spacing: 14
+
+                    Text {
+                        text: "Do you want to store calibration file?"
+                        color: "#ffffff"
+                        font.pixelSize: 16
+                        font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    RowLayout {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 24
+
+                        Rectangle {
+                            width: 120; height: 50
+                            radius: 10
+                            color: confirmButtonSelected === 0 ? "#00aa00" : "#444444"
+                            border.color: confirmButtonSelected === 0 ? "#ffffff" : "#888888"
+                            border.width: 1
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "OK"
+                                color: "#ffffff"
+                                font.pixelSize: 14
+                                font.bold: true
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    confirmButtonSelected = 0;
+                                    saveCalibrationFile();
+                                    confirmDialogVisible = false;
+                                    root.exitPressed();
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            width: 120; height: 50
+                            radius: 10
+                            color: confirmButtonSelected === 1 ? "#aa0000" : "#444444"
+                            border.color: confirmButtonSelected === 1 ? "#ffffff" : "#888888"
+                            border.width: 1
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "Cancel"
+                                color: "#ffffff"
+                                font.pixelSize: 14
+                                font.bold: true
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    confirmButtonSelected = 1;
+                                    confirmDialogVisible = false;
+                                    root.exitPressed();
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: "Use left/right to choose, then Enter."
+                        color: "#aaaaaa"
+                        font.pixelSize: 12
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                }
+            }
+        }
+
         Rectangle {
             anchors.left: parent.left
             anchors.top: parent.top
@@ -236,7 +656,6 @@ FocusScope {
                     width: 90
                     height: 50
                     RowLayout {
-//                        spacing: 30
                         Rectangle {
                             Layout.leftMargin: 10
                             width: 20
