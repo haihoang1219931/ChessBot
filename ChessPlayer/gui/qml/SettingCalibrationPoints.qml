@@ -29,8 +29,30 @@ FocusScope {
         }
     }
 
+    function initializeCalibrationArrays() {
+        chessboardCalib = [];
+        for (var i = 0; i < 8; i++) {
+            chessboardCalib[i] = [];
+            for (var j = 0; j < 8; j++) {
+                chessboardCalib[i][j] = {x: 0, y: 0};
+            }
+        }
+
+        dropzoneRightCalib = [];
+        dropzoneLeftCalib = [];
+        for (var i = 0; i < 8; i++) {
+            dropzoneRightCalib[i] = [];
+            dropzoneLeftCalib[i] = [];
+            for (var j = 0; j < 2; j++) {
+                dropzoneRightCalib[i][j] = {x: 0, y: 0};
+                dropzoneLeftCalib[i][j] = {x: 0, y: 0};
+            }
+        }
+    }
+
     function loadCalibrationData() {
-        var data = fileio.read(calibrationFile);
+        initializeCalibrationArrays();
+        var data = fileio.read(calibrationFile) || "";
         if (data !== "") {
             var jsonData = JSON.parse(data);
             
@@ -83,11 +105,60 @@ FocusScope {
     
     function getCurrentPoint() {
         if (selectedZone === 0) {
-            return chessboardCalib[selectedRow][selectedCol];
+            return chessboardCalib[selectedRow] && chessboardCalib[selectedRow][selectedCol] ? chessboardCalib[selectedRow][selectedCol] : {x: 0, y: 0};
         } else if (selectedZone === 1) {
-            return dropzoneRightCalib[selectedRow][selectedCol];
+            return dropzoneRightCalib[selectedRow] && dropzoneRightCalib[selectedRow][selectedCol] ? dropzoneRightCalib[selectedRow][selectedCol] : {x: 0, y: 0};
         } else {
-            return dropzoneLeftCalib[selectedRow][selectedCol];
+            return dropzoneLeftCalib[selectedRow] && dropzoneLeftCalib[selectedRow][selectedCol] ? dropzoneLeftCalib[selectedRow][selectedCol] : {x: 0, y: 0};
+        }
+    }
+
+    function adjustCurrentPoint(dx, dy) {
+        var point;
+        if (selectedZone === 0) {
+            if (!chessboardCalib[selectedRow] || !chessboardCalib[selectedRow][selectedCol]) return;
+            point = chessboardCalib[selectedRow][selectedCol];
+        } else if (selectedZone === 1) {
+            if (!dropzoneRightCalib[selectedRow] || !dropzoneRightCalib[selectedRow][selectedCol]) return;
+            point = dropzoneRightCalib[selectedRow][selectedCol];
+        } else {
+            if (!dropzoneLeftCalib[selectedRow] || !dropzoneLeftCalib[selectedRow][selectedCol]) return;
+            point = dropzoneLeftCalib[selectedRow][selectedCol];
+        }
+        point.x += dx;
+        point.y += dy;
+        popupX = point.x;
+        popupY = point.y;
+    }
+
+    function isValidDropzoneLeft(row, col) {
+        return row >= 0 && row < 8 && col >= 0 && col < 2 && !(col === 0 && row <= 2);
+    }
+
+    function isValidSelection(zone, row, col) {
+        if (zone === 0) {
+            return row >= 0 && row < 8 && col >= 0 && col < 8;
+        } else if (zone === 1) {
+            return row >= 0 && row < 8 && col >= 0 && col < 2;
+        } else if (zone === 2) {
+            return isValidDropzoneLeft(row, col);
+        }
+        return false;
+    }
+
+    function clampSelection() {
+        if (selectedZone === 0) {
+            selectedRow = Math.max(0, Math.min(selectedRow, 7));
+            selectedCol = Math.max(0, Math.min(selectedCol, 7));
+        } else if (selectedZone === 1) {
+            selectedRow = Math.max(0, Math.min(selectedRow, 7));
+            selectedCol = Math.max(0, Math.min(selectedCol, 1));
+        } else {
+            selectedRow = Math.max(0, Math.min(selectedRow, 7));
+            selectedCol = Math.max(0, Math.min(selectedCol, 1));
+            if (!isValidDropzoneLeft(selectedRow, selectedCol)) {
+                selectedCol = 1;
+            }
         }
     }
 
@@ -95,6 +166,14 @@ FocusScope {
     property bool confirmDialogVisible: false
     property int confirmButtonSelected: 0
     property int highlightDirection: 0 // 0:none, 1:up, 2:right, 3:down, 4:left
+    property real popupX: 0
+    property real popupY: 0
+
+    function updatePopupValues() {
+        var point = getCurrentPoint();
+        popupX = point.x;
+        popupY = point.y;
+    }
 
     function navigateSelection(key) {
         if (confirmDialogVisible || infoPopupVisible) return;
@@ -127,18 +206,29 @@ FocusScope {
                 if (selectedCol < 1) selectedCol++;
                 else { selectedZone = 0; selectedCol = 0; }
             } else if (key === Qt.Key_Left) {
-                if (selectedCol > 0) selectedCol--;
+                if (selectedCol > 0) {
+                    var targetRow = selectedRow;
+                    var targetCol = selectedCol - 1;
+                    if (isValidDropzoneLeft(targetRow, targetCol)) selectedCol--;
+                }
             } else if (key === Qt.Key_Up) {
-                if (selectedRow > 0) selectedRow--;
+                if (selectedRow > 0) {
+                    var targetRow = selectedRow - 1;
+                    if (isValidDropzoneLeft(targetRow, selectedCol)) selectedRow--;
+                }
             } else if (key === Qt.Key_Down) {
-                if (selectedRow < 7) selectedRow++;
+                if (selectedRow < 7) {
+                    var targetRow = selectedRow + 1;
+                    if (isValidDropzoneLeft(targetRow, selectedCol)) selectedRow++;
+                }
             }
         }
+        clampSelection();
     }
 
     function saveCalibrationFile() {
         var payload = {};
-        var existing = fileio.read(calibrationFile);
+        var existing = fileio.read(calibrationFile) || "";
         if (existing !== "") {
             var parsed = JSON.parse(existing);
             for (var key in parsed) {
@@ -265,15 +355,19 @@ FocusScope {
             } else if (infoPopupVisible) {
                 if (event.key === Qt.Key_Left) {
                     highlightDirection = 4;
+                    adjustCurrentPoint(-10, 0);
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Right) {
                     highlightDirection = 2;
+                    adjustCurrentPoint(10, 0);
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Up) {
                     highlightDirection = 1;
+                    adjustCurrentPoint(0, -10);
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Down) {
                     highlightDirection = 3;
+                    adjustCurrentPoint(0, 10);
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Escape) {
                     infoPopupVisible = false;
@@ -287,6 +381,7 @@ FocusScope {
                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                     infoPopupVisible = true;
                     highlightDirection = 0;
+                    updatePopupValues();
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Escape) {
                     confirmDialogVisible = true;
@@ -323,27 +418,30 @@ FocusScope {
                             height: 50
                             property int rowIdx: Math.floor(index / 2)
                             property int colIdx: index % 2
+                            property bool isInvalidCell: colIdx === 0 && rowIdx < 3
                             property bool isSelected: selectedZone === 2 && selectedRow === rowIdx && selectedCol === colIdx
-                            color: isSelected ? "#ffaa00" : "#2a2a2a"
-                            border.color: isSelected ? "#ffffff" : "#666666"
+                            color: isSelected ? "#ffaa00" : isInvalidCell ? "#111111" : "#2a2a2a"
+                            border.color: isSelected ? "#ffffff" : isInvalidCell ? "#444444" : "#666666"
                             border.width: isSelected ? 2 : 1
 
                             Text {
                                 anchors.centerIn: parent
-                                text: dropzoneLeftCalib[rowIdx] && dropzoneLeftCalib[rowIdx][colIdx] ? dropzoneLeftCalib[rowIdx][colIdx].x.toFixed(0) + "\n" + dropzoneLeftCalib[rowIdx][colIdx].y.toFixed(0) : "?"
+                                text: "C" + colIdx + ",R" + rowIdx
                                 color: "#ffffff"
-                                font.pixelSize: 8
+                                font.pixelSize: 10
+                                font.bold: true
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
-                                wrapMode: Text.WordWrap
                             }
 
                             MouseArea {
                                 anchors.fill: parent
                                 onClicked: {
-                                    selectedZone = 2;
-                                    selectedRow = rowIdx;
-                                    selectedCol = colIdx;
+                                    if (!isInvalidCell) {
+                                        selectedZone = 2;
+                                        selectedRow = rowIdx;
+                                        selectedCol = colIdx;
+                                    }
                                 }
                             }
                         }
@@ -385,9 +483,10 @@ FocusScope {
 
                             Text {
                                 anchors.centerIn: parent
-                                text: chessboardCalib[rowIdx] && chessboardCalib[rowIdx][colIdx] ? chessboardCalib[rowIdx][colIdx].x.toFixed(0) + "," + chessboardCalib[rowIdx][colIdx].y.toFixed(0) : "?"
+                                text: "C" + colIdx + ",R" + rowIdx
                                 color: isBlack ? "#eeeeee" : "#111111"
-                                font.pixelSize: 8
+                                font.pixelSize: 10
+                                font.bold: true
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
@@ -429,12 +528,12 @@ FocusScope {
 
                             Text {
                                 anchors.centerIn: parent
-                                text: dropzoneRightCalib[rowIdx] && dropzoneRightCalib[rowIdx][colIdx] ? dropzoneRightCalib[rowIdx][colIdx].x.toFixed(0) + "\n" + dropzoneRightCalib[rowIdx][colIdx].y.toFixed(0) : "?"
+                                text: "C" + colIdx + ",R" + rowIdx
                                 color: "#ffffff"
-                                font.pixelSize: 8
+                                font.pixelSize: 10
+                                font.bold: true
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
-                                wrapMode: Text.WordWrap
                             }
 
                             MouseArea {
@@ -490,12 +589,12 @@ FocusScope {
                     }
 
                     Text {
-                        text: "X: " + getCurrentPoint().x.toFixed(1) + " mm"
+                        text: "X: " + popupX.toFixed(1) + " mm"
                         color: "#dddddd"
                         font.pixelSize: 14
                     }
                     Text {
-                        text: "Y: " + getCurrentPoint().y.toFixed(1) + " mm"
+                        text: "Y: " + popupY.toFixed(1) + " mm"
                         color: "#dddddd"
                         font.pixelSize: 14
                     }
@@ -504,7 +603,7 @@ FocusScope {
                         id: indicatorCanvas
                         width: parent.width
                         height: 180
-                        anchors.horizontalCenter: parent.horizontalCenter
+                        Layout.alignment: Qt.AlignHCenter
                         onPaint: {
                             var ctx = getContext("2d");
                             drawPopupIndicator(ctx, width, height);
@@ -552,7 +651,7 @@ FocusScope {
                     }
 
                     RowLayout {
-                        anchors.horizontalCenter: parent.horizontalCenter
+                        Layout.alignment: Qt.AlignHCenter
                         spacing: 24
 
                         Rectangle {
