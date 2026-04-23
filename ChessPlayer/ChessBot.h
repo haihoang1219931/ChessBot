@@ -18,6 +18,13 @@ class ChessController;
 #ifdef IMAGE_PROCESS_MOVE
 class ChessImageProcessing;
 #endif
+
+typedef enum{
+    INIT_COMMUNICATION,
+    CALIB_UPLOAD_TO_ROBOT,
+    CALIB_REQUEST_FROM_ROBOT,
+} INIT_DIRECTION;
+
 typedef enum{
     STATE_INIT,
     STATE_PENDING,
@@ -106,8 +113,8 @@ Q_SIGNALS:
     void sideChanged(int side);
     void levelTypeChanged(int type);
     void levelScoreChanged(int score);
-    void calibrationUploadProgress(int progress);
-    void calibrationUploadComplete(bool success);
+    void calibrationUploadProgress(int direction, int progress);
+    void calibrationUploadComplete(int direction, bool success);
 
 private:
     void playLoop();
@@ -125,7 +132,7 @@ private:
     void initRobot();
     bool detectArduinoPort(int baudRate = 38400);
     bool getArduinoVersion();
-    QPoint readCalibrationPoint(const QString &command);
+    bool readCalibrationPoint(const QString &command, QPoint& point);
     bool sendCalibrationCells();
     void abortCalibrationUpload();
     bool waitForCalibrationProgress();
@@ -157,6 +164,8 @@ private:
     QVector<QVector<QPoint>> m_dropzoneLeftCalib;  // 8x2 left
     int m_calibRow;
     int m_calibCol;
+    int m_calibCellCount;
+    bool m_validCalibFileFound;
 };
 
 #endif // CHESSBOT_H

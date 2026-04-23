@@ -1,5 +1,7 @@
 import QtQuick 2.0
 import QtMultimedia 5.12
+import QtQml 2.0
+
 FocusScope {
     id: root
     width: 800; height: 480
@@ -29,7 +31,10 @@ FocusScope {
         var corners = backend.chessboardCorners();
         if(corners.length === 4) {
             points = corners;
+        } else {
+            backend.updateCorners(points);
         }
+
         canvas.requestPaint();
     }
     Canvas {

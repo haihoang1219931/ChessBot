@@ -18,7 +18,8 @@
 
 
 ChessBot::ChessBot(QThread *parent) :
-    QThread(parent)
+    QThread(parent),
+    m_validCalibFileFound(false)
 {
     m_mutex = new QMutex;
     m_pauseCond = new QWaitCondition;
@@ -42,7 +43,7 @@ ChessBot::ChessBot(QThread *parent) :
         }
     }
 #endif
-    loadCalibrationData();
+    m_validCalibFileFound = loadCalibrationData();
 }
 
 ChessBot::~ChessBot()
@@ -86,15 +87,14 @@ void ChessBot::updateCorners(QVariantList corners)
 {
     m_chessboardConners.clear();
     for (const QVariant &val : corners) {
-        m_chessboardConners.append(val.toPoint());
+        QVariantMap map = val.toMap();
+        m_chessboardConners.append(QPoint(map["x"].toInt(),map["y"].toInt()));
     }
     saveCalibrationData();
 }
 
 void ChessBot::updateCalibrationData(int type, int row, int col, int x, int y)
 {
-    printf("updateCalibrationData: type[%d] r[%d] c[%d] x[%d] y[%d]\r\n",
-           type,row,col,x,y);
     if(type == 0) {
         m_chessboardCalib[row][col].setX(x);
         m_chessboardCalib[row][col].setY(y);
@@ -346,13 +346,12 @@ uint8_t ChessBot::testRobot()
     return STATE_DONE;
 }
 
-QPoint ChessBot::readCalibrationPoint(const QString &command)
+bool ChessBot::readCalibrationPoint(const QString &command,QPoint& point)
 {
-    QPoint point(-1, -1);
-    
+
     if (!robotController->isOpen()) {
         qDebug("Serial port is not open.");
-        return point;
+        return false;
     }
     
     // Send calibration request command
@@ -370,7 +369,7 @@ QPoint ChessBot::readCalibrationPoint(const QString &command)
         expectedPrefix = "DB";
     } else {
         qDebug("Unknown command type: %s", command.toStdString().c_str());
-        return point;
+        return false;
     }
     
     // Wait for response and handle multiple responses
@@ -410,7 +409,7 @@ QPoint ChessBot::readCalibrationPoint(const QString &command)
                     point = QPoint(x, y);
                     qDebug("Valid calibration point received: (%d, %d)", x, y);
                     QThread::msleep(100); // Small delay between requests
-                    return point;
+                    return true;
                 }
             }
             
@@ -423,14 +422,14 @@ QPoint ChessBot::readCalibrationPoint(const QString &command)
     }
     
     QThread::msleep(100); // Small delay between requests
-    return point;
+    return false;
 }
 
 bool ChessBot::sendCalibrationCells()
 {
     if (!robotController->isOpen()) {
         qDebug("Serial port is not open.");
-         Q_EMIT calibrationUploadComplete(false);
+         Q_EMIT calibrationUploadComplete(CALIB_UPLOAD_TO_ROBOT, false);
         return false;
     }
 
@@ -443,7 +442,7 @@ bool ChessBot::sendCalibrationCells()
     // Wait for CALIB_START_ACK response within 2 seconds
     if (!robotController->waitForReadyRead(2000)) {
         qDebug("No CALIB_START_ACK response received within timeout");
-        Q_EMIT calibrationUploadComplete(false);
+        Q_EMIT calibrationUploadComplete(CALIB_UPLOAD_TO_ROBOT, false);
         return false;
     }
 
@@ -453,7 +452,7 @@ bool ChessBot::sendCalibrationCells()
 
     if (!startResponseStr.contains("CALIB_START_ACK")) {
         qDebug("Invalid CALIB_START response: %s", startResponseStr.toStdString().c_str());
-        Q_EMIT calibrationUploadComplete(false);
+        Q_EMIT calibrationUploadComplete(CALIB_UPLOAD_TO_ROBOT, false);
         return false;
     }
 
@@ -471,7 +470,7 @@ bool ChessBot::sendCalibrationCells()
             // Wait for progress response
             if (!waitForCalibrationProgress()) {
                 qDebug("Failed to receive calibration progress response for chessboard cell [%d,%d]", r, c);
-                Q_EMIT calibrationUploadComplete(false);
+                Q_EMIT calibrationUploadComplete(CALIB_UPLOAD_TO_ROBOT, false);
                 return false;
             }
             
@@ -492,7 +491,7 @@ bool ChessBot::sendCalibrationCells()
             // Wait for progress response
             if (!waitForCalibrationProgress()) {
                 qDebug("Failed to receive calibration progress response for right dropzone cell [%d,%d]", r, c);
-                Q_EMIT calibrationUploadComplete(false);
+                Q_EMIT calibrationUploadComplete(CALIB_UPLOAD_TO_ROBOT, false);
                 return false;
             }
             
@@ -513,7 +512,7 @@ bool ChessBot::sendCalibrationCells()
             // Wait for progress response
             if (!waitForCalibrationProgress()) {
                 qDebug("Failed to receive calibration progress response for left dropzone cell [%d,%d]", r, c);
-                Q_EMIT calibrationUploadComplete(false);
+                Q_EMIT calibrationUploadComplete(CALIB_UPLOAD_TO_ROBOT, false);
                 return false;
             }
             
@@ -534,20 +533,20 @@ bool ChessBot::sendCalibrationCells()
 
         if (responseStr.contains("CALIB_OK")) {
             qDebug("RobotController accepted all calibration data");
-             Q_EMIT calibrationUploadComplete(true);
+             Q_EMIT calibrationUploadComplete(CALIB_UPLOAD_TO_ROBOT, true);
             return true;
         } else if (responseStr.contains("CALIB_ERROR")) {
             qDebug("RobotController rejected calibration data");
-             Q_EMIT calibrationUploadComplete(false);
+             Q_EMIT calibrationUploadComplete(CALIB_UPLOAD_TO_ROBOT, false);
             return false;
         } else {
             qDebug("Unexpected response from RobotController");
-             Q_EMIT calibrationUploadComplete(false);
+             Q_EMIT calibrationUploadComplete(CALIB_UPLOAD_TO_ROBOT, false);
             return false;
         }
     } else {
         qDebug("No response from RobotController to calibration end");
-         Q_EMIT calibrationUploadComplete(false);
+         Q_EMIT calibrationUploadComplete(CALIB_UPLOAD_TO_ROBOT, false);
         return false;
     }
 }
@@ -562,7 +561,7 @@ void ChessBot::abortCalibrationUpload()
     qDebug("Aborting calibration upload...");
     robotController->write("CALIB_ABORT\n");
     robotController->waitForBytesWritten(200);
-     Q_EMIT calibrationUploadComplete(false);
+     Q_EMIT calibrationUploadComplete(CALIB_UPLOAD_TO_ROBOT, false);
 }
 
 bool ChessBot::waitForCalibrationProgress()
@@ -574,7 +573,7 @@ bool ChessBot::waitForCalibrationProgress()
 
     qDebug("Collecting calibration progress responses for 2 seconds...");
     while (timer.elapsed() < 500) {
-        if (robotController->waitForReadyRead(100)) {
+        if (robotController->waitForReadyRead(200)) {
             QByteArray chunk = robotController->readAll();
             allResponses.append(chunk);
             qDebug("Received progress chunk: %s", chunk.constData());
@@ -615,7 +614,7 @@ bool ChessBot::waitForCalibrationProgress()
                 qDebug("Calibration progress: R%d/%d L%d/%d C%d/%d = %d%%",
                        rightReceived, rightTotal, leftReceived, leftTotal,
                        chessReceived, chessTotal, progressPercent);
-                Q_EMIT calibrationUploadProgress(progressPercent);
+                Q_EMIT calibrationUploadProgress(CALIB_UPLOAD_TO_ROBOT, progressPercent);
                 return true;
             }
         }
@@ -634,7 +633,7 @@ void ChessBot::initRobot()
             m_stateInit = INIT_GET_VERSION;
         } else {
             qDebug("Failed to detect Arduino port. Initialization aborted.");
-            Q_EMIT calibrationUploadComplete(false);
+            Q_EMIT calibrationUploadComplete(INIT_COMMUNICATION, false);
             m_state = STATE_EXIT;
             togglePause(true);
         }
@@ -647,7 +646,7 @@ void ChessBot::initRobot()
             m_stateInit = INIT_SEND_CALIBRATION;
         } else {
             qDebug("Failed to get Arduino version. Initialization aborted.");
-            Q_EMIT calibrationUploadComplete(false);
+            Q_EMIT calibrationUploadComplete(INIT_COMMUNICATION, false);
             m_state = STATE_EXIT;
             togglePause(true);
         }
@@ -670,6 +669,7 @@ void ChessBot::initRobot()
             qDebug("Calibration data is invalid. Requesting calibration data from RobotController...");
             m_calibRow = 0;
             m_calibCol = 0;
+            m_calibCellCount = 0;
             m_stateInit = INIT_REQUEST_CALIB_CHESSBOARD;
         }
     }
@@ -679,8 +679,15 @@ void ChessBot::initRobot()
         if (m_calibRow < 8) {
             if (m_calibCol < 8) {
                 QString command = QString::asprintf("lccbr%dc%d", m_calibRow, m_calibCol);
-                QPoint point = readCalibrationPoint(command);
+                QPoint point;
+                if(!readCalibrationPoint(command,point)){
+                    Q_EMIT calibrationUploadComplete(CALIB_REQUEST_FROM_ROBOT,false);
+                    m_stateInit = INIT_DONE;
+                    break;
+                }
                 m_chessboardCalib[m_calibRow][m_calibCol] = point;
+                m_calibCellCount ++;
+                calibrationUploadProgress(CALIB_REQUEST_FROM_ROBOT,m_calibCellCount*100/98);
                 m_calibCol++;
             } else {
                 m_calibCol = 0;
@@ -699,8 +706,15 @@ void ChessBot::initRobot()
         if (m_calibRow < 8) {
             if (m_calibCol < 2) {
                 QString command = QString::asprintf("lcdpr%dc%d", m_calibRow, m_calibCol);
-                QPoint point = readCalibrationPoint(command);
+                QPoint point;
+                if(!readCalibrationPoint(command,point)){
+                    Q_EMIT calibrationUploadComplete(CALIB_REQUEST_FROM_ROBOT,false);
+                    m_stateInit = INIT_DONE;
+                    break;
+                }
                 m_dropzoneRightCalib[m_calibRow][m_calibCol] = point;
+                m_calibCellCount ++;
+                calibrationUploadProgress(CALIB_REQUEST_FROM_ROBOT,m_calibCellCount*100/98);
                 m_calibCol++;
             } else {
                 m_calibCol = 0;
@@ -719,16 +733,30 @@ void ChessBot::initRobot()
         if (m_calibRow < 8) {
             if (m_calibCol < 2) {
                 QString command = QString::asprintf("lcdbr%dc%d", m_calibRow, m_calibCol);
-                QPoint point = readCalibrationPoint(command);
+                QPoint point;
+                if(!readCalibrationPoint(command,point)){
+                    Q_EMIT calibrationUploadComplete(CALIB_REQUEST_FROM_ROBOT,false);
+                    m_stateInit = INIT_DONE;
+                    break;
+                }
                 m_dropzoneLeftCalib[m_calibRow][m_calibCol] = point;
+                m_calibCellCount ++;
+                calibrationUploadProgress(CALIB_REQUEST_FROM_ROBOT,m_calibCellCount*100/98);
                 m_calibCol++;
             } else {
                 m_calibCol = 0;
                 m_calibRow++;
             }
         } else {
-            qDebug("Left dropzone calibration complete.");
-            qDebug("All calibration data collected successfully.");
+            if(m_calibCellCount == 64+16+16) {
+                Q_EMIT calibrationUploadComplete(CALIB_REQUEST_FROM_ROBOT,true);
+                qDebug("Left dropzone calibration complete.");
+                qDebug("All calibration data collected successfully.");
+                saveCalibrationData();
+            } else {
+                Q_EMIT calibrationUploadComplete(CALIB_REQUEST_FROM_ROBOT,false);
+            }
+
             m_stateInit = INIT_DONE;
         }
     }
@@ -942,6 +970,7 @@ QString ChessBot::getCalibrationJson() const
 }
 
 bool ChessBot::isCalibDataLoaded() {
+    if(!m_validCalibFileFound) return false;
     // 1. Check Chessboard (8 rows, 8 columns)
     if (m_chessboardCalib.size() != 8) return false;
     for (const auto& row : m_chessboardCalib) {

@@ -10,6 +10,8 @@ Item {
 
     signal overlayHidden()
 
+    property int direction: 0
+    property var titleMap: ["Init communication","Upload calib to robot","Request calib from robot"]
     property int progress: 0
     property bool finished: false
     property bool success: false
@@ -51,7 +53,8 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             Text {
                 id: statusText
-                text: root.finished ? (root.success ? "Upload complete" : "Upload failed") : "Upload calib config..."
+                text: root.titleMap[root.direction] +
+                      (root.finished ? (root.success ? " complete" : " failed") : "...")
                 color: "white"
                 horizontalAlignment: Text.AlignHCenter
                 font.pixelSize: 14
@@ -93,15 +96,17 @@ Item {
 
     Connections {
         target: backend
-        onCalibrationUploadProgress: {
+        onCalibrationUploadProgress: function(direction, progress){
             root.show()
             root.progress = progress
+            root.direction = direction
         }
-        onCalibrationUploadComplete: function(success) {
+        onCalibrationUploadComplete: function(direction, success) {
             root.finished = true
             root.success = success
             if (success) root.progress = 100
             hideTimer.start()
+            root.direction = direction
         }
     }
 
