@@ -16,6 +16,18 @@ FocusScope {
     property int selectedCol: 0
     property int selectedZone: 0  // 0: chessboard, 1: dropzone right, 2: dropzone left
     
+    // Excluded cells configuration - developers can modify these arrays
+    // Each object contains {actualRow, actualCol} coordinates
+    // If array is empty, all cells are selectable
+    property var excludedLeftDropzoneCells: [
+        
+    ]
+    property var excludedRightDropzoneCells: [
+        {actualRow: 5, actualCol: 1},
+        {actualRow: 6, actualCol: 1},
+        {actualRow: 7, actualCol: 1}
+    ]
+    
     signal exitPressed()
     focus: true
     
@@ -56,7 +68,7 @@ FocusScope {
         if (data !== "") {
             var jsonData = JSON.parse(data);
             
-            // Load chessboard calibration (8x8)
+            // Load chessboard calibration (8x8 matrix)
             if (jsonData.chessboard) {
                 chessboardCalib = [];
                 for (var i = 0; i < 8; i++) {
@@ -65,13 +77,22 @@ FocusScope {
                         chessboardCalib[i][j] = {x: 0, y: 0};
                     }
                 }
-                for (var k = 0; k < jsonData.chessboard.length; k++) {
-                    var point = jsonData.chessboard[k];
-                    chessboardCalib[point.row][point.col] = {x: point.x, y: point.y};
+                if (Array.isArray(jsonData.chessboard[0])) {
+                    for (var r = 0; r < Math.min(8, jsonData.chessboard.length); r++) {
+                        for (var c = 0; c < Math.min(8, jsonData.chessboard[r].length); c++) {
+                            var point = jsonData.chessboard[r][c];
+                            chessboardCalib[r][c] = {x: point.x || 0, y: point.y || 0};
+                        }
+                    }
+                } else {
+                    for (var k = 0; k < jsonData.chessboard.length; k++) {
+                        var point = jsonData.chessboard[k];
+                        chessboardCalib[point.row][point.col] = {x: point.x, y: point.y};
+                    }
                 }
             }
             
-            // Load right dropzone calibration (8x2)
+            // Load right dropzone calibration (8x2 matrix)
             if (jsonData.dropzone_right) {
                 dropzoneRightCalib = [];
                 for (var i = 0; i < 8; i++) {
@@ -80,13 +101,22 @@ FocusScope {
                         dropzoneRightCalib[i][j] = {x: 0, y: 0};
                     }
                 }
-                for (var k = 0; k < jsonData.dropzone_right.length; k++) {
-                    var point = jsonData.dropzone_right[k];
-                    dropzoneRightCalib[point.row][point.col] = {x: point.x, y: point.y};
+                if (Array.isArray(jsonData.dropzone_right[0])) {
+                    for (var r = 0; r < Math.min(8, jsonData.dropzone_right.length); r++) {
+                        for (var c = 0; c < Math.min(2, jsonData.dropzone_right[r].length); c++) {
+                            var point = jsonData.dropzone_right[r][c];
+                            dropzoneRightCalib[r][c] = {x: point.x || 0, y: point.y || 0};
+                        }
+                    }
+                } else {
+                    for (var k = 0; k < jsonData.dropzone_right.length; k++) {
+                        var point = jsonData.dropzone_right[k];
+                        dropzoneRightCalib[point.row][point.col] = {x: point.x, y: point.y};
+                    }
                 }
             }
             
-            // Load left dropzone calibration (8x2)
+            // Load left dropzone calibration (8x2 matrix)
             if (jsonData.dropzone_left) {
                 dropzoneLeftCalib = [];
                 for (var i = 0; i < 8; i++) {
@@ -95,35 +125,60 @@ FocusScope {
                         dropzoneLeftCalib[i][j] = {x: 0, y: 0};
                     }
                 }
-                for (var k = 0; k < jsonData.dropzone_left.length; k++) {
-                    var point = jsonData.dropzone_left[k];
-                    dropzoneLeftCalib[point.row][point.col] = {x: point.x, y: point.y};
+                if (Array.isArray(jsonData.dropzone_left[0])) {
+                    for (var r = 0; r < Math.min(8, jsonData.dropzone_left.length); r++) {
+                        for (var c = 0; c < Math.min(2, jsonData.dropzone_left[r].length); c++) {
+                            var point = jsonData.dropzone_left[r][c];
+                            dropzoneLeftCalib[r][c] = {x: point.x || 0, y: point.y || 0};
+                        }
+                    }
+                } else {
+                    for (var k = 0; k < jsonData.dropzone_left.length; k++) {
+                        var point = jsonData.dropzone_left[k];
+                        dropzoneLeftCalib[point.row][point.col] = {x: point.x, y: point.y};
+                    }
                 }
             }
         }
     }
     
+    function getReversedRow(row) {
+        return 7 - row;
+    }
+
+    function getReversedCol(zone, col) {
+        if (zone === 0) { // chessboard
+            return 7 - col;
+        } else { // dropzones
+            return 1 - col;
+        }
+    }
+
     function getCurrentPoint() {
+        var actualRow = getReversedRow(selectedRow);
+        var actualCol = getReversedCol(selectedZone, selectedCol);
         if (selectedZone === 0) {
-            return chessboardCalib[selectedRow] && chessboardCalib[selectedRow][selectedCol] ? chessboardCalib[selectedRow][selectedCol] : {x: 0, y: 0};
+            return chessboardCalib[actualRow] && chessboardCalib[actualRow][actualCol] ? chessboardCalib[actualRow][actualCol] : {x: 0, y: 0};
         } else if (selectedZone === 1) {
-            return dropzoneRightCalib[selectedRow] && dropzoneRightCalib[selectedRow][selectedCol] ? dropzoneRightCalib[selectedRow][selectedCol] : {x: 0, y: 0};
+            return dropzoneRightCalib[actualRow] && dropzoneRightCalib[actualRow][actualCol] ? dropzoneRightCalib[actualRow][actualCol] : {x: 0, y: 0};
         } else {
-            return dropzoneLeftCalib[selectedRow] && dropzoneLeftCalib[selectedRow][selectedCol] ? dropzoneLeftCalib[selectedRow][selectedCol] : {x: 0, y: 0};
+            return dropzoneLeftCalib[actualRow] && dropzoneLeftCalib[actualRow][actualCol] ? dropzoneLeftCalib[actualRow][actualCol] : {x: 0, y: 0};
         }
     }
 
     function adjustCurrentPoint(dx, dy) {
+        var actualRow = getReversedRow(selectedRow);
+        var actualCol = getReversedCol(selectedZone, selectedCol);
         var point;
         if (selectedZone === 0) {
-            if (!chessboardCalib[selectedRow] || !chessboardCalib[selectedRow][selectedCol]) return;
-            point = chessboardCalib[selectedRow][selectedCol];
+            if (!chessboardCalib[actualRow] || !chessboardCalib[actualRow][actualCol]) return;
+            point = chessboardCalib[actualRow][actualCol];
         } else if (selectedZone === 1) {
-            if (!dropzoneRightCalib[selectedRow] || !dropzoneRightCalib[selectedRow][selectedCol]) return;
-            point = dropzoneRightCalib[selectedRow][selectedCol];
+            if (!dropzoneRightCalib[actualRow] || !dropzoneRightCalib[actualRow][actualCol]) return;
+            point = dropzoneRightCalib[actualRow][actualCol];
         } else {
-            if (!dropzoneLeftCalib[selectedRow] || !dropzoneLeftCalib[selectedRow][selectedCol]) return;
-            point = dropzoneLeftCalib[selectedRow][selectedCol];
+            if (!dropzoneLeftCalib[actualRow] || !dropzoneLeftCalib[actualRow][actualCol]) return;
+            point = dropzoneLeftCalib[actualRow][actualCol];
         }
         point.x += dx;
         point.y += dy;
@@ -131,15 +186,35 @@ FocusScope {
         popupY = point.y;
     }
 
+    function isCellExcluded(excludedCellsArray, actualRow, actualCol) {
+        if (!excludedCellsArray || excludedCellsArray.length === 0) {
+            return false; // If array is empty, no cells are excluded
+        }
+        for (var i = 0; i < excludedCellsArray.length; i++) {
+            if (excludedCellsArray[i].actualRow === actualRow && excludedCellsArray[i].actualCol === actualCol) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     function isValidDropzoneLeft(row, col) {
-        return row >= 0 && row < 8 && col >= 0 && col < 2 && !(col === 0 && row <= 2);
+        var actualRow = getReversedRow(row);
+        var actualCol = getReversedCol(2, col);
+        return actualRow >= 0 && actualRow < 8 && actualCol >= 0 && actualCol < 2 && !isCellExcluded(excludedLeftDropzoneCells, actualRow, actualCol);
+    }
+
+    function isValidDropzoneRight(row, col) {
+        var actualRow = getReversedRow(row);
+        var actualCol = getReversedCol(1, col);
+        return actualRow >= 0 && actualRow < 8 && actualCol >= 0 && actualCol < 2 && !isCellExcluded(excludedRightDropzoneCells, actualRow, actualCol);
     }
 
     function isValidSelection(zone, row, col) {
         if (zone === 0) {
             return row >= 0 && row < 8 && col >= 0 && col < 8;
         } else if (zone === 1) {
-            return row >= 0 && row < 8 && col >= 0 && col < 2;
+            return isValidDropzoneRight(row, col);
         } else if (zone === 2) {
             return isValidDropzoneLeft(row, col);
         }
@@ -153,6 +228,22 @@ FocusScope {
         } else if (selectedZone === 1) {
             selectedRow = Math.max(0, Math.min(selectedRow, 7));
             selectedCol = Math.max(0, Math.min(selectedCol, 1));
+            if (!isValidDropzoneRight(selectedRow, selectedCol)) {
+                // Try to find a valid position in the right dropzone
+                if (selectedCol === 0 && isValidDropzoneRight(selectedRow, 1)) {
+                    selectedCol = 1;
+                } else if (selectedCol === 1 && isValidDropzoneRight(selectedRow, 0)) {
+                    selectedCol = 0;
+                } else {
+                    // If no valid position in current row, move to a valid row
+                    for (var r = 0; r < 8; r++) {
+                        if (isValidDropzoneRight(r, selectedCol)) {
+                            selectedRow = r;
+                            break;
+                        }
+                    }
+                }
+            }
         } else {
             selectedRow = Math.max(0, Math.min(selectedRow, 7));
             selectedCol = Math.max(0, Math.min(selectedCol, 1));
@@ -181,27 +272,16 @@ FocusScope {
         if (selectedZone === 0) {
             if (key === Qt.Key_Left) {
                 if (selectedCol > 0) selectedCol--;
-                else { selectedZone = 2; selectedCol = 1; }
+                else { selectedZone = 1; selectedCol = 1; }
             } else if (key === Qt.Key_Right) {
                 if (selectedCol < 7) selectedCol++;
-                else { selectedZone = 1; selectedCol = 0; }
+                else { selectedZone = 2; selectedCol = 0; }
             } else if (key === Qt.Key_Up) {
                 if (selectedRow > 0) selectedRow--;
             } else if (key === Qt.Key_Down) {
                 if (selectedRow < 7) selectedRow++;
             }
         } else if (selectedZone === 1) {
-            if (key === Qt.Key_Left) {
-                if (selectedCol > 0) selectedCol--;
-                else { selectedZone = 0; selectedCol = 7; }
-            } else if (key === Qt.Key_Right) {
-                if (selectedCol < 1) selectedCol++;
-            } else if (key === Qt.Key_Up) {
-                if (selectedRow > 0) selectedRow--;
-            } else if (key === Qt.Key_Down) {
-                if (selectedRow < 7) selectedRow++;
-            }
-        } else if (selectedZone === 2) {
             if (key === Qt.Key_Right) {
                 if (selectedCol < 1) selectedCol++;
                 else { selectedZone = 0; selectedCol = 0; }
@@ -209,8 +289,29 @@ FocusScope {
                 if (selectedCol > 0) {
                     var targetRow = selectedRow;
                     var targetCol = selectedCol - 1;
+                    if (isValidDropzoneRight(targetRow, targetCol)) selectedCol--;
+                }
+            } else if (key === Qt.Key_Up) {
+                if (selectedRow > 0) {
+                    var targetRow = selectedRow - 1;
+                    if (isValidDropzoneRight(targetRow, selectedCol)) selectedRow--;
+                }
+            } else if (key === Qt.Key_Down) {
+                if (selectedRow < 7) {
+                    var targetRow = selectedRow + 1;
+                    if (isValidDropzoneRight(targetRow, selectedCol)) selectedRow++;
+                }
+            }
+        } else if (selectedZone === 2) {
+            if (key === Qt.Key_Left) {
+                if (selectedCol > 0) {
+                    var targetRow = selectedRow;
+                    var targetCol = selectedCol - 1;
                     if (isValidDropzoneLeft(targetRow, targetCol)) selectedCol--;
                 }
+                else { selectedZone = 0; selectedCol = 7; }
+            } else if (key === Qt.Key_Right) {
+                if (selectedCol < 1) selectedCol++;
             } else if (key === Qt.Key_Up) {
                 if (selectedRow > 0) {
                     var targetRow = selectedRow - 1;
@@ -240,29 +341,35 @@ FocusScope {
 
         payload.chessboard = [];
         for (var r = 0; r < 8; r++) {
+            var row = [];
             for (var c = 0; c < 8; c++) {
                 var p = chessboardCalib[r][c];
-                payload.chessboard.push({row: r, col: c, x: p.x, y: p.y});
+                row.push({x: p.x, y: p.y});
             }
+            payload.chessboard.push(row);
         }
 
         payload.dropzone_right = [];
         for (var r = 0; r < 8; r++) {
+            var rightRow = [];
             for (var c = 0; c < 2; c++) {
                 var p = dropzoneRightCalib[r][c];
-                payload.dropzone_right.push({row: r, col: c, x: p.x, y: p.y});
+                rightRow.push({x: p.x, y: p.y});
             }
+            payload.dropzone_right.push(rightRow);
         }
 
         payload.dropzone_left = [];
         for (var r = 0; r < 8; r++) {
+            var leftRow = [];
             for (var c = 0; c < 2; c++) {
                 var p = dropzoneLeftCalib[r][c];
-                payload.dropzone_left.push({row: r, col: c, x: p.x, y: p.y});
+                leftRow.push({x: p.x, y: p.y});
             }
+            payload.dropzone_left.push(leftRow);
         }
 
-        fileio.write(calibrationFile, JSON.stringify(payload));
+        fileio.write(calibrationFile, JSON.stringify(payload, null, 4) + "\n");
     }
 
     function drawBrackets(ctx, w, h) {
@@ -403,7 +510,7 @@ FocusScope {
             anchors.margins: 40
             spacing: 30
 
-            // --- LEFT COLUMN: DROP ZONE LEFT ---
+            // --- LEFT COLUMN: DROP ZONE RIGHT ---
             Item {
                 width: 100; height: 400
                 GridLayout {
@@ -418,15 +525,15 @@ FocusScope {
                             height: 50
                             property int rowIdx: Math.floor(index / 2)
                             property int colIdx: index % 2
-                            property bool isInvalidCell: colIdx === 0 && rowIdx < 3
-                            property bool isSelected: selectedZone === 2 && selectedRow === rowIdx && selectedCol === colIdx
-                            color: isSelected ? "#ffaa00" : isInvalidCell ? "#111111" : "#2a2a2a"
+                            property bool isInvalidCell: isCellExcluded(excludedRightDropzoneCells, getReversedRow(rowIdx), getReversedCol(1, colIdx))
+                            property bool isSelected: selectedZone === 1 && selectedRow === rowIdx && selectedCol === colIdx
+                            color: isSelected ? "#ff00ff" : isInvalidCell ? "#111111" : "#2a2a2a"
                             border.color: isSelected ? "#ffffff" : isInvalidCell ? "#444444" : "#666666"
                             border.width: isSelected ? 2 : 1
 
                             Text {
                                 anchors.centerIn: parent
-                                text: "C" + colIdx + ",R" + rowIdx
+                                text: "C" + getReversedCol(1, colIdx) + ",R" + getReversedRow(rowIdx)
                                 color: "#ffffff"
                                 font.pixelSize: 10
                                 font.bold: true
@@ -438,7 +545,7 @@ FocusScope {
                                 anchors.fill: parent
                                 onClicked: {
                                     if (!isInvalidCell) {
-                                        selectedZone = 2;
+                                        selectedZone = 1;
                                         selectedRow = rowIdx;
                                         selectedCol = colIdx;
                                     }
@@ -483,7 +590,7 @@ FocusScope {
 
                             Text {
                                 anchors.centerIn: parent
-                                text: "C" + colIdx + ",R" + rowIdx
+                                text: "C" + getReversedCol(0, colIdx) + ",R" + getReversedRow(rowIdx)
                                 color: isBlack ? "#eeeeee" : "#111111"
                                 font.pixelSize: 10
                                 font.bold: true
@@ -504,7 +611,7 @@ FocusScope {
                 }
             }
 
-            // --- RIGHT COLUMN: THE 2x8 DROP ZONE ---
+            // --- RIGHT COLUMN: THE 2x8 DROP ZONE LEFT ---
             Item {
                 width: 100
                 height: 400
@@ -521,14 +628,15 @@ FocusScope {
                             height: 50
                             property int rowIdx: Math.floor(index / 2)
                             property int colIdx: index % 2
-                            property bool isSelected: selectedZone === 1 && selectedRow === rowIdx && selectedCol === colIdx
-                            color: isSelected ? "#ff00ff" : "#2a2a2a"
-                            border.color: isSelected ? "#ffffff" : "#666666"
+                            property bool isInvalidCell: isCellExcluded(excludedLeftDropzoneCells, getReversedRow(rowIdx), getReversedCol(2, colIdx))
+                            property bool isSelected: selectedZone === 2 && selectedRow === rowIdx && selectedCol === colIdx
+                            color: isSelected ? "#ffaa00" : isInvalidCell ? "#111111" : "#2a2a2a"
+                            border.color: isSelected ? "#ffffff" : isInvalidCell ? "#444444" : "#666666"
                             border.width: isSelected ? 2 : 1
 
                             Text {
                                 anchors.centerIn: parent
-                                text: "C" + colIdx + ",R" + rowIdx
+                                text: "C" + getReversedCol(2, colIdx) + ",R" + getReversedRow(rowIdx)
                                 color: "#ffffff"
                                 font.pixelSize: 10
                                 font.bold: true
@@ -539,9 +647,11 @@ FocusScope {
                             MouseArea {
                                 anchors.fill: parent
                                 onClicked: {
-                                    selectedZone = 1;
-                                    selectedRow = rowIdx;
-                                    selectedCol = colIdx;
+                                    if (!isInvalidCell) {
+                                        selectedZone = 2;
+                                        selectedRow = rowIdx;
+                                        selectedCol = colIdx;
+                                    }
                                 }
                             }
                         }
