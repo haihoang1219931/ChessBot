@@ -26,11 +26,11 @@ FocusScope {
     }
 
     Component.onCompleted: {
-        var data = fileio.read(filePath);
-        if (data !== "") {
-            points = JSON.parse(data);
-            canvas.requestPaint();
+        var corners = backend.chessboardCorners();
+        if(corners.length === 4) {
+            points = corners;
         }
+        canvas.requestPaint();
     }
     Canvas {
         id: canvas
@@ -71,8 +71,7 @@ FocusScope {
         Keys.onPressed: (event) => {
             var step = 2;
             if (event.key === Qt.Key_Space) {
-                fileio.write(filePath, JSON.stringify(points));
-                console.log("Points saved to " + filePath);
+                backend.updateCorners(points);
             }
             else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 isEditing = !isEditing; // Toggle mode

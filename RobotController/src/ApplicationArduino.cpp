@@ -495,7 +495,7 @@ volatile int countSample0 = 0;
 volatile int countSample1 = 0;
 ISR(TIMER0_COMPA_vect){
   countSample0++;
-  if(countSample0 >= 61) {
+  if(countSample0 >= 10) {
     countSample0 = 0;
     app.readCommand();
   }

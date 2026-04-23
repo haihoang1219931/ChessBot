@@ -23,6 +23,9 @@ ChessBot::ChessBot(QThread *parent) :
     m_mutex = new QMutex;
     m_pauseCond = new QWaitCondition;
     m_chessController = new ChessController();
+    m_chessboardCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(8));
+    m_dropzoneRightCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(2));
+    m_dropzoneLeftCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(2));
 #ifdef IMAGE_PROCESS_MOVE
     m_moveDetector = new ChessImageProcessing();
 #endif
@@ -39,6 +42,7 @@ ChessBot::ChessBot(QThread *parent) :
         }
     }
 #endif
+    loadCalibrationData();
 }
 
 ChessBot::~ChessBot()
@@ -78,6 +82,14 @@ void ChessBot::disconnectCamera()
 #endif
 }
 
+void ChessBot::updateCorners(QVariantList corners)
+{
+    m_chessboardConners.clear();
+    for (const QVariant &val : corners) {
+        m_chessboardConners.append(val.toPoint());
+    }
+    saveCalibrationData();
+}
 void ChessBot::run()
 {
     qDebug("Dowork");
@@ -397,6 +409,205 @@ QPoint ChessBot::readCalibrationPoint(const QString &command)
     return point;
 }
 
+bool ChessBot::sendCalibrationCells()
+{
+    if (!robotController->isOpen()) {
+        qDebug("Serial port is not open.");
+         Q_EMIT calibrationUploadComplete(false);
+        return false;
+    }
+
+    qDebug("Sending calibration data to RobotController...");
+
+    // Send start marker and wait for acknowledgment
+    robotController->write("CALIB_START\n");
+    robotController->waitForBytesWritten(200);
+
+    // Wait for CALIB_START_ACK response within 2 seconds
+    if (!robotController->waitForReadyRead(2000)) {
+        qDebug("No CALIB_START_ACK response received within timeout");
+        Q_EMIT calibrationUploadComplete(false);
+        return false;
+    }
+
+    QByteArray startResponse = robotController->readAll();
+    QString startResponseStr = QString::fromLatin1(startResponse).trimmed();
+    qDebug("CALIB_START response: %s", startResponseStr.toStdString().c_str());
+
+    if (!startResponseStr.contains("CALIB_START_ACK")) {
+        qDebug("Invalid CALIB_START response: %s", startResponseStr.toStdString().c_str());
+        Q_EMIT calibrationUploadComplete(false);
+        return false;
+    }
+
+    qDebug("CALIB_START acknowledged, proceeding with calibration upload...");
+
+    // Send chessboard calibration (8x8 = 64 cells)
+    for (int r = 0; r < 8; r++) {
+        for (int c = 0; c < 8; c++) {
+            QPoint p = m_chessboardCalib[r][c];
+            QString cmd = QString("SC r%1 c%2 x%3 y%4\n")
+                .arg(r).arg(c).arg(p.x()).arg(p.y());
+            robotController->write(cmd.toLatin1());
+            robotController->waitForBytesWritten(20);
+            
+            // Wait for progress response
+            if (!waitForCalibrationProgress()) {
+                qDebug("Failed to receive calibration progress response for chessboard cell [%d,%d]", r, c);
+                Q_EMIT calibrationUploadComplete(false);
+                return false;
+            }
+            
+            // Allow UI to process events and check for abort
+            QThread::msleep(10);
+        }
+    }
+
+    // Send right dropzone calibration (8x2 = 16 cells)
+    for (int r = 0; r < 8; r++) {
+        for (int c = 0; c < 2; c++) {
+            QPoint p = m_dropzoneRightCalib[r][c];
+            QString cmd = QString("SR r%1 c%2 x%3 y%4\n")
+                .arg(r).arg(c).arg(p.x()).arg(p.y());
+            robotController->write(cmd.toLatin1());
+            robotController->waitForBytesWritten(20);
+            
+            // Wait for progress response
+            if (!waitForCalibrationProgress()) {
+                qDebug("Failed to receive calibration progress response for right dropzone cell [%d,%d]", r, c);
+                Q_EMIT calibrationUploadComplete(false);
+                return false;
+            }
+            
+            // Allow UI to process events and check for abort
+            QThread::msleep(10);
+        }
+    }
+
+    // Send left dropzone calibration (8x2 = 16 cells)
+    for (int r = 0; r < 8; r++) {
+        for (int c = 0; c < 2; c++) {
+            QPoint p = m_dropzoneLeftCalib[r][c];
+            QString cmd = QString("SL r%1 c%2 x%3 y%4\n")
+                .arg(r).arg(c).arg(p.x()).arg(p.y());
+            robotController->write(cmd.toLatin1());
+            robotController->waitForBytesWritten(20);
+            
+            // Wait for progress response
+            if (!waitForCalibrationProgress()) {
+                qDebug("Failed to receive calibration progress response for left dropzone cell [%d,%d]", r, c);
+                Q_EMIT calibrationUploadComplete(false);
+                return false;
+            }
+            
+            // Allow UI to process events and check for abort
+            QThread::msleep(10);
+        }
+    }
+
+    // Send end marker
+    robotController->write("CALIB_END\n");
+    robotController->waitForBytesWritten(200);
+
+    // Wait for final response
+    if (robotController->waitForReadyRead(3000)) {
+        QByteArray response = robotController->readAll();
+        QString responseStr = QString::fromLatin1(response).trimmed();
+        qDebug("Calibration end response: %s", responseStr.toStdString().c_str());
+
+        if (responseStr.contains("CALIB_OK")) {
+            qDebug("RobotController accepted all calibration data");
+             Q_EMIT calibrationUploadComplete(true);
+            return true;
+        } else if (responseStr.contains("CALIB_ERROR")) {
+            qDebug("RobotController rejected calibration data");
+             Q_EMIT calibrationUploadComplete(false);
+            return false;
+        } else {
+            qDebug("Unexpected response from RobotController");
+             Q_EMIT calibrationUploadComplete(false);
+            return false;
+        }
+    } else {
+        qDebug("No response from RobotController to calibration end");
+         Q_EMIT calibrationUploadComplete(false);
+        return false;
+    }
+}
+
+void ChessBot::abortCalibrationUpload()
+{
+    if (!robotController->isOpen()) {
+        qDebug("Serial port is not open for abort.");
+        return;
+    }
+
+    qDebug("Aborting calibration upload...");
+    robotController->write("CALIB_ABORT\n");
+    robotController->waitForBytesWritten(200);
+     Q_EMIT calibrationUploadComplete(false);
+}
+
+bool ChessBot::waitForCalibrationProgress()
+{
+    // Collect all responses for 2 seconds
+    QByteArray allResponses;
+    QTime timer;
+    timer.start();
+
+    qDebug("Collecting calibration progress responses for 2 seconds...");
+    while (timer.elapsed() < 500) {
+        if (robotController->waitForReadyRead(100)) {
+            QByteArray chunk = robotController->readAll();
+            allResponses.append(chunk);
+            qDebug("Received progress chunk: %s", chunk.constData());
+        }
+    }
+
+    if (allResponses.isEmpty()) {
+        qDebug("No progress responses received within 2 seconds");
+        return false;
+    }
+
+    qDebug("Total progress responses: %s", allResponses.constData());
+
+    // Split responses into lines and find the valid progress response
+    QString responseStr = QString::fromLatin1(allResponses);
+    QStringList responses = responseStr.split(QRegExp("[\\r\\n]+"), QString::SkipEmptyParts);
+
+    // Parse the progress format: "R1/16 L12/16 C23/64"
+    for (const QString &response : responses) {
+        QString trimmedResponse = response.trimmed();
+        qDebug("Processing progress response: %s", trimmedResponse.toStdString().c_str());
+
+        QRegExp progressRegex("R(\\d+)/(\\d+) L(\\d+)/(\\d+) C(\\d+)/(\\d+)");
+        if (progressRegex.indexIn(trimmedResponse) != -1) {
+            int rightReceived = progressRegex.cap(1).toInt();
+            int rightTotal = progressRegex.cap(2).toInt();
+            int leftReceived = progressRegex.cap(3).toInt();
+            int leftTotal = progressRegex.cap(4).toInt();
+            int chessReceived = progressRegex.cap(5).toInt();
+            int chessTotal = progressRegex.cap(6).toInt();
+
+            // Calculate total progress
+            int totalReceived = rightReceived + leftReceived + chessReceived;
+            int totalExpected = rightTotal + leftTotal + chessTotal;
+
+            if (totalExpected > 0) {
+                int progressPercent = (totalReceived * 100) / totalExpected;
+                qDebug("Calibration progress: R%d/%d L%d/%d C%d/%d = %d%%",
+                       rightReceived, rightTotal, leftReceived, leftTotal,
+                       chessReceived, chessTotal, progressPercent);
+                Q_EMIT calibrationUploadProgress(progressPercent);
+                return true;
+            }
+        }
+    }
+
+    qDebug("No valid progress response found in collected data");
+    return false;
+}
+
 void ChessBot::initRobot()
 {
     switch (m_stateInit) {
@@ -415,7 +626,7 @@ void ChessBot::initRobot()
     case INIT_GET_VERSION: {
         qDebug("[Step 2] Getting Arduino version...");
         if (getArduinoVersion()) {
-            m_stateInit = INIT_CHECK_CALIB_FILE;
+            m_stateInit = INIT_SEND_CALIBRATION;
         } else {
             qDebug("Failed to get Arduino version. Initialization aborted.");
             m_state = STATE_EXIT;
@@ -424,21 +635,23 @@ void ChessBot::initRobot()
     }
         break;
         
-    case INIT_CHECK_CALIB_FILE: {
+    case INIT_SEND_CALIBRATION: {
         qDebug("[Step 3] Checking for calibration file...");
-        QFile calibFile("calib.json");
-        
-        if (!calibFile.exists()) {
-            qDebug("Calibration file not found. Requesting calibration data from Arduino...");
-            m_chessboardCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(8));
-            m_dropzoneRightCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(2));
-            m_dropzoneLeftCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(2));
+        if (isCalibDataLoaded()) {
+            qDebug("Calibration data valid found. Loading and uploading to RobotController...");
+            if (sendCalibrationCells()) {
+                qDebug("Calibration data uploaded to RobotController.");
+                m_stateInit = INIT_DONE;
+            } else {
+                qDebug("Failed to upload calibration data to RobotController. Initialization aborted.");
+                m_state = STATE_EXIT;
+                togglePause(true);
+            }
+        } else {
+            qDebug("Calibration data is invalid. Requesting calibration data from RobotController...");
             m_calibRow = 0;
             m_calibCol = 0;
             m_stateInit = INIT_REQUEST_CALIB_CHESSBOARD;
-        } else {
-            qDebug("Calibration file found. Skipping calibration request.");
-            m_stateInit = INIT_DONE;
         }
     }
         break;
@@ -504,8 +717,6 @@ void ChessBot::initRobot()
         
     case INIT_DONE: {
         qDebug("=== Robot Initialization Complete ===");
-        // Save calibration data to file
-        saveCalibrationData("trapezoid_data.json");
         m_state = STATE_CONFIGURE;
         togglePause(true);
     }
@@ -513,30 +724,21 @@ void ChessBot::initRobot()
     }
 }
 
-bool ChessBot::saveCalibrationData(const QString &fileName)
+bool ChessBot::saveCalibrationData(QString fileName)
 {
     qDebug("Saving calibration data to: %s", fileName.toStdString().c_str());
     
     QJsonObject root;
-    
-    // Read existing file to preserve camera calibration points
-    QFile existingFile(fileName);
-    if (existingFile.exists() && existingFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QByteArray fileData = existingFile.readAll();
-        existingFile.close();
-        
-        QJsonDocument existingDoc = QJsonDocument::fromJson(fileData);
-        if (existingDoc.isObject()) {
-            QJsonObject existingRoot = existingDoc.object();
-            // Preserve camera calibration points if they exist
-            if (existingRoot.contains("camera_calibration")) {
-                root["camera_calibration"] = existingRoot["camera_calibration"];
-                qDebug("Preserved existing camera calibration points");
-            }
-        }
-    } else {
-        qDebug("No existing calibration file found, creating new one");
+
+    // Save chessboard calibration (8x8)
+    QJsonArray cameraCorners;
+    for (int cornerID = 0; cornerID < m_chessboardConners.size(); cornerID++) {
+        QJsonObject pointObj;
+        pointObj["x"] = m_chessboardConners[cornerID].x();
+        pointObj["y"] = m_chessboardConners[cornerID].y();
+        cameraCorners.append(pointObj);
     }
+    root["camera_calibration"] = cameraCorners;
     
     // Save chessboard calibration (8x8)
     QJsonArray chessboardArray;
@@ -554,8 +756,8 @@ bool ChessBot::saveCalibrationData(const QString &fileName)
     
     // Save right dropzone calibration (8x2)
     QJsonArray rightDropzoneArray;
-    for (int row = 0; row < 8; row++) {
-        for (int col = 0; col < 2; col++) {
+    for (int row = 0; row < m_dropzoneRightCalib.size(); row++) {
+        for (int col = 0; col < m_dropzoneRightCalib[row].size(); col++) {
             QJsonObject pointObj;
             pointObj["row"] = row;
             pointObj["col"] = col;
@@ -568,8 +770,8 @@ bool ChessBot::saveCalibrationData(const QString &fileName)
     
     // Save left dropzone calibration (8x2)
     QJsonArray leftDropzoneArray;
-    for (int row = 0; row < 8; row++) {
-        for (int col = 0; col < 2; col++) {
+    for (int row = 0; row < m_dropzoneLeftCalib.size(); row++) {
+        for (int col = 0; col < m_dropzoneLeftCalib[row].size(); col++) {
             QJsonObject pointObj;
             pointObj["row"] = row;
             pointObj["col"] = col;
@@ -593,6 +795,88 @@ bool ChessBot::saveCalibrationData(const QString &fileName)
     file.close();
     
     qDebug("Calibration data saved successfully to: %s", fileName.toStdString().c_str());
+    return true;
+}
+
+bool ChessBot::loadCalibrationData(QString fileName)
+{
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly)) return false;
+
+    QByteArray data = file.readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (!doc.isObject()) return false;
+
+    QJsonObject root = doc.object();
+
+    // 1. Helper lambda to parse grids (8x8 or 8x2)
+    auto parseGrid = [&](const QString &key, int rows, int cols) {
+        QVector<QVector<QPoint>> grid(rows, QVector<QPoint>(cols));
+        QJsonArray arr = root.value(key).toArray();
+
+        for (const QJsonValue &val : arr) {
+            QJsonObject obj = val.toObject();
+            int r = obj.value("row").toInt();
+            int c = obj.value("col").toInt();
+            if (r < rows && c < cols) {
+                grid[r][c] = QPoint(obj.value("x").toInt(), obj.value("y").toInt());
+            }
+        }
+#ifdef IMAGE_PROCESS_MOVE
+    m_moveDetector->corners().clear();
+    if(grid.size() && grid[0].size() >= 2 && grid[1].size() >= 2)
+    {
+        m_moveDetector->corners().push_back(
+                cv::Point(grid[0][1].x(),grid[0][1].y()));
+        m_moveDetector->corners().push_back(
+                cv::Point(grid[0][0].x(),grid[0][0].y()));
+        m_moveDetector->corners().push_back(
+                cv::Point(grid[1][0].x(),grid[1][0].y()));
+        m_moveDetector->corners().push_back(
+                cv::Point(grid[1][1].x(),grid[1][1].y()));
+    }
+    int threshold = 80;
+    m_moveDetector->setThreshold(threshold);
+#endif
+        return grid;
+    };
+
+    // 2. Parse the specific variables
+    m_chessboardCalib    = parseGrid("chessboard", 8, 8);
+    m_dropzoneRightCalib = parseGrid("dropzone_right", 8, 2);
+    m_dropzoneLeftCalib  = parseGrid("dropzone_left", 8, 2);
+
+    // 3. Handle camera_calibration (corners)
+    // Since it's a list of 4 points, we'll treat it as a 1x4 or 4x1 2D vector
+    m_chessboardConners.clear();
+    QJsonArray calibArr = root.value("camera_calibration").toArray();
+    for (const QJsonValue &val : calibArr) {
+        QJsonObject obj = val.toObject();
+        m_chessboardConners.append(QPoint(obj.value("x").toInt(), obj.value("y").toInt()));
+    }
+
+    return true;
+}
+
+bool ChessBot::isCalibDataLoaded() {
+    // 1. Check Chessboard (8 rows, 8 columns)
+    if (m_chessboardCalib.size() != 8) return false;
+    for (const auto& row : m_chessboardCalib) {
+        if (row.size() != 8) return false;
+    }
+
+    // 2. Check Dropzone Right (8 rows, 2 columns)
+    if (m_dropzoneRightCalib.size() != 8) return false;
+    for (const auto& row : m_dropzoneRightCalib) {
+        if (row.size() != 2) return false;
+    }
+
+    // 3. Check Dropzone Left (8 rows, 2 columns)
+    if (m_dropzoneLeftCalib.size() != 8) return false;
+    for (const auto& row : m_dropzoneLeftCalib) {
+        if (row.size() != 2) return false;
+    }
+
     return true;
 }
 
@@ -685,71 +969,6 @@ int ChessBot::side()
     return m_side;
 }
 
-void ChessBot::loadCorners(QString fileName)
-{
-    QVector<QPoint> points;
-    QFile file(fileName);
-
-    // Open the file in read-only mode
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qDebug("Could not open file for reading: %s",fileName.toStdString().c_str());
-        return;
-    }
-
-    // Read all data and parse into a JSON document
-    QByteArray jsonData = file.readAll();
-    file.close();
-
-    QJsonDocument doc = QJsonDocument::fromJson(jsonData);
-    QJsonArray jsonArray;
-
-    // Handle both old format (array) and new format (object with camera_calibration key)
-    if (doc.isArray()) {
-        // Old format: root is an array
-        jsonArray = doc.array();
-    } else if (doc.isObject()) {
-        // New format: get camera_calibration from object
-        QJsonObject root = doc.object();
-        if (root.contains("camera_calibration")) {
-            jsonArray = root["camera_calibration"].toArray();
-        } else {
-            qDebug("JSON format error: No camera_calibration found in object.");
-            return;
-        }
-    } else {
-        qDebug("JSON format error: Root is neither an array nor an object.");
-        return;
-    }
-
-    int cornerID = 0;
-    for (const QJsonValue &value : jsonArray) {
-        if (value.isObject()) {
-            QJsonObject obj = value.toObject();
-            // Extract x and y, then append as a QPoint
-            points.append(QPoint(obj["x"].toInt(), obj["y"].toInt()));
-            qDebug("corner[%d] (%d,%d)",cornerID,
-                   obj["x"].toInt(),obj["y"].toInt());
-            cornerID++;
-
-        }
-    }
-#ifdef IMAGE_PROCESS_MOVE
-    if(points.size() == 4){
-        m_moveDetector->corners().clear();
-        for(QPoint corner: points){
-            m_moveDetector->corners().push_back(
-                        cv::Point(corner.x(),corner.y()));
-        }
-    }
-    int threshold = 80;
-    m_moveDetector->setThreshold(threshold);
-#endif
-}
-
-void ChessBot::updateCorners(QPoint c1, QPoint c2,QPoint c3, QPoint c4)
-{
-
-}
 void ChessBot::randomMove()
 {
     QString gameState = m_chessController->buildResultText();
@@ -766,7 +985,14 @@ void ChessBot::randomMove()
         processNextMove();
     }
 }
-
+QVariantList ChessBot::chessboardCorners() const {
+    QVariantList rootList;
+    qDebug("Number of m_chessboardConners %d",m_chessboardConners.size());
+    for (const QPoint &corner : m_chessboardConners) {
+        rootList.append(QVariant::fromValue(corner));
+    }
+    return rootList;
+}
 ChessController* ChessBot::chessController()
 {
     return m_chessController;

@@ -69,7 +69,6 @@ HEADERS += \
 }
 SOURCES += \
     ChessBot.cpp \
-    FileIO.cpp \
     main.cpp 
 
 RESOURCES += \
@@ -78,6 +77,5 @@ QML_DESIGNER_IMPORT_PATH =
 
 HEADERS += \
     ChessBot.h \
-    FileIO.h
 
 

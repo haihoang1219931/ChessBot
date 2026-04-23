@@ -20,6 +20,7 @@ public:
     void promotePiece(uint8_t piece);
     void setCalibChessBoardPoint(int row, int col, Point point);
     void setCalibDropZonePoint(int row, int col, ZONE_TYPE zone, Point point);
+    void resetCalibrationToFormula();
     Point convertDropPoint(int row, int col, ZONE_TYPE zone);
 
 private:

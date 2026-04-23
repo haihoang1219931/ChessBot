@@ -178,3 +178,20 @@ void ChessBoard::setCalibDropZonePoint(int row, int col, ZONE_TYPE zone, Point p
         m_cellCalibsDropZonePlayer[row][col].calibbed = true;
     }
 }
+
+void ChessBoard::resetCalibrationToFormula() {
+    // Reset all chessboard calibration points to uncalibrated (use formula)
+    for(int rowId = 0; rowId < 8; rowId++) {
+        for(int colId = 0; colId < 8; colId++) {
+            m_cellCalibsChessBoard[rowId][colId].calibbed = false;
+        }
+    }
+    
+    // Reset all dropzone calibration points to uncalibrated (use formula)
+    for(int rowId = 0; rowId < 8; rowId++) {
+        for(int colId = 0; colId < 2; colId++) {
+            m_cellCalibsDropZonePlayer[rowId][colId].calibbed = false;
+            m_cellCalibsDropZoneBot[rowId][colId].calibbed = false;
+        }
+    }
+}

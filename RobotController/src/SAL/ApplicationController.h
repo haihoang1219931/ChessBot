@@ -42,6 +42,7 @@ public:
                          int startCol, int startRow,
                          int stopCol, int stopRow,
                          char promotePiece = 0);
+    void sendCalibrationProgress();
     void calculateSequenceMoveStraight(int startCol, int startRow,int stopCol, int stopRow);
     void calculateSequenceMove(int startCol, int startRow, int upAngleInDegree, bool isCapture);
     void calculateSequenceMoveNormal(int startCol, int startRow,
@@ -98,6 +99,14 @@ public:
     uint32_t m_numPointInCommand;
     Point m_curPos;
     Point m_tarPos;
+    int m_calibrationReceivedCount;
+    int m_calibrationChessboardCount;
+    int m_calibrationRightDropzoneCount;
+    int m_calibrationLeftDropzoneCount;
+    bool m_calibrationChessboardCalibrated[8][8];
+    bool m_calibrationRightDropzoneCalibrated[8][2];
+    bool m_calibrationLeftDropzoneCalibrated[8][2];
+    bool m_calibrationInProgress;
     int m_appTimer;
     float m_minSpace;
     bool m_engineEnabled;

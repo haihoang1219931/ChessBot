@@ -259,11 +259,43 @@ FocusScope {
     property int highlightDirection: 0 // 0:none, 1:up, 2:right, 3:down, 4:left
     property real popupX: 0
     property real popupY: 0
+    
+    // Upload progress properties
+    property bool uploadProgressVisible: false
+    property real uploadProgress: 0.0
+    property bool uploadAbortDialogVisible: false
+    property int uploadAbortButtonSelected: 0
 
-    function updatePopupValues() {
-        var point = getCurrentPoint();
-        popupX = point.x;
-        popupY = point.y;
+    function abortCalibrationUpload() {
+        // Send abort command to RobotController
+        backend.abortCalibrationUpload();
+        uploadProgressVisible = false;
+        uploadAbortDialogVisible = false;
+        // Return to parent panel
+        root.exitPressed();
+    }
+
+    function startCalibrationUpload() {
+        uploadProgress = 0.0;
+        uploadProgressVisible = true;
+        // Trigger the asynchronous upload process
+        backend.sendCalibrationCells();
+    }
+
+    function simulateUploadProgress() {
+        if (uploadProgress < 100) {
+            uploadProgress += 2; // Simulate 2% progress per step
+            if (uploadProgress >= 100) {
+                uploadProgress = 100;
+                // Upload complete - hide progress bar after a delay
+                Qt.timer(function() {
+                    uploadProgressVisible = false;
+                }, 1000);
+            } else {
+                // Continue progress simulation
+                Qt.timer(simulateUploadProgress, 100);
+            }
+        }
     }
 
     function navigateSelection(key) {
@@ -443,7 +475,31 @@ FocusScope {
         focus: true
 
         Keys.onPressed: {
-            if (confirmDialogVisible) {
+            if (uploadAbortDialogVisible) {
+                if (event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
+                    uploadAbortButtonSelected = 1 - uploadAbortButtonSelected;
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    if (uploadAbortButtonSelected === 0) {
+                        // Continue
+                        uploadAbortDialogVisible = false;
+                    } else {
+                        // Abort
+                        uploadAbortDialogVisible = false;
+                        abortCalibrationUpload();
+                    }
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Escape) {
+                    uploadAbortDialogVisible = false;
+                    event.accepted = true;
+                }
+            } else if (uploadProgressVisible) {
+                if (event.key === Qt.Key_Escape) {
+                    uploadAbortDialogVisible = true;
+                    uploadAbortButtonSelected = 0; // Default to Continue
+                    event.accepted = true;
+                }
+            } else if (confirmDialogVisible) {
                 if (event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
                     confirmButtonSelected = 1 - confirmButtonSelected;
                     event.accepted = true;
@@ -733,6 +789,23 @@ FocusScope {
                     onHighlightDirectionChanged: indicatorCanvas.requestPaint()
                     onInfoPopupVisibleChanged: if (infoPopupVisible) indicatorCanvas.requestPaint()
                 }
+
+                Connections {
+                    target: backend
+                    onCalibrationUploadProgress: {
+                        uploadProgress = progress;
+                    }
+                    onCalibrationUploadComplete: {
+                        uploadProgressVisible = false;
+                        if (success) {
+                            // Show success message or handle completion
+                            console.log("Calibration upload completed successfully");
+                        } else {
+                            // Show error message or handle failure
+                            console.log("Calibration upload failed");
+                        }
+                    }
+                }
             }
 
             // Confirm dialog
@@ -816,70 +889,213 @@ FocusScope {
                         }
                     }
 
-                    Text {
-                        text: "Use left/right to choose, then Enter."
-                        color: "#aaaaaa"
-                        font.pixelSize: 12
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-                }
-            }
-        }
-
-        Rectangle {
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.topMargin: 40
-            color: "#e8e8e8"
-            width: 90
-            height: 150
-            ColumnLayout {
-                spacing: 20
-                Item {
-                    width: 90
-                    height: 30
+                    // Upload progress dialog
                     Rectangle {
-                        x: 25
-                        width: 30
-                        height: width
-                        radius: width/2
+                        visible: uploadProgressVisible
+                        anchors.centerIn: parent
+                        width: 400
+                        height: 160
+                        radius: 16
+                        color: "#232323"
                         border.color: "#888"
-                        border.width: 2
-                    }
-                }
+                        border.width: 1
+                        z: 11
 
-                Item {
-                    width: 90
-                    height: 50
-                    Rectangle {
-                        x: 15
-                        width: 50
-                        height: width
-                        radius: width/2
-                        border.color: "#888"
-                        border.width: 2
-                    }
-                }
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 18
+                            spacing: 14
 
-                Item {
-                    width: 90
-                    height: 50
-                    RowLayout {
-                        Rectangle {
-                            Layout.leftMargin: 10
-                            width: 20
-                            height: width
-                            radius: width/2
-                            border.color: "#888"
-                            border.width: 2
+                            Text {
+                                text: "Uploading calibration data"
+                                color: "#ffffff"
+                                font.pixelSize: 16
+                                font.bold: true
+                                horizontalAlignment: Text.AlignHCenter
+                            }
+
+                            ProgressBar {
+                                id: uploadProgressBar
+                                Layout.fillWidth: true
+                                from: 0
+                                to: 100
+                                value: uploadProgress
+
+                                background: Rectangle {
+                                    implicitWidth: 200
+                                    implicitHeight: 6
+                                    color: "#444444"
+                                    radius: 3
+                                }
+
+                                contentItem: Item {
+                                    implicitWidth: 200
+                                    implicitHeight: 4
+
+                                    Rectangle {
+                                        width: uploadProgressBar.visualPosition * parent.width
+                                        height: parent.height
+                                        radius: 2
+                                        color: "#00aa00"
+                                    }
+                                }
+                            }
+
+                            Text {
+                                text: Math.round(uploadProgress) + "% complete - Press ESC to abort"
+                                color: "#aaaaaa"
+                                font.pixelSize: 12
+                                horizontalAlignment: Text.AlignHCenter
+                            }
                         }
-                        Rectangle {
-                            Layout.leftMargin: 15
-                            width: 20
-                            height: width
-                            radius: width/2
-                            border.color: "#888"
-                            border.width: 2
+                    }
+
+                    // Upload abort confirmation dialog
+                    Rectangle {
+                        visible: uploadAbortDialogVisible
+                        anchors.centerIn: parent
+                        width: 420
+                        height: 180
+                        radius: 16
+                        color: "#232323"
+                        border.color: "#888"
+                        border.width: 1
+                        z: 12
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 18
+                            spacing: 14
+
+                            Text {
+                                text: "Do you want to continue uploading calibration file?"
+                                color: "#ffffff"
+                                font.pixelSize: 16
+                                font.bold: true
+                                horizontalAlignment: Text.AlignHCenter
+                            }
+
+                            RowLayout {
+                                Layout.alignment: Qt.AlignHCenter
+                                spacing: 24
+
+                                Rectangle {
+                                    width: 120; height: 50
+                                    radius: 10
+                                    color: uploadAbortButtonSelected === 0 ? "#00aa00" : "#444444"
+                                    border.color: uploadAbortButtonSelected === 0 ? "#ffffff" : "#888888"
+                                    border.width: 1
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "Continue"
+                                        color: "#ffffff"
+                                        font.pixelSize: 14
+                                        font.bold: true
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: {
+                                            uploadAbortButtonSelected = 0;
+                                            uploadAbortDialogVisible = false;
+                                            // Continue upload - no action needed, upload continues
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    width: 120; height: 50
+                                    radius: 10
+                                    color: uploadAbortButtonSelected === 1 ? "#aa0000" : "#444444"
+                                    border.color: uploadAbortButtonSelected === 1 ? "#ffffff" : "#888888"
+                                    border.width: 1
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "Abort"
+                                        color: "#ffffff"
+                                        font.pixelSize: 14
+                                        font.bold: true
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: {
+                                            uploadAbortButtonSelected = 1;
+                                            uploadAbortDialogVisible = false;
+                                            abortCalibrationUpload();
+                                        }
+                                    }
+                                }
+                            }
+
+                            Text {
+                                text: "Use left/right to choose, then Enter."
+                                color: "#aaaaaa"
+                                font.pixelSize: 12
+                                horizontalAlignment: Text.AlignHCenter
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.topMargin: 40
+                        color: "#e8e8e8"
+                        width: 90
+                        height: 150
+                        ColumnLayout {
+                            spacing: 20
+                            Item {
+                                width: 90
+                                height: 30
+                                Rectangle {
+                                    x: 25
+                                    width: 30
+                                    height: width
+                                    radius: width/2
+                                    border.color: "#888"
+                                    border.width: 2
+                                }
+                            }
+
+                            Item {
+                                width: 90
+                                height: 50
+                                Rectangle {
+                                    x: 15
+                                    width: 50
+                                    height: width
+                                    radius: width/2
+                                    border.color: "#888"
+                                    border.width: 2
+                                }
+                            }
+
+                            Item {
+                                width: 90
+                                height: 50
+                                RowLayout {
+                                    Rectangle {
+                                        Layout.leftMargin: 10
+                                        width: 20
+                                        height: width
+                                        radius: width/2
+                                        border.color: "#888"
+                                        border.width: 2
+                                    }
+                                    Rectangle {
+                                        Layout.leftMargin: 15
+                                        width: 20
+                                        height: width
+                                        radius: width/2
+                                        border.color: "#888"
+                                        border.width: 2
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -18,6 +18,14 @@ ApplicationController::ApplicationController()
     m_machineState = MACHINE_WAIT_COMMAND;
     m_appTimer = 0;
     m_engineEnabled = false;
+    m_calibrationReceivedCount = 0;
+    m_calibrationChessboardCount = 0;
+    m_calibrationRightDropzoneCount = 0;
+    m_calibrationLeftDropzoneCount = 0;
+    memset(m_calibrationChessboardCalibrated, 0, sizeof(m_calibrationChessboardCalibrated));
+    memset(m_calibrationRightDropzoneCalibrated, 0, sizeof(m_calibrationRightDropzoneCalibrated));
+    memset(m_calibrationLeftDropzoneCalibrated, 0, sizeof(m_calibrationLeftDropzoneCalibrated));
+    m_calibrationInProgress = false;
 }
 
 ApplicationController::~ApplicationController() {
@@ -242,6 +250,15 @@ void ApplicationController::setMachineState(MACHINE_STATE machineState) {
 #ifdef DEBUG_COMMAND        
         this->printf("APP STATE: %d\r\n",m_machineState);
 #endif
+    }
+}
+
+void ApplicationController::sendCalibrationProgress() {
+    if(m_calibrationInProgress) {
+        this->printf("R%d/16 L%d/16 C%d/64\r\n", 
+                    m_calibrationRightDropzoneCount,
+                    m_calibrationLeftDropzoneCount,
+                    m_calibrationChessboardCount);
     }
 }
 
@@ -477,6 +494,111 @@ void ApplicationController::executeCommand(char* command) {
                 stepTime, isRelative);
         setMachineState(MACHINE_EXECUTE_COMMAND);
         this->printf("[m%d] Go to position confirmed\r\n", motorID);
+    }
+    else if(strncmp(command, "CALIB_START", 11) == 0) {
+        // Start calibration data transmission
+        m_calibrationReceivedCount = 0;
+        m_calibrationChessboardCount = 0;
+        m_calibrationRightDropzoneCount = 0;
+        m_calibrationLeftDropzoneCount = 0;
+        memset(m_calibrationChessboardCalibrated, 0, sizeof(m_calibrationChessboardCalibrated));
+        memset(m_calibrationRightDropzoneCalibrated, 0, sizeof(m_calibrationRightDropzoneCalibrated));
+        memset(m_calibrationLeftDropzoneCalibrated, 0, sizeof(m_calibrationLeftDropzoneCalibrated));
+        m_calibrationInProgress = true;
+        m_chessBoard->resetCalibrationToFormula(); // Reset all to formula values initially
+        this->printf("CALIB_START_ACK\r\n");
+    }
+    else if(strncmp(command, "SC r", 4) == 0) {
+        // Set chessboard calibration point: SC r[row] c[col] x[x] y[y]
+        if(m_calibrationInProgress) {
+            int row, col, x, y;
+            if(sscanf(command, "SC r%d c%d x%d y%d", &row, &col, &x, &y) == 4) {
+                if(row >= 0 && row < 8 && col >= 0 && col < 8) {
+                    // Only update if this cell hasn't been calibrated yet
+                    if(!m_calibrationChessboardCalibrated[row][col]) {
+                        m_chessBoard->setCalibChessBoardPoint(row, col, {(float)x, (float)y, 0, true});
+                        m_calibrationChessboardCalibrated[row][col] = true;
+                        m_calibrationChessboardCount++;
+                        m_calibrationReceivedCount++;
+                        sendCalibrationProgress();
+                    } else {
+                        // Cell already calibrated, just update the value without incrementing counters
+                        m_chessBoard->setCalibChessBoardPoint(row, col, {(float)x, (float)y, 0, true});
+                    }
+                }
+            }
+        }
+    }
+    else if(strncmp(command, "SR r", 4) == 0) {
+        // Set right dropzone calibration point: SR r[row] c[col] x[x] y[y]
+        if(m_calibrationInProgress) {
+            int row, col, x, y;
+            if(sscanf(command, "SR r%d c%d x%d y%d", &row, &col, &x, &y) == 4) {
+                if(row >= 0 && row < 8 && col >= 0 && col < 2) {
+                    // Only update if this cell hasn't been calibrated yet
+                    if(!m_calibrationRightDropzoneCalibrated[row][col]) {
+                        m_chessBoard->setCalibDropZonePoint(row, col, ZONE_BOT, {(float)x, (float)y, 0, true});
+                        m_calibrationRightDropzoneCalibrated[row][col] = true;
+                        m_calibrationRightDropzoneCount++;
+                        m_calibrationReceivedCount++;
+                        sendCalibrationProgress();
+                    } else {
+                        // Cell already calibrated, just update the value without incrementing counters
+                        m_chessBoard->setCalibDropZonePoint(row, col, ZONE_BOT, {(float)x, (float)y, 0, true});
+                    }
+                }
+            }
+        }
+    }
+    else if(strncmp(command, "SL r", 4) == 0) {
+        // Set left dropzone calibration point: SL r[row] c[col] x[x] y[y]
+        if(m_calibrationInProgress) {
+            int row, col, x, y;
+            if(sscanf(command, "SL r%d c%d x%d y%d", &row, &col, &x, &y) == 4) {
+                if(row >= 0 && row < 8 && col >= 0 && col < 2) {
+                    // Only update if this cell hasn't been calibrated yet
+                    if(!m_calibrationLeftDropzoneCalibrated[row][col]) {
+                        m_chessBoard->setCalibDropZonePoint(row, col, ZONE_PLAYER, {(float)x, (float)y, 0, true});
+                        m_calibrationLeftDropzoneCalibrated[row][col] = true;
+                        m_calibrationLeftDropzoneCount++;
+                        m_calibrationReceivedCount++;
+                        sendCalibrationProgress();
+                    } else {
+                        // Cell already calibrated, just update the value without incrementing counters
+                        m_chessBoard->setCalibDropZonePoint(row, col, ZONE_PLAYER, {(float)x, (float)y, 0, true});
+                    }
+                }
+            }
+        }
+    }
+    else if(strncmp(command, "CALIB_END", 9) == 0) {
+        // End calibration data transmission
+        if(m_calibrationInProgress) {
+            m_calibrationInProgress = false;
+            if(m_calibrationReceivedCount == 96) {
+                // All 96 cells received (64 chessboard + 16 right + 16 left)
+                this->printf("CALIB_OK\r\n");
+            } else {
+                // Incomplete calibration data - reset to formula values
+                m_chessBoard->resetCalibrationToFormula();
+                memset(m_calibrationChessboardCalibrated, 0, sizeof(m_calibrationChessboardCalibrated));
+                memset(m_calibrationRightDropzoneCalibrated, 0, sizeof(m_calibrationRightDropzoneCalibrated));
+                memset(m_calibrationLeftDropzoneCalibrated, 0, sizeof(m_calibrationLeftDropzoneCalibrated));
+                this->printf("CALIB_ERROR\r\n");
+            }
+        }
+    }
+    else if(strncmp(command, "CALIB_ABORT", 11) == 0) {
+        // Abort calibration data transmission
+        if(m_calibrationInProgress) {
+            m_calibrationInProgress = false;
+            // Reset all calibration data to formula values
+            m_chessBoard->resetCalibrationToFormula();
+            memset(m_calibrationChessboardCalibrated, 0, sizeof(m_calibrationChessboardCalibrated));
+            memset(m_calibrationRightDropzoneCalibrated, 0, sizeof(m_calibrationRightDropzoneCalibrated));
+            memset(m_calibrationLeftDropzoneCalibrated, 0, sizeof(m_calibrationLeftDropzoneCalibrated));
+            this->printf("CALIB_ABORT_ACK\r\n");
+        }
     }
     else {
         this->printf("[%s] Unknown Command\r\n", command);

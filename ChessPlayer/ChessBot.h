@@ -12,6 +12,8 @@
 #include <QPoint>
 #include <QVector>
 
+#define CONFIGURE_CHESSBOARD_CALIB_FILE "calib_data.json"
+
 class ChessController;
 #ifdef IMAGE_PROCESS_MOVE
 class ChessImageProcessing;
@@ -51,7 +53,7 @@ typedef enum{
 typedef enum{
     INIT_DETECT_PORT,
     INIT_GET_VERSION,
-    INIT_CHECK_CALIB_FILE,
+    INIT_SEND_CALIBRATION,
     INIT_REQUEST_CALIB_CHESSBOARD,
     INIT_REQUEST_CALIB_RIGHT_DROPZONE,
     INIT_REQUEST_CALIB_LEFT_DROPZONE,
@@ -75,9 +77,10 @@ public:
     int levelType();
     int levelScore();
     int side();
-    void updateCorners(QPoint c1, QPoint c2,QPoint c3, QPoint c4);
     QObject* chessControllerObject() const;
     ChessController* chessController();
+    Q_INVOKABLE QVariantList chessboardCorners() const;
+
 public Q_SLOTS:
     void run() override;
     void startService();
@@ -90,15 +93,17 @@ public Q_SLOTS:
     void setSide(int side);
     void randomMove();
     void resetGame();
-    void loadCorners(QString file);
     void connectCamera();
     void disconnectCamera();
+    void updateCorners(QVariantList corners);
 
 Q_SIGNALS:
     void gameEnded(int endState);
     void sideChanged(int side);
     void levelTypeChanged(int type);
     void levelScoreChanged(int score);
+    void calibrationUploadProgress(int progress);
+    void calibrationUploadComplete(bool success);
 
 private:
     void playLoop();
@@ -117,7 +122,12 @@ private:
     bool detectArduinoPort(int baudRate = 38400);
     bool getArduinoVersion();
     QPoint readCalibrationPoint(const QString &command);
-    bool saveCalibrationData(const QString &fileName);
+    bool sendCalibrationCells();
+    void abortCalibrationUpload();
+    bool waitForCalibrationProgress();
+    bool saveCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
+    bool loadCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
+    bool isCalibDataLoaded();
 
 private:
     bool m_stopped = false;
@@ -139,6 +149,7 @@ private:
     int m_levelScore;
     int m_side;
     QString m_arduinoVersion;
+    QVector<QPoint> m_chessboardConners; // 4 corners
     QVector<QVector<QPoint>> m_chessboardCalib;    // 8x8 chessboard
     QVector<QVector<QPoint>> m_dropzoneRightCalib; // 8x2 right
     QVector<QVector<QPoint>> m_dropzoneLeftCalib;  // 8x2 left
