@@ -90,6 +90,23 @@ void ChessBot::updateCorners(QVariantList corners)
     }
     saveCalibrationData();
 }
+
+void ChessBot::updateCalibrationData(int type, int row, int col, int x, int y)
+{
+    printf("updateCalibrationData: type[%d] r[%d] c[%d] x[%d] y[%d]\r\n",
+           type,row,col,x,y);
+    if(type == 0) {
+        m_chessboardCalib[row][col].setX(x);
+        m_chessboardCalib[row][col].setY(y);
+    } else if(type == 1) {
+        m_dropzoneRightCalib[row][col].setX(x);
+        m_dropzoneRightCalib[row][col].setY(y);
+    } else {
+        m_dropzoneLeftCalib[row][col].setX(x);
+        m_dropzoneLeftCalib[row][col].setY(y);
+    }
+}
+
 void ChessBot::run()
 {
     qDebug("Dowork");
@@ -617,6 +634,7 @@ void ChessBot::initRobot()
             m_stateInit = INIT_GET_VERSION;
         } else {
             qDebug("Failed to detect Arduino port. Initialization aborted.");
+            Q_EMIT calibrationUploadComplete(false);
             m_state = STATE_EXIT;
             togglePause(true);
         }
@@ -629,6 +647,7 @@ void ChessBot::initRobot()
             m_stateInit = INIT_SEND_CALIBRATION;
         } else {
             qDebug("Failed to get Arduino version. Initialization aborted.");
+            Q_EMIT calibrationUploadComplete(false);
             m_state = STATE_EXIT;
             togglePause(true);
         }
@@ -800,11 +819,18 @@ bool ChessBot::saveCalibrationData(QString fileName)
 
 bool ChessBot::loadCalibrationData(QString fileName)
 {
-    QFile file(fileName);
-    if (!file.open(QIODevice::ReadOnly)) return false;
+    QJsonDocument doc;
+    if (!fileName.isEmpty()) {
+        QFile file(fileName);
+        if (!file.open(QIODevice::ReadOnly)) return false;
+        QByteArray data = file.readAll();
+        doc = QJsonDocument::fromJson(data);
+    } else {
+        QString data = getCalibrationJson();
+        if (data.isEmpty()) return false;
+        doc = QJsonDocument::fromJson(data.toUtf8());
+    }
 
-    QByteArray data = file.readAll();
-    QJsonDocument doc = QJsonDocument::fromJson(data);
     if (!doc.isObject()) return false;
 
     QJsonObject root = doc.object();
@@ -856,6 +882,63 @@ bool ChessBot::loadCalibrationData(QString fileName)
     }
 
     return true;
+}
+
+QString ChessBot::getCalibrationJson() const
+{
+    QJsonObject root;
+
+    QJsonArray chessboardArray;
+    for (int row = 0; row < m_chessboardCalib.size(); ++row) {
+        QJsonArray rowArray;
+        for (int col = 0; col < m_chessboardCalib[row].size(); ++col) {
+            QJsonObject pointObj;
+            pointObj["x"] = m_chessboardCalib[row][col].x();
+            pointObj["y"] = m_chessboardCalib[row][col].y();
+            rowArray.append(pointObj);
+        }
+        chessboardArray.append(rowArray);
+    }
+    root["chessboard"] = chessboardArray;
+
+    QJsonArray rightArray;
+    for (int row = 0; row < m_dropzoneRightCalib.size(); ++row) {
+        QJsonArray rowArray;
+        for (int col = 0; col < m_dropzoneRightCalib[row].size(); ++col) {
+            QJsonObject pointObj;
+            pointObj["x"] = m_dropzoneRightCalib[row][col].x();
+            pointObj["y"] = m_dropzoneRightCalib[row][col].y();
+            rowArray.append(pointObj);
+        }
+        rightArray.append(rowArray);
+    }
+    root["dropzone_right"] = rightArray;
+
+    QJsonArray leftArray;
+    for (int row = 0; row < m_dropzoneLeftCalib.size(); ++row) {
+        QJsonArray rowArray;
+        for (int col = 0; col < m_dropzoneLeftCalib[row].size(); ++col) {
+            QJsonObject pointObj;
+            pointObj["x"] = m_dropzoneLeftCalib[row][col].x();
+            pointObj["y"] = m_dropzoneLeftCalib[row][col].y();
+            rowArray.append(pointObj);
+        }
+        leftArray.append(rowArray);
+    }
+    root["dropzone_left"] = leftArray;
+
+    if (!m_chessboardConners.isEmpty()) {
+        QJsonArray cornersArray;
+        for (const QPoint &pt : m_chessboardConners) {
+            QJsonObject ptObj;
+            ptObj["x"] = pt.x();
+            ptObj["y"] = pt.y();
+            cornersArray.append(ptObj);
+        }
+        root["camera_calibration"] = cornersArray;
+    }
+
+    return QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Compact));
 }
 
 bool ChessBot::isCalibDataLoaded() {

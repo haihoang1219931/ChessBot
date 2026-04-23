@@ -1,6 +1,8 @@
 import QtQuick 2.0
 import QtQuick.Layouts 1.12
 import QtQuick.Controls 2.0
+import QtGraphicalEffects 1.0
+import QtQml 2.0
 
 FocusScope {
     id: root
@@ -64,7 +66,7 @@ FocusScope {
 
     function loadCalibrationData() {
         initializeCalibrationArrays();
-        var data = fileio.read(calibrationFile) || "";
+        var data = backend.getCalibrationJson() || "";
         if (data !== "") {
             var jsonData = JSON.parse(data);
             
@@ -141,7 +143,7 @@ FocusScope {
             }
         }
     }
-    
+
     function getReversedRow(row) {
         return 7 - row;
     }
@@ -166,6 +168,12 @@ FocusScope {
         }
     }
 
+    function updatePopupValues() {
+        var point = getCurrentPoint();
+        popupX = point.x;
+        popupY = point.y;
+    }
+
     function adjustCurrentPoint(dx, dy) {
         var actualRow = getReversedRow(selectedRow);
         var actualCol = getReversedCol(selectedZone, selectedCol);
@@ -184,6 +192,7 @@ FocusScope {
         point.y += dy;
         popupX = point.x;
         popupY = point.y;
+        backend.updateCalibrationData(selectedZone,actualRow,actualCol,point.x,point.y);
     }
 
     function isCellExcluded(excludedCellsArray, actualRow, actualCol) {
@@ -359,51 +368,6 @@ FocusScope {
         clampSelection();
     }
 
-    function saveCalibrationFile() {
-        var payload = {};
-        var existing = fileio.read(calibrationFile) || "";
-        if (existing !== "") {
-            var parsed = JSON.parse(existing);
-            for (var key in parsed) {
-                if (key !== "chessboard" && key !== "dropzone_left" && key !== "dropzone_right") {
-                    payload[key] = parsed[key];
-                }
-            }
-        }
-
-        payload.chessboard = [];
-        for (var r = 0; r < 8; r++) {
-            var row = [];
-            for (var c = 0; c < 8; c++) {
-                var p = chessboardCalib[r][c];
-                row.push({x: p.x, y: p.y});
-            }
-            payload.chessboard.push(row);
-        }
-
-        payload.dropzone_right = [];
-        for (var r = 0; r < 8; r++) {
-            var rightRow = [];
-            for (var c = 0; c < 2; c++) {
-                var p = dropzoneRightCalib[r][c];
-                rightRow.push({x: p.x, y: p.y});
-            }
-            payload.dropzone_right.push(rightRow);
-        }
-
-        payload.dropzone_left = [];
-        for (var r = 0; r < 8; r++) {
-            var leftRow = [];
-            for (var c = 0; c < 2; c++) {
-                var p = dropzoneLeftCalib[r][c];
-                leftRow.push({x: p.x, y: p.y});
-            }
-            payload.dropzone_left.push(leftRow);
-        }
-
-        fileio.write(calibrationFile, JSON.stringify(payload, null, 4) + "\n");
-    }
-
     function drawBrackets(ctx, w, h) {
         ctx.reset();
         ctx.strokeStyle = "#888";
@@ -505,7 +469,7 @@ FocusScope {
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                     if (confirmButtonSelected === 0) {
-                        saveCalibrationFile();
+                        backend.saveCalibrationData();;
                     }
                     confirmDialogVisible = false;
                     infoPopupVisible = false;
@@ -722,7 +686,65 @@ FocusScope {
                 }
             }
         }
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.topMargin: 40
+            color: "#e8e8e8"
+            width: 90
+            height: 150
+            ColumnLayout {
+                spacing: 20
+                Item {
+                    width: 90
+                    height: 30
+                    Rectangle {
+                        x: 25
+                        width: 30
+                        height: width
+                        radius: width/2
+                        border.color: "#888"
+                        border.width: 2
+                    }
+                }
 
+                Item {
+                    width: 90
+                    height: 50
+                    Rectangle {
+                        x: 15
+                        width: 50
+                        height: width
+                        radius: width/2
+                        border.color: "#888"
+                        border.width: 2
+                    }
+                }
+
+                Item {
+                    width: 90
+                    height: 50
+                    RowLayout {
+                        Rectangle {
+                            Layout.leftMargin: 10
+                            width: 20
+                            height: width
+                            radius: width/2
+                            border.color: "#888"
+                            border.width: 2
+                        }
+                        Rectangle {
+                            Layout.leftMargin: 15
+                            width: 20
+                            height: width
+                            radius: width/2
+                            border.color: "#888"
+                            border.width: 2
+                        }
+                    }
+                }
+            }
+        }
         Rectangle {
             anchors.fill: parent
             color: "#00000088"
@@ -856,7 +878,7 @@ FocusScope {
                                 anchors.fill: parent
                                 onClicked: {
                                     confirmButtonSelected = 0;
-                                    saveCalibrationFile();
+                                    backend.saveCalibrationData();
                                     confirmDialogVisible = false;
                                     root.exitPressed();
                                 }
@@ -888,218 +910,10 @@ FocusScope {
                             }
                         }
                     }
-
-                    // Upload progress dialog
-                    Rectangle {
-                        visible: uploadProgressVisible
-                        anchors.centerIn: parent
-                        width: 400
-                        height: 160
-                        radius: 16
-                        color: "#232323"
-                        border.color: "#888"
-                        border.width: 1
-                        z: 11
-
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 18
-                            spacing: 14
-
-                            Text {
-                                text: "Uploading calibration data"
-                                color: "#ffffff"
-                                font.pixelSize: 16
-                                font.bold: true
-                                horizontalAlignment: Text.AlignHCenter
-                            }
-
-                            ProgressBar {
-                                id: uploadProgressBar
-                                Layout.fillWidth: true
-                                from: 0
-                                to: 100
-                                value: uploadProgress
-
-                                background: Rectangle {
-                                    implicitWidth: 200
-                                    implicitHeight: 6
-                                    color: "#444444"
-                                    radius: 3
-                                }
-
-                                contentItem: Item {
-                                    implicitWidth: 200
-                                    implicitHeight: 4
-
-                                    Rectangle {
-                                        width: uploadProgressBar.visualPosition * parent.width
-                                        height: parent.height
-                                        radius: 2
-                                        color: "#00aa00"
-                                    }
-                                }
-                            }
-
-                            Text {
-                                text: Math.round(uploadProgress) + "% complete - Press ESC to abort"
-                                color: "#aaaaaa"
-                                font.pixelSize: 12
-                                horizontalAlignment: Text.AlignHCenter
-                            }
-                        }
-                    }
-
-                    // Upload abort confirmation dialog
-                    Rectangle {
-                        visible: uploadAbortDialogVisible
-                        anchors.centerIn: parent
-                        width: 420
-                        height: 180
-                        radius: 16
-                        color: "#232323"
-                        border.color: "#888"
-                        border.width: 1
-                        z: 12
-
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 18
-                            spacing: 14
-
-                            Text {
-                                text: "Do you want to continue uploading calibration file?"
-                                color: "#ffffff"
-                                font.pixelSize: 16
-                                font.bold: true
-                                horizontalAlignment: Text.AlignHCenter
-                            }
-
-                            RowLayout {
-                                Layout.alignment: Qt.AlignHCenter
-                                spacing: 24
-
-                                Rectangle {
-                                    width: 120; height: 50
-                                    radius: 10
-                                    color: uploadAbortButtonSelected === 0 ? "#00aa00" : "#444444"
-                                    border.color: uploadAbortButtonSelected === 0 ? "#ffffff" : "#888888"
-                                    border.width: 1
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "Continue"
-                                        color: "#ffffff"
-                                        font.pixelSize: 14
-                                        font.bold: true
-                                    }
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        onClicked: {
-                                            uploadAbortButtonSelected = 0;
-                                            uploadAbortDialogVisible = false;
-                                            // Continue upload - no action needed, upload continues
-                                        }
-                                    }
-                                }
-
-                                Rectangle {
-                                    width: 120; height: 50
-                                    radius: 10
-                                    color: uploadAbortButtonSelected === 1 ? "#aa0000" : "#444444"
-                                    border.color: uploadAbortButtonSelected === 1 ? "#ffffff" : "#888888"
-                                    border.width: 1
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "Abort"
-                                        color: "#ffffff"
-                                        font.pixelSize: 14
-                                        font.bold: true
-                                    }
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        onClicked: {
-                                            uploadAbortButtonSelected = 1;
-                                            uploadAbortDialogVisible = false;
-                                            abortCalibrationUpload();
-                                        }
-                                    }
-                                }
-                            }
-
-                            Text {
-                                text: "Use left/right to choose, then Enter."
-                                color: "#aaaaaa"
-                                font.pixelSize: 12
-                                horizontalAlignment: Text.AlignHCenter
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.top: parent.top
-                        anchors.topMargin: 40
-                        color: "#e8e8e8"
-                        width: 90
-                        height: 150
-                        ColumnLayout {
-                            spacing: 20
-                            Item {
-                                width: 90
-                                height: 30
-                                Rectangle {
-                                    x: 25
-                                    width: 30
-                                    height: width
-                                    radius: width/2
-                                    border.color: "#888"
-                                    border.width: 2
-                                }
-                            }
-
-                            Item {
-                                width: 90
-                                height: 50
-                                Rectangle {
-                                    x: 15
-                                    width: 50
-                                    height: width
-                                    radius: width/2
-                                    border.color: "#888"
-                                    border.width: 2
-                                }
-                            }
-
-                            Item {
-                                width: 90
-                                height: 50
-                                RowLayout {
-                                    Rectangle {
-                                        Layout.leftMargin: 10
-                                        width: 20
-                                        height: width
-                                        radius: width/2
-                                        border.color: "#888"
-                                        border.width: 2
-                                    }
-                                    Rectangle {
-                                        Layout.leftMargin: 15
-                                        width: 20
-                                        height: width
-                                        radius: width/2
-                                        border.color: "#888"
-                                        border.width: 2
-                                    }
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }
+
+
     }
 }

@@ -16,5 +16,6 @@
         <file>qml/SettingCalibChessBoard.qml</file>
         <file>qml/SettingCalibrationPoints.qml</file>
         <file>qml/SettingsMenu.qml</file>
+        <file>qml/DownloadProgress.qml</file>
     </qresource>
 </RCC>

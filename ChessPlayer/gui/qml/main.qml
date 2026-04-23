@@ -2,6 +2,7 @@ import QtQuick.Window 2.2
 import QtQuick.Controls 2.0
 import QtQuick 2.12
 import QtQuick.Layouts 1.12
+import QtQml 2.0
 
 ApplicationWindow {
     id: wroot
@@ -24,7 +25,20 @@ ApplicationWindow {
         onCurrentItemChanged: if (currentItem) currentItem.forceActiveFocus()
 
         Component.onCompleted: {
-            stack.push(menuSelection)
+            stack.push(downloadProgressLoader)
+        }
+    }
+
+    Component {
+        id: downloadProgressLoader
+        DownloadProgress {
+            onOverlayHidden: {
+                stack.pop()
+                stack.push(menuSelection)
+            }
+            Component.onCompleted: {
+                backend.initRobotCommunication();
+            }
         }
     }
 

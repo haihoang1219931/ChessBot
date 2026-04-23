@@ -1,6 +1,8 @@
 import QtQuick 2.0
 import QtQuick.Layouts 1.12
 import QtGraphicalEffects 1.0
+import QtQml 2.0
+
 FocusScope {
     id: root
     width: 800
@@ -114,8 +116,5 @@ FocusScope {
                 }
             }
         }
-    }
-    Component.onCompleted :{
-        backend.initRobotCommunication();
     }
 }

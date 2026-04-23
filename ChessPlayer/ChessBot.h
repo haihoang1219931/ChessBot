@@ -80,6 +80,11 @@ public:
     QObject* chessControllerObject() const;
     ChessController* chessController();
     Q_INVOKABLE QVariantList chessboardCorners() const;
+    Q_INVOKABLE QString getCalibrationJson() const;
+    Q_INVOKABLE bool saveCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
+    Q_INVOKABLE bool loadCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
+    Q_INVOKABLE void updateCorners(QVariantList corners);
+    Q_INVOKABLE void updateCalibrationData(int type, int row, int col, int x, int y);
 
 public Q_SLOTS:
     void run() override;
@@ -95,7 +100,6 @@ public Q_SLOTS:
     void resetGame();
     void connectCamera();
     void disconnectCamera();
-    void updateCorners(QVariantList corners);
 
 Q_SIGNALS:
     void gameEnded(int endState);
@@ -125,8 +129,6 @@ private:
     bool sendCalibrationCells();
     void abortCalibrationUpload();
     bool waitForCalibrationProgress();
-    bool saveCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
-    bool loadCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
     bool isCalibDataLoaded();
 
 private:
