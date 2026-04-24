@@ -64,12 +64,14 @@ typedef enum{
     INIT_REQUEST_CALIB_CHESSBOARD,
     INIT_REQUEST_CALIB_RIGHT_DROPZONE,
     INIT_REQUEST_CALIB_LEFT_DROPZONE,
+    INIT_ENABLE_ROBOT,
+    INIT_GO_HOME,
     INIT_DONE
 } STATE_INIT_PHASE;
 
 typedef enum{
     TEST_ROBOT,
-    TEST_INFORM_RESULT,
+    TEST_CHECK_RESULT,
     TEST_DONE
 } STATE_TEST_PHASE;
 class ChessBot : public QThread {
@@ -129,6 +131,7 @@ private:
     uint8_t configureSide();
     uint8_t configureLevel();
     uint8_t testRobot();
+    uint8_t testCheckResult();
     void initRobot();
     bool detectArduinoPort(int baudRate = 38400);
     bool getArduinoVersion();
@@ -136,6 +139,8 @@ private:
     bool sendCalibrationCells();
     void abortCalibrationUpload();
     bool waitForCalibrationProgress();
+    uint8_t enableRobot();
+    uint8_t goHome();
     bool isCalibDataLoaded();
 
 private:
@@ -165,6 +170,7 @@ private:
     int m_calibRow;
     int m_calibCol;
     int m_calibCellCount;
+    QString m_cmdId;
     bool m_validCalibFileFound;
 };
 

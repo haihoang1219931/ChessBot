@@ -37,6 +37,7 @@ void ApplicationController::loop() {
 #ifdef DEBUG_APP
     this->printf("APP Timer[%d] m_machineState[%d]\r\n",m_appTimer,m_machineState);
 #endif
+    readCommand();
     switch(m_machineState) {
         case MACHINE_WAIT_COMMAND: {            
             break;
@@ -429,73 +430,60 @@ void ApplicationController::executeCommand(char* command) {
         } else if( command[1] == 'r') {
             m_comCommandID ++;
             goToCalibPosition();
-            this->printf("[lr] Go to calib position confirmed\r\n");
+            this->printf("[lr] Go to calib confirmed\r\n");
         } else if(command[1] == 'a') {
             m_comCommandID ++;
             calibToHome(MAX_MOTOR);
-            this->printf("[la] Calib to home position confirmed\r\n");
+            this->printf("[la] Calib to home confirmed\r\n");
         }
         else if(command[1] >= '0' && command[1] <= '5')
         {
             m_comCommandID ++;
             calibToHome(command[1]-'0');
-            this->printf("[l%d] Calib to home position confirmed\r\n", command[1]-'0');
+            this->printf("[l%d] Calib to home confirmed\r\n", command[1]-'0');
         }
     }
     else if(command[0] == 'c' && strlen(command)>=5) {
         m_comCommandID ++;
         executeSequence(MOVE_NORMAL, command[2]-'0',command[1]-'0',
                 command[4]-'0',command[3]-'0');
-        this->printf("[%s] Move sequence normal confirmed\r\n", command);
+        this->printf("[%s] Normal seq confirmed\r\n", command);
     }else if(command[0] == 'c' && strlen(command)>=5) {
         m_comCommandID ++;
         executeSequence(MOVE_CASTLE, command[2]-'0',command[1]-'0',
                 command[4]-'0',command[3]-'0');
-        this->printf("[%s] Move sequence castle confirmed\r\n", command);
+        this->printf("[%s] Castle confirmed\r\n", command);
     }else if(command[0] == 'a' && strlen(command)>=5) {
         m_comCommandID ++;
         executeSequence(MOVE_ATTACK, command[2]-'0',command[1]-'0',
                 command[4]-'0',command[3]-'0');
-        this->printf("[%s] Move sequence attack confirmed\r\n", command);
+        this->printf("[%s] Attack confirmed\r\n", command);
     }else if(command[0] == 'p' && strlen(command)>=6 && command[1] == 'p') {
         m_comCommandID ++;
         executeSequence(MOVE_PASTPAWN, command[3]-'0',command[2]-'0',
                 command[5]-'0',command[4]-'0');
-        this->printf("[%s] Move sequence past pawn confirmed\r\n", command);
+        this->printf("[%s] Past pawn confirmed\r\n", command);
     }else if(command[0] == 'p' && strlen(command)>=6) {
         m_comCommandID ++;
         executeSequence(MOVE_PROMOTE, command[3]-'0',command[2]-'0',
                 command[5]-'0',command[4]-'0',command[1]);
-        this->printf("[%s] Move sequence promote confirmed\r\n", command);
+        this->printf("[%s] Promote confirmed\r\n", command);
 
-    }else if(command[0] == 'p' && strlen(command)>=2 && command[1] >= '0' && command[1] <= '5')
+    }else if(command[0] == 't' && strlen(command)>=2)
     {
-        int motorID = command[1]-'0';
-        char angleStr[8];
-        angleStr[0] = command[3];
-        angleStr[1] = command[4];
-        angleStr[2] = command[5];
-        angleStr[3] = command[6];
-        angleStr[4] = 0;
-        float angle = atoi(angleStr);
-
-        char stepTimeStr[8];
-        stepTimeStr[0] = command[8];
-        stepTimeStr[1] = command[9];
-        stepTimeStr[2] = command[10];
-        stepTimeStr[3] = command[11];
-        stepTimeStr[4] = 0;
-        int stepTime = atoi(stepTimeStr);
-
-        bool isRelative = command[13] == 'r';
         m_comCommandID ++;
-        m_robot->requestGoPosition(motorID,
-                m_robot->angleToStep(motorID, angle),
-                stepTime, isRelative);
-        setMachineState(MACHINE_EXECUTE_COMMAND);
-        this->printf("[m%d] Go to position confirmed\r\n", motorID);
-    }
-    else if(strncmp(command, "CALIB_START", 11) == 0) {
+        int xPos,yPos;
+        int row,col;
+        if(sscanf(command, "tx%dy%d", &xPos, &yPos) == 2) {
+            gotoPosition((float)xPos/10.0f, (float)yPos/10.0f, 45.0f);
+            this->printf("[%s] Pos confirmed\r\n", command);
+        } else if(sscanf(command, "%s","ts") == 1) {
+            Point currentPosition = currentPos();
+            this->printf("TS %d %d\r\n", 
+                (int)(currentPosition.x*10.0f), 
+                (int)(currentPosition.y*10.0f));
+        }
+    }else if(strncmp(command, "CALIB_START", 11) == 0) {
         // Start calibration data transmission
         m_calibrationReceivedCount = 0;
         m_calibrationChessboardCount = 0;
@@ -717,7 +705,7 @@ void ApplicationController::calculateJoints(float xPos, float yPos, float upAngl
     jointSteps[MOTOR_ARM5] = m_robot->angleToStep(
                 MOTOR_ARM5,
                 upAngleInDegree);
-#ifndef DEBUG_KINEMATIC
+#ifdef DEBUG_KINEMATIC
     this->printf("calculateJoints upAngleInDegree[%f]\r\n",upAngleInDegree);
 #endif
 }
@@ -807,6 +795,16 @@ void ApplicationController::goToCalibPosition() {
     m_robot->setMoveTarget(jointSteps);
     m_robot->moveToTarget(MAX_MOTOR);
     setMachineState(MACHINE_EXECUTE_POSITION);    
+}
+void ApplicationController::gotoPosition(float x, float y, float upAngleInDegree) {
+    int jointSteps[MAX_MOTOR];
+    jointSteps[MOTOR_CAPTURE] = 0;
+    jointSteps[MOTOR_ARM3] = 0;
+    jointSteps[MOTOR_ARM4] = 0;
+    calculateJoints(y, x, upAngleInDegree, jointSteps);
+    m_robot->setMoveTarget(jointSteps);
+    m_robot->moveToTarget(MAX_MOTOR);
+    setMachineState(MACHINE_EXECUTE_POSITION);
 }
 void ApplicationController::executeSequence(
         MOVE_TYPE moveType,

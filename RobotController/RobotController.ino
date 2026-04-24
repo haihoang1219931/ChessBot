@@ -6,7 +6,6 @@ void setup() {
   Serial.println("======Arduino Serial======");
   app.printf("APP Arduino Init done\r\n");
   delay(100);
-  app.initHardwareTimer(TIMER_ID_CHECK_COMMAND, 100.0f);
   // delay(2900);
   // app.enableEngine(true);
   // int jointSteps[MAX_MOTOR] = {0,1200,273,0,0,0};

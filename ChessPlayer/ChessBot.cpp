@@ -95,6 +95,7 @@ void ChessBot::updateCorners(QVariantList corners)
 
 void ChessBot::updateCalibrationData(int type, int row, int col, int x, int y)
 {
+    qDebug("ChessBot::updateCalibrationData");
     if(type == 0) {
         m_chessboardCalib[row][col].setX(x);
         m_chessboardCalib[row][col].setY(y);
@@ -105,6 +106,7 @@ void ChessBot::updateCalibrationData(int type, int row, int col, int x, int y)
         m_dropzoneLeftCalib[row][col].setX(x);
         m_dropzoneLeftCalib[row][col].setY(y);
     }
+    sendTestCommand("tx"+QString::number(x)+"y"+QString::number(y));
 }
 
 void ChessBot::run()
@@ -237,6 +239,11 @@ void ChessBot::testLoop()
             m_stateTest = TEST_DONE;
         }
     }
+    case TEST_CHECK_RESULT: {
+        if(testCheckResult() == STATE_DONE){
+            m_stateTest = TEST_DONE;
+        }
+    }
         break;
     case TEST_DONE: {
         togglePause(true);
@@ -343,6 +350,45 @@ uint8_t ChessBot::configureLevel()
 
 uint8_t ChessBot::testRobot()
 {
+    uint8_t testState = STATE_PENDING;
+    robotController->write(m_commandTest.toStdString().c_str());
+    robotController->waitForBytesWritten(200);
+    if (robotController->waitForReadyRead(500)) {
+        QByteArray chunk = robotController->readAll();
+        qDebug("Received progress chunk: %s", chunk.constData());
+        testState = STATE_DONE;
+    }
+//    sleep(1);
+//    robotController->write("cmd");
+//    robotController->waitForBytesWritten(200);
+//    if (robotController->waitForReadyRead(500)) {
+//        QByteArray chunk = robotController->readAll();
+//        qDebug("Received progress chunk: %s", chunk.constData());
+//        QString positionCmdIDStr = QString::fromLatin1(chunk);
+//        if(positionCmdIDStr.contains("[cmd]")) {
+//            m_cmdId = positionCmdIDStr.section(']', 1);
+//            qDebug("position Cmd ID: %s", m_cmdId.toStdString().c_str());
+//            testState = STATE_DONE;
+//        }
+//    }
+    return testState;
+}
+
+uint8_t ChessBot::testCheckResult()
+{
+//    uint8_t testState = STATE_PENDING;
+//    robotController->write(("_"+m_cmdId).toStdString().c_str());
+//    robotController->waitForBytesWritten(200);
+//    if (robotController->waitForReadyRead(500)) {
+//        QByteArray chunk = robotController->readAll();
+//        qDebug("Received progress chunk: %s", chunk.constData());
+//        QString positionCmdStateStr = QString::fromLatin1(chunk);
+//        if(positionCmdStateStr.contains("]DONE")) {
+//            qDebug("position command %s Done", m_cmdId.toStdString().c_str());
+//            testState = STATE_DONE;
+//        }
+//    }
+//    sleep(1);
     return STATE_DONE;
 }
 
@@ -560,7 +606,7 @@ void ChessBot::abortCalibrationUpload()
 
     qDebug("Aborting calibration upload...");
     robotController->write("CALIB_ABORT\n");
-    robotController->waitForBytesWritten(200);
+    robotController->waitForBytesWritten(100);
      Q_EMIT calibrationUploadComplete(CALIB_UPLOAD_TO_ROBOT, false);
 }
 
@@ -572,8 +618,8 @@ bool ChessBot::waitForCalibrationProgress()
     timer.start();
 
     qDebug("Collecting calibration progress responses for 2 seconds...");
-    while (timer.elapsed() < 500) {
-        if (robotController->waitForReadyRead(200)) {
+    while (timer.elapsed() < 100) {
+        if (robotController->waitForReadyRead(50)) {
             QByteArray chunk = robotController->readAll();
             allResponses.append(chunk);
             qDebug("Received progress chunk: %s", chunk.constData());
@@ -659,7 +705,7 @@ void ChessBot::initRobot()
             qDebug("Calibration data valid found. Loading and uploading to RobotController...");
             if (sendCalibrationCells()) {
                 qDebug("Calibration data uploaded to RobotController.");
-                m_stateInit = INIT_DONE;
+                m_stateInit = INIT_ENABLE_ROBOT;
             } else {
                 qDebug("Failed to upload calibration data to RobotController. Initialization aborted.");
                 m_state = STATE_EXIT;
@@ -682,7 +728,7 @@ void ChessBot::initRobot()
                 QPoint point;
                 if(!readCalibrationPoint(command,point)){
                     Q_EMIT calibrationUploadComplete(CALIB_REQUEST_FROM_ROBOT,false);
-                    m_stateInit = INIT_DONE;
+                    m_stateInit = INIT_ENABLE_ROBOT;
                     break;
                 }
                 m_chessboardCalib[m_calibRow][m_calibCol] = point;
@@ -709,7 +755,7 @@ void ChessBot::initRobot()
                 QPoint point;
                 if(!readCalibrationPoint(command,point)){
                     Q_EMIT calibrationUploadComplete(CALIB_REQUEST_FROM_ROBOT,false);
-                    m_stateInit = INIT_DONE;
+                    m_stateInit = INIT_ENABLE_ROBOT;
                     break;
                 }
                 m_dropzoneRightCalib[m_calibRow][m_calibCol] = point;
@@ -736,7 +782,7 @@ void ChessBot::initRobot()
                 QPoint point;
                 if(!readCalibrationPoint(command,point)){
                     Q_EMIT calibrationUploadComplete(CALIB_REQUEST_FROM_ROBOT,false);
-                    m_stateInit = INIT_DONE;
+                    m_stateInit = INIT_ENABLE_ROBOT;
                     break;
                 }
                 m_dropzoneLeftCalib[m_calibRow][m_calibCol] = point;
@@ -757,17 +803,114 @@ void ChessBot::initRobot()
                 Q_EMIT calibrationUploadComplete(CALIB_REQUEST_FROM_ROBOT,false);
             }
 
+            m_stateInit = INIT_ENABLE_ROBOT;
+        }
+    }
+        break;
+    case INIT_ENABLE_ROBOT: {
+        if(enableRobot() == STATE_DONE){
+            m_stateInit = INIT_GO_HOME;
+        }
+    }
+        break;
+    case INIT_GO_HOME: {
+        if(goHome() == STATE_DONE){
             m_stateInit = INIT_DONE;
         }
     }
         break;
-        
     case INIT_DONE: {
         qDebug("=== Robot Initialization Complete ===");
         m_state = STATE_CONFIGURE;
         togglePause(true);
     }
         break;
+    }
+}
+
+uint8_t ChessBot::enableRobot()
+{
+    qDebug("Enable Robot");
+    if (!robotController->isOpen()) {
+        qDebug("Serial port is not open for abort.");
+        return STATE_DONE;
+    } else {
+        robotController->write("ee");
+        robotController->waitForBytesWritten(1000);
+        bool robotEnabled = false;
+        int retry = 0;
+        do {
+            robotController->write("es");
+            robotController->waitForBytesWritten(200);
+            if (robotController->waitForReadyRead(500)) {
+                QByteArray chunk = robotController->readAll();
+                qDebug("Received progress chunk: %s", chunk.constData());
+                QString responseStr = QString::fromLatin1(chunk);
+                if(responseStr.contains("[es] Enabled")) {
+                    robotEnabled = true;
+                }
+            }
+        } while(!robotEnabled && retry < 5);
+        sleep(1);
+        return STATE_DONE;
+    }
+}
+
+uint8_t ChessBot::goHome()
+{
+    qDebug("Request Robot to go home");
+    if (!robotController->isOpen()) {
+        qDebug("Serial port is not open for abort.");
+        return STATE_DONE;
+    } else {
+        robotController->write("ha");
+        robotController->waitForBytesWritten(1000);
+        sleep(1);
+        if (robotController->waitForReadyRead(500)) {
+            QByteArray chunk = robotController->readAll();
+            qDebug("Received progress chunk: %s", chunk.constData());
+        }
+        QString homeCmdID = "";
+        QString homeCmdRequest = "";
+        QString homeCmdState = "";
+        int retry = 0;
+        do {
+            robotController->write("cmd");
+            robotController->waitForBytesWritten(200);
+            if (robotController->waitForReadyRead(500)) {
+                QByteArray chunk = robotController->readAll();
+                qDebug("Received progress chunk: %s", chunk.constData());
+                QString homeCmdIDStr = QString::fromLatin1(chunk);
+                if(homeCmdIDStr.contains("[cmd]")) {
+                    homeCmdID = homeCmdIDStr.section(']', 1);
+                    qDebug("homeCmdID: %s", homeCmdID.toStdString().c_str());
+                    break;
+                }
+            }
+            retry++;
+        } while(retry < 5);
+
+        if(homeCmdID != "") {
+            homeCmdRequest = "_"+homeCmdID;
+            retry = 0;
+            do {
+                robotController->write(homeCmdRequest.toStdString().c_str());
+                robotController->waitForBytesWritten(200);
+                if (robotController->waitForReadyRead(200)) {
+                    QByteArray chunk = robotController->readAll();
+                    qDebug("Received progress chunk: %s", chunk.constData());
+                    QString homeCmdStateStr = QString::fromLatin1(chunk);
+                    if(homeCmdStateStr.contains("]DONE")) {
+                        homeCmdState = homeCmdStateStr.section(']', 1);
+                        qDebug("homeCmdState: %s", homeCmdState.toStdString().c_str());
+                        break;
+                    }
+                }
+                sleep(1);
+                retry++;
+            } while(retry < 25);
+        }
+        return STATE_DONE;
     }
 }
 

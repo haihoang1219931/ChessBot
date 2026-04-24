@@ -38,6 +38,7 @@ public:
     void calibToHome(int motorID);
     void goToReadyPosition();
     void goToCalibPosition();
+    void gotoPosition(float x, float y, float upAngleInDegree);
     void executeSequence(MOVE_TYPE moveType,
                          int startCol, int startRow,
                          int stopCol, int stopRow,

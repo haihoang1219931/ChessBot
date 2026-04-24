@@ -498,7 +498,9 @@ void Robot::initMove(int motorIDFirst, int motorIDLast)
         m_motorParamList[i].startStep = m_motorParamList[i].currentStep;
         m_motorParamList[i].direction = (m_motorParamList[i].targetStep > m_motorParamList[i].currentStep) ? 1 : -1;   
         float numStep = (float)abs(m_motorParamList[i].targetStep - m_motorParamList[i].currentStep);
+#if defined(DEBUG_INITMOVE) && defined(DEBUG_COMMAND)
         m_app->printf("calculateTotalTime M[%d]\r\n", i);
+#endif
         calculateTotalTime(m_motorParamList[i].numStepAccel, numStep,
                                 (float)m_motorParamList[i].minPulsePerStep, (float)m_motorParamList[i].homeStepTime,
                              &m_timeDelay[i],&m_startDelay[i]);

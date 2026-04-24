@@ -300,10 +300,12 @@ void ApplicationArduino::enableEngine(bool enable) {
 
 void ApplicationArduino::initDirection(int motorID, int direction)
 {
-  // Serial.print("initDirection motorID[");
-  // Serial.print(motorID);
-  // Serial.print("] direction=");
-  // Serial.println(direction);
+#ifdef DEBUG_COMMAND
+  Serial.print("initDirection motorID[");
+  Serial.print(motorID);
+  Serial.print("] direction=");
+  Serial.println(direction);
+#endif
   switch(motorID){
     case MOTOR::MOTOR_ARM1: {
       digitalWrite(dirPin1, direction > 0 ? LOW : HIGH);
@@ -443,13 +445,8 @@ uint8_t ApplicationArduino::executePulseStepper2Wires(uint8_t statePulse,
   uint8_t nextStatePulse = statePulse;
   switch(statePulse){
     case STATE_COMMAND1: {
-      // long start = micros();
-      // digitalWrite(stepPin,HIGH);
       *portRegister |= (1 << bit);
       nextStatePulse = countPulse >= (uint32_t)(numWaitPulse/2-1) ? STATE_COMMAND2 : STATE_WAIT1;
-      // long duration = micros() - start;
-      // Serial.print("Command pulse 2wires duration (microseconds): ");
-      // Serial.println(duration);
 #ifdef DEBUG_PULSE
       Serial.print("STATE_COMMAND1 -> STATE_WAIT1\r\n");
 #endif
@@ -465,7 +462,6 @@ uint8_t ApplicationArduino::executePulseStepper2Wires(uint8_t statePulse,
     }
     break;
     case STATE_COMMAND2: {
-      // digitalWrite(stepPin,LOW);
       *portRegister &= ~(1 << bit);
       nextStatePulse = countPulse >= (uint32_t)(numWaitPulse-1) ? STATE_DONE : STATE_WAIT2;
 #ifdef DEBUG_PULSE
@@ -491,19 +487,8 @@ uint8_t ApplicationArduino::executePulseStepper2Wires(uint8_t statePulse,
   return nextStatePulse;
 }
 
-volatile int countSample0 = 0;
-volatile int countSample1 = 0;
-ISR(TIMER0_COMPA_vect){
-  countSample0++;
-  if(countSample0 >= 10) {
-    countSample0 = 0;
-    app.readCommand();
-  }
-}
-
 ISR(TIMER1_COMPA_vect)
 {
-  countSample1++;
   app.executeSmoothMotionLoop(MOTOR_ARM1);
   app.executeSmoothMotionLoop(MOTOR_ARM2);
   app.executeSmoothMotionLoop(MOTOR_ARM5);

@@ -17,7 +17,7 @@ FocusScope {
     property int selectedRow: 0
     property int selectedCol: 0
     property int selectedZone: 0  // 0: chessboard, 1: dropzone right, 2: dropzone left
-    
+    property int adjustValue: 50
     // Excluded cells configuration - developers can modify these arrays
     // Each object contains {actualRow, actualCol} coordinates
     // If array is empty, all cells are selectable
@@ -482,19 +482,19 @@ FocusScope {
             } else if (infoPopupVisible) {
                 if (event.key === Qt.Key_Left) {
                     highlightDirection = 4;
-                    adjustCurrentPoint(-10, 0);
+                    adjustCurrentPoint(-adjustValue, 0);
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Right) {
                     highlightDirection = 2;
-                    adjustCurrentPoint(10, 0);
+                    adjustCurrentPoint(adjustValue, 0);
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Up) {
                     highlightDirection = 1;
-                    adjustCurrentPoint(0, -10);
+                    adjustCurrentPoint(0, -adjustValue);
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Down) {
                     highlightDirection = 3;
-                    adjustCurrentPoint(0, 10);
+                    adjustCurrentPoint(0, adjustValue);
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Escape) {
                     infoPopupVisible = false;
@@ -509,6 +509,7 @@ FocusScope {
                     infoPopupVisible = true;
                     highlightDirection = 0;
                     updatePopupValues();
+                    backend.sendTestCommand("tx"+popupX+"y"+popupY);
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Escape) {
                     confirmDialogVisible = true;
