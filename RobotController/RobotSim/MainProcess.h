@@ -53,7 +53,6 @@ public Q_SLOTS:
     void changeSleepTime(int sleepTime);
     void changeTimerPeriodMotion(int sleepTime);
     void changeTimerPeriodInput(int sleepTime);
-    void changeTimerPeriodCommand(int sleepTime);
 private:
     unsigned char m_renderData[93110400]; // 1920x1080 I420
     ApplicationSim* m_application;

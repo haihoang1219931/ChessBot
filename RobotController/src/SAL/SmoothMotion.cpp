@@ -1,7 +1,9 @@
 #include "SmoothMotion.h"
 #include "Robot.h"
+#if defined(DEBUG_COMMAND)
 #include "../ApplicationArduino.h"
 extern ApplicationArduino app;
+#endif
 SmoothMotion::SmoothMotion(uint8_t id, Robot* robot):
   m_robot(robot),
   m_id(id),

@@ -56,7 +56,7 @@ public:
                          int stopCol, int stopRow, char promotePiece);
     void calculateSequenceCastle(int kingCol, int kingRow,
                                  int rookCol, int rookRow);
-    void calculatePolygonEdge(float upAngleInDegree, float* edge, float* angle);
+    void calculatePolygonEdgeA2345(float upAngleInDegree, float* edge, float* angleA2A2345);
     void calculateJoints(float xPos, float yPos, float upAngleInDegree, int* jointSteps);
     Point calibPos();
     Command calculateNextPointInLine(Point currPos, Point targetPos, float numPointInCommand);

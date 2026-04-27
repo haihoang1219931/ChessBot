@@ -7,8 +7,6 @@ HardwareTimerSim::HardwareTimerSim(QObject *parent) : QObject(parent)
     connect(m_timerMotion, &QTimer::timeout, this, &HardwareTimerSim::taskLoopMotion);
     m_timerInput = new QTimer(this);
     connect(m_timerInput, &QTimer::timeout, this, &HardwareTimerSim::taskLoopInput);
-    m_timerCommand = new QTimer(this);
-    connect(m_timerCommand, &QTimer::timeout, this, &HardwareTimerSim::taskLoopCommand);
 }
 
 void HardwareTimerSim::setApplication(ApplicationSim* app)
@@ -24,11 +22,6 @@ void HardwareTimerSim::setIntervalMotion(int millis)
 void HardwareTimerSim::setIntervalInput(int millis)
 {
     m_timerInput->setInterval(millis);
-}
-
-void HardwareTimerSim::setIntervalCommand(int millis)
-{
-    m_timerCommand->setInterval(millis);
 }
 
 void HardwareTimerSim::enableTaskMotion(bool enable)
@@ -49,15 +42,6 @@ void HardwareTimerSim::enableTaskInput(bool enable)
     }
 }
 
-void HardwareTimerSim::enableTaskCommand(bool enable)
-{
-    if (!enable) {
-        m_timerCommand->stop();
-    } else {
-        m_timerCommand->start();
-    }
-}
-
 void HardwareTimerSim::taskLoopMotion()
 {
     m_app->executeSmoothMotionLoop(0);
@@ -69,9 +53,4 @@ void HardwareTimerSim::taskLoopMotion()
 void HardwareTimerSim::taskLoopInput()
 {
     m_app->updateInputState();
-}
-
-void HardwareTimerSim::taskLoopCommand()
-{
-    m_app->readCommand();
 }

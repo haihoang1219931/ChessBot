@@ -35,25 +35,62 @@ void ApplicationSim::initRobot()
 
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
-        {true,  100.0f*(20.0f/360.0f),                0,      10,        0,         2,           0,       250,       2,   FREQUENCY_TIMER1,     50},
-        {true,  1.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,         8,         -17,       150,       2,   FREQUENCY_TIMER1,    150},
-        {true,  1.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,         8,          50,       210,       2,   FREQUENCY_TIMER1,    150},
-        {false,  1.0f/1.0f,                          15,     130,      130,         1,         130,       130,       1,   FREQUENCY_TIMER1,      0},
-        {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       1,   FREQUENCY_TIMER1,      0},
-        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,      10,        0,         2,           0,        45,       2,   FREQUENCY_TIMER1,     50}
+        {true,  100.0f*(20.0f/360.0f),                0,      10,        0,        15,           0,       250,      15,   FREQUENCY_TIMER1,      0},
+        {true,  1.0f*18.0f/01.0f*(200.0f/360.0f),   300,       0,        0,        18,         -17,       150,       6,   FREQUENCY_TIMER1,    350},
+        {true,  1.0f*70.0f/20.0f*(200.0f/360.0f),    80,     140,        0,        64,          50,       210,      12,   FREQUENCY_TIMER1,     75},
+        {false,  1.0f/1.0f,                          20,     180,      180,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
+        {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       6,   FREQUENCY_TIMER1,      0},
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,      10,        0,         6,           0,        45,       6,   FREQUENCY_TIMER1,      0}
     };
+
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
-        printf("ApplicationSim::initRobot[%d] param maxSpeed[%d]\r\n",
-               motor,armPrams[motor].minPulsePerStep);
         m_robot->setMotorParam(motor,armPrams[motor]);
         m_robot->updateInitAngle(motor,armPrams[motor].initAngle);
     }
+    /**
+     * CB r[7] c[7] x[1395] y[3325]
+        simulateReceivedCommand:[tx1395y3325]
+        [tx1395y3325] Pos confirmed
+        simulateReceivedCommand:[ts0]
+        [ts0] TS confirmed
+        TS x[3489] y[1313] m[1][787] m[2][262] m[5][892]
+     */
+    Point targetPosition;
+    targetPosition.x = armPrams[MOTOR_ARM1].length
+            + armPrams[MOTOR_ARM2].length
+            + armPrams[MOTOR_ARM3].length
+            + armPrams[MOTOR_ARM4].length
+            + armPrams[MOTOR_ARM5].length;
+    targetPosition.y = 0;
+    int jointSteps[MAX_MOTOR];
+    jointSteps[MOTOR_CAPTURE] = 0;
+    jointSteps[MOTOR_ARM3] = 0;
+    jointSteps[MOTOR_ARM4] = 0;
+    calculateJoints(targetPosition.x, targetPosition.y, 0, jointSteps);
+    this->printf("calculateJoints x[%d] y[%d] m[1][%d] m[2][%d] m[5][%d]\r\n",
+        (int)(targetPosition.x),
+        (int)(targetPosition.y),
+        jointSteps[MOTOR_ARM1],
+        jointSteps[MOTOR_ARM2],
+        jointSteps[MOTOR_ARM5]
+    );
+    m_robot->m_motorParamList[MOTOR_ARM1].currentStep = 0;
+    m_robot->m_motorParamList[MOTOR_ARM2].currentStep = 0;
+    m_robot->m_motorParamList[MOTOR_ARM5].currentStep = jointSteps[MOTOR_ARM5];
+    Point currentPosition = currentPos();
+    this->printf("TS x[%d] y[%d] m[1][%d] m[2][%d] m[5][%d]\r\n",
+        (int)(currentPosition.x*10.0f),
+        (int)(currentPosition.y*10.0f),
+        m_robot->currentStep(1),
+        m_robot->currentStep(2),
+        m_robot->currentStep(5)
+    );
+
 }
 
 void ApplicationSim::specificPlatformGohome(int motorID)
 {
     m_mainProcess->changeTimerPeriodMotion(1);
-    m_mainProcess->changeTimerPeriodCommand(1000);
     m_mainProcess->changeTimerPeriodInput(1000);
 }
 

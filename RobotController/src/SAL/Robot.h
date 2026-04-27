@@ -58,7 +58,7 @@ public:
     void calculateTotalTime(int numStepAccel, int numStepTotal, float minsleep, float homeStepTime,
                             float* totalDelay, float* startDelay);
 
-private:
+public:
     ApplicationController* m_app;
     SmoothMotion* m_motorList[MAX_MOTOR];
     JointParam m_motorParamList[MAX_MOTOR];
