@@ -196,7 +196,7 @@ ApplicationWindow {
                 arm1Width: command.arm1Length
                 arm2Width: command.arm2Length
                 arm3Width: command.arm3Length
-                arm4Width: parseInt(command.arm4Length * Math.cos((45-command.upAngle)/180.0*Math.PI))
+                arm4Width: parseInt(command.arm4Length * Math.cos((command.upAngle)/180.0*Math.PI))
                 arm5Width: command.arm5Length
                 angle1: 180-command.angle1
                 angle2: 180+command.angle2

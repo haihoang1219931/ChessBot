@@ -388,8 +388,8 @@ Item {
                             id: sldArmAngle
                             width: 300
                             height: 40
-                            from: 0
-                            to: 45
+                            from: -45
+                            to: 0
                         }
                         Label {
                             width: 40

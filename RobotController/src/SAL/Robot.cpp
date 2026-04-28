@@ -388,12 +388,12 @@ void Robot::updateCurrentStep(int motorID)
 void Robot::setMoveTarget(int* jointSteps)
 {
     m_app->enableHardwareTimer(false);
-//    memcpy(m_moveSequence[m_numMove].jointSteps,jointSteps,sizeof(int)*MAX_MOTOR);
     for(int i=0; i< MAX_MOTOR; i++) {
         if(!m_motorParamList[i].active) continue;
-        m_moveTarget.jointSteps[i].steps = jointSteps[i];
-//        m_app->printf("Robot::setMoveTarget M[%d] step[%d]\r\n",
-//                      i,m_moveTarget.jointSteps[i].steps);
+        m_moveTarget.jointSteps[i].steps = jointSteps[i]-m_motorParamList[i].currentStep;
+        m_app->printf("Robot::setMoveTarget M[%d] step[%d] from J[%d] C[%d]\r\n",
+                      i,m_moveTarget.jointSteps[i].steps,
+                      jointSteps[i],m_motorParamList[i].currentStep);
     }
     m_app->enableHardwareTimer(true);
 }
@@ -494,7 +494,7 @@ void Robot::initMove(int motorIDFirst, int motorIDLast)
     float maxTime = 0;
     for(int i=motorIDFirst; i<= motorIDLast; i++) {
         if(!m_motorParamList[i].active) continue;
-        m_motorParamList[i].targetStep = m_moveTarget.jointSteps[i].steps;
+        m_motorParamList[i].targetStep = m_moveTarget.jointSteps[i].steps + m_motorParamList[i].currentStep;
         m_motorParamList[i].startStep = m_motorParamList[i].currentStep;
         m_motorParamList[i].direction = (m_motorParamList[i].targetStep > m_motorParamList[i].currentStep) ? 1 : -1;   
         float numStep = (float)abs(m_motorParamList[i].targetStep - m_motorParamList[i].currentStep);
