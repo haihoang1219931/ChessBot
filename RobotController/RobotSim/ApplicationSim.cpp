@@ -27,7 +27,7 @@ ApplicationSim::~ApplicationSim()
 #define FREQUENCY_TIMER1 1250.0f
 void ApplicationSim::initRobot()
 {
-    m_chessBoard->setChessBoardPosX(31-31*8/2);
+    m_chessBoard->setChessBoardPosX(-31.0f+31.0f*8.0f/2.0f);
     m_chessBoard->setChessBoardPosY(100);
     m_chessBoard->setChessBoardSize(31*8);
     m_chessBoard->setDropZoneSpace(31);
@@ -47,6 +47,12 @@ void ApplicationSim::initRobot()
         m_robot->setMotorParam(motor,armPrams[motor]);
         m_robot->updateInitAngle(motor,armPrams[motor].initAngle);
     }
+    Point c00 = m_chessBoard->convertDropPoint(0,1,ZONE_PLAYER);
+    printf("c00 x(%.2f) y(%.2f)\r\n",c00.x,c00.y);
+    Point c07 = m_chessBoard->convertDropPoint(0,1,ZONE_BOT);
+    printf("c07 x(%.2f) y(%.2f)\r\n",c07.x,c07.y);
+    Point c77 = m_chessBoard->convertPoint(7,7);
+    printf("c77 x(%.2f) y(%.2f)\r\n",c77.x,c77.y);
     /**
      * CB r[7] c[7] x[1395] y[3325]
         simulateReceivedCommand:[tx1395y3325]

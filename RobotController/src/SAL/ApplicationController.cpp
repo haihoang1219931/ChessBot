@@ -130,8 +130,8 @@ int ApplicationController::executeCommandNormal()
     switch (m_commandState) {
     case COMMAND_STATE_INIT: {
         int jointSteps[MAX_MOTOR];
-        calculateJoints(m_sequenceCommand[m_curCommandId].y,
-                        -m_sequenceCommand[m_curCommandId].x,
+        calculateJoints(m_sequenceCommand[m_curCommandId].x,
+                        m_sequenceCommand[m_curCommandId].y,
                         m_sequenceCommand[m_curCommandId].updownAngle,
                         jointSteps);
         jointSteps[MOTOR_CAPTURE] = m_sequenceCommand[m_curCommandId].captureStep;
@@ -159,8 +159,8 @@ int ApplicationController::executeCommandLine()
     switch (m_commandState) {
     case COMMAND_STATE_INIT: {
         m_curPos = currentPos();
-        m_tarPos = {m_sequenceCommand[m_curCommandId].y,
-                        m_sequenceCommand[m_curCommandId].x,
+        m_tarPos = {m_sequenceCommand[m_curCommandId].x,
+                        m_sequenceCommand[m_curCommandId].y,
                         0};
         m_curPointInCommand = 0;
         m_numPointInCommand = (uint32_t)(distance(m_curPos.x,m_curPos.y,m_tarPos.x,m_tarPos.y))/
@@ -174,8 +174,8 @@ int ApplicationController::executeCommandLine()
             m_nextPoint = calculateNextPointInLine(m_curPos,m_tarPos,(float)m_curPointInCommand);
             m_commandState = COMMAND_STATE_EXECUTE_THEN_RECAL;
         } else {
-            m_nextPoint.y = m_sequenceCommand[m_curCommandId].x;
-            m_nextPoint.x = m_sequenceCommand[m_curCommandId].y;
+            m_nextPoint.x = m_sequenceCommand[m_curCommandId].x;
+            m_nextPoint.y = m_sequenceCommand[m_curCommandId].y;
             m_nextPoint.updownAngle = m_sequenceCommand[m_curCommandId].updownAngle;
             m_nextPoint.captureStep = m_sequenceCommand[m_curCommandId].captureStep;
             m_commandState = COMMAND_STATE_EXECUTE_THEN_DONE;
@@ -448,7 +448,7 @@ void ApplicationController::executeCommand(char* command) {
         executeSequence(MOVE_NORMAL, command[2]-'0',command[1]-'0',
                 command[4]-'0',command[3]-'0');
         this->printf("[%s] Normal seq confirmed\r\n", command);
-    }else if(command[0] == 'c' && strlen(command)>=5) {
+    }else if(command[0] == 'C' && strlen(command)>=5) {
         m_comCommandID ++;
         executeSequence(MOVE_CASTLE, command[2]-'0',command[1]-'0',
                 command[4]-'0',command[3]-'0');
@@ -614,7 +614,7 @@ void ApplicationController::executeSingleMotor(int motorID,
     }
     initSequenceMove(MAX_MOTOR);
 }
-#define DEBUG_KINEMATIC
+//#define DEBUG_KINEMATIC
 bool ApplicationController::inverseKinematic(float x, float y, float a1, float a2, float* p1, float* p2)
 {
 //    if(sqrtf(x*x+y*y) > fabs(a1+a2) || sqrtf(x*x+y*y) < fabs(a1-a2)) return false;
@@ -641,7 +641,9 @@ void ApplicationController::forwardKinematic(float a1, float a2, float p1, float
 
 void ApplicationController::calculatePolygonEdgeA2345(float upAngleInDegree, float* edge, float* angleA2A2345)
 {
+#ifdef DEBUG_KINEMATIC
     this->printf("ApplicationController::calculatePolygonEdgeA2345\r\n");
+#endif
     float upAngle = upAngleInDegree/180.0f*M_PI;
     float a2, a3, a45, a23, a2345, q1, q2, xFK, yFK;
     float angleA3A23 = 0;
@@ -662,8 +664,10 @@ void ApplicationController::calculatePolygonEdgeA2345(float upAngleInDegree, flo
             - m_robot->homeAngle(MOTOR_ARM3)/180.0f*M_PI
             - m_robot->homeAngle(MOTOR_ARM4)/180.0f*M_PI;
     *edge = a2345;
+#ifdef DEBUG_KINEMATIC
     this->printf("ApplicationController::calculatePolygonEdgeA2345 done a2345[%.02f] angleA2A2345[%.02f]\r\n",
                  a2345,*angleA2A2345/M_PI*180.0f);
+#endif
 }
 
 void ApplicationController::calculateJoints(float xPos, float yPos, float upAngleInDegree, int* jointSteps)
@@ -686,10 +690,12 @@ void ApplicationController::calculateJoints(float xPos, float yPos, float upAngl
     this->printf("a1[%d]\r\n",(int)a1);
     this->printf("a2345[%d]\r\n",(int)a2345);
     this->printf("angleA2A2345[%d]\r\n",(int)(angleA2A2345*180.f/M_PI));
-#endif
     this->printf("Inverse\r\n");
+#endif
     inverseKinematic(xPos, yPos, a1, a2345, &q1, &q2);
+#ifdef DEBUG_KINEMATIC
     this->printf("Inverse done\r\n");
+#endif
     float xPosFK = 0, yPosFK = 0;
     forwardKinematic(a1,a2345,q1,q2,&xPosFK,&yPosFK);
     if(xPosFK*xPos < 0 || yPosFK * yPos < 0) q1 = q1 - M_PI;
@@ -979,8 +985,8 @@ void ApplicationController::calculateSequenceCastle(int kingCol, int kingRow,
         rookNewPoint = m_chessBoard->convertPoint(kingRow,kingCol+1);
     }
     clearSequenceMove();
+    appendSequenceMove(kingPoint, kingNewPoint, true);
     appendSequenceMove(rookPoint, rookNewPoint);
-    appendSequenceMove(kingPoint, kingNewPoint);
 }
 
 float ApplicationController::distance(float x1, float y1, float x2, float y2)
@@ -997,8 +1003,8 @@ void ApplicationController::clearSequenceMove() {
 }
 void ApplicationController::appendSequenceMove(Point start, Point stop, bool straightMove) {
     if(!straightMove) {
-        float upAngles[6] = {0.0f,40.0f,0.0f,
-                              0.0f,40.0f,0.0f};
+        float upAngles[6] = {-45.0f,0.0f,-45.0f,
+                             -45.0f,0.0f,-45.0f};
         Point position[6] = {start,start,start,
                               stop,stop,stop};
         int captureStep[6] = {0,490,490,
@@ -1014,19 +1020,18 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
             m_numCommand++;
         }
     } else {
-        float upAngles[4] = {0.0f,40.0f,40.0f,
-                              0.0f};
-        Point position[4] = {start,start,stop,stop};
-        int captureStep[4] = {0,415,0,0};
-        int numStep = 4;
+        float upAngles[6] = {-45.0f,0.0f,0.0f,0.0f,
+                              0.0f,-45.0f};
+        Point position[6] = {start,start,start,stop,stop,stop};
+        int captureStep[6] = {0,0,490,490,0,0};
+        int numStep = 6;
         for(int seqStep = 0; seqStep < numStep; seqStep++)
         {
             m_sequenceCommand[m_numCommand].x = position[seqStep].x;
             m_sequenceCommand[m_numCommand].y = position[seqStep].y;
             m_sequenceCommand[m_numCommand].updownAngle = upAngles[seqStep];
             m_sequenceCommand[m_numCommand].captureStep = captureStep[seqStep];
-            m_sequenceCommand[m_numCommand].type = seqStep != 2 ?
-                        COMMAND_NORMAL : COMMAND_LINE;
+            m_sequenceCommand[m_numCommand].type = COMMAND_NORMAL;
             m_numCommand++;
         }
     }

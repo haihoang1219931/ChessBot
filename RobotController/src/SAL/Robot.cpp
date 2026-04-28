@@ -391,9 +391,9 @@ void Robot::setMoveTarget(int* jointSteps)
     for(int i=0; i< MAX_MOTOR; i++) {
         if(!m_motorParamList[i].active) continue;
         m_moveTarget.jointSteps[i].steps = jointSteps[i]-m_motorParamList[i].currentStep;
-        m_app->printf("Robot::setMoveTarget M[%d] step[%d] from J[%d] C[%d]\r\n",
-                      i,m_moveTarget.jointSteps[i].steps,
-                      jointSteps[i],m_motorParamList[i].currentStep);
+//        m_app->printf("Robot::setMoveTarget M[%d] step[%d] from J[%d] C[%d]\r\n",
+//                      i,m_moveTarget.jointSteps[i].steps,
+//                      jointSteps[i],m_motorParamList[i].currentStep);
     }
     m_app->enableHardwareTimer(true);
 }

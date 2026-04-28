@@ -223,7 +223,7 @@ ApplicationWindow {
             angle5: 180
             upAngle: mainProcess.listAngle[5]
             grabberAngle: mainProcess.listAngle[0]
-            chessBoardPosX: mainProcess.chessBoardInfo[0] * visualScale
+            chessBoardPosX: -mainProcess.chessBoardInfo[0] * visualScale
             chessBoardPosY: mainProcess.chessBoardInfo[1] * visualScale
             chessBoardWidth: mainProcess.chessBoardInfo[2] * visualScale
             onAngle1Changed: {

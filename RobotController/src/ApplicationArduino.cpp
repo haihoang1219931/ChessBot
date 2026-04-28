@@ -97,7 +97,7 @@ int16_t ApplicationArduino::readA13() {
 
 void ApplicationArduino::initRobot()
 {
-    m_chessBoard->setChessBoardPosX(31-31*8/2);
+    m_chessBoard->setChessBoardPosX(-31+31*8/2);
     m_chessBoard->setChessBoardPosY(100);
     m_chessBoard->setChessBoardSize(31*8);
     m_chessBoard->setDropZoneSpace(31);
@@ -106,11 +106,11 @@ void ApplicationArduino::initRobot()
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
         {true,  100.0f*(20.0f/360.0f),                0,      10,        0,        15,           0,       250,      15,   FREQUENCY_TIMER1,      0},
-        {true,  1.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -15,        18,         -17,       150,       6,   FREQUENCY_TIMER1,    350},
-        {true,  1.0f*70.0f/20.0f*(200.0f/360.0f), 80.27,     140,       48,        64,          50,       210,      12,   FREQUENCY_TIMER1,     75},
+        {true,  1.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -15,        18,         -17,       150,       8,   FREQUENCY_TIMER1,    350},
+        {true,  1.0f*70.0f/20.0f*(200.0f/360.0f), 80.27,     140,       48,        64,          50,       210,      16,   FREQUENCY_TIMER1,    150},
         {false,  1.0f/1.0f,                       25.57,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
         {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       6,   FREQUENCY_TIMER1,      0},
-        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,      10,        0,         6,           0,        45,       6,   FREQUENCY_TIMER1,      0}
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -45,         6,         -45,         0,       6,   FREQUENCY_TIMER1,      0}
     };
 
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {

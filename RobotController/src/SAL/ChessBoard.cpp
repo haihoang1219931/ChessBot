@@ -96,8 +96,8 @@ Point ChessBoard::convertPoint(int row, int col)
     Point convertValue;
     if(!m_cellCalibsChessBoard[row][col].calibbed) {
         float squareLength = m_chessBoardRect;
-        convertValue.x = (float)(col-centerCol) * squareLength
-                + squareLength/2 + m_chessBoardPosX;
+        convertValue.x = -(float)(col-centerCol) * squareLength
+                - squareLength/2 + m_chessBoardPosX;
         convertValue.y = (float)(row-centerRow) * squareLength
                 + squareLength/2 + m_chessBoardPosY;
     } else {
@@ -113,13 +113,13 @@ Point ChessBoard::convertDropPoint(int row, int col, ZONE_TYPE zone) {
                 m_cellCalibsDropZonePlayer[row][col]:
                 m_cellCalibsDropZoneBot[row][col]).calibbed) {
         convertValue.x = zone == ZONE_PLAYER?
-                m_chessBoardPosX+8*m_chessBoardRect+m_dropZoneSpace+
-                    col*m_chessBoardRect + m_chessBoardRect/2:
-                m_chessBoardPosX-(m_dropZoneSpace+
-                    (1-col)*m_chessBoardRect + m_chessBoardRect/2);
+                m_chessBoardPosX - 8*m_chessBoardRect - m_dropZoneSpace
+                    - col*m_chessBoardRect - m_chessBoardRect/2:
+                m_chessBoardPosX + 2*m_chessBoardRect + m_dropZoneSpace
+                    - col*m_chessBoardRect - m_chessBoardRect/2;
         convertValue.y = m_chessBoardPosY +
                     row * m_chessBoardRect +
-                    m_chessBoardRect/2;        
+                    m_chessBoardRect/2;
     } else {
         convertValue = zone == ZONE_PLAYER?
                 m_cellCalibsDropZonePlayer[row][col]:
