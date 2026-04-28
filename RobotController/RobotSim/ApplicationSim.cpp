@@ -47,9 +47,9 @@ void ApplicationSim::initRobot()
         m_robot->setMotorParam(motor,armPrams[motor]);
         m_robot->updateInitAngle(motor,armPrams[motor].initAngle);
     }
-    Point c00 = m_chessBoard->convertDropPoint(0,1,ZONE_PLAYER);
+    Point c00 = m_chessBoard->convertDropPoint(0,0,ZONE_PLAYER);
     printf("c00 x(%.2f) y(%.2f)\r\n",c00.x,c00.y);
-    Point c07 = m_chessBoard->convertDropPoint(0,1,ZONE_BOT);
+    Point c07 = m_chessBoard->convertDropPoint(0,0,ZONE_BOT);
     printf("c07 x(%.2f) y(%.2f)\r\n",c07.x,c07.y);
     Point c77 = m_chessBoard->convertPoint(7,7);
     printf("c77 x(%.2f) y(%.2f)\r\n",c77.x,c77.y);

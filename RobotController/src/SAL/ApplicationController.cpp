@@ -448,10 +448,10 @@ void ApplicationController::executeCommand(char* command) {
         executeSequence(MOVE_NORMAL, command[2]-'0',command[1]-'0',
                 command[4]-'0',command[3]-'0');
         this->printf("[%s] Normal seq confirmed\r\n", command);
-    }else if(command[0] == 'C' && strlen(command)>=5) {
+    }else if(command[0] == 'C' && strlen(command)>=7 && command[1] == 'S' && command[2] == 'T') {
         m_comCommandID ++;
-        executeSequence(MOVE_CASTLE, command[2]-'0',command[1]-'0',
-                command[4]-'0',command[3]-'0');
+        executeSequence(MOVE_CASTLE, command[4]-'0',command[3]-'0',
+                command[6]-'0',command[5]-'0');
         this->printf("[%s] Castle confirmed\r\n", command);
     }else if(command[0] == 'a' && strlen(command)>=5) {
         m_comCommandID ++;
