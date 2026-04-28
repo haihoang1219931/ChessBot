@@ -148,6 +148,11 @@ void SmoothMotion::cruiseSpeed() {
 }
 
 void SmoothMotion::decreaseSpeed() {
+#ifdef DEBUG_COUNT_STEP
+  app.printf(" M[%d]", m_id);
+  app.printf(" Decel stepCount=%d", m_stepCountDecel);
+  app.printf(" delay=%d\r\n", (int)m_numWaitPulse);
+#endif
   if(m_stepCountDecel >= m_numStepDecel) {
     changeStateControl(MOTOR_EXECUTE_DONE);
     return;

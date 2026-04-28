@@ -105,12 +105,12 @@ void ApplicationArduino::initRobot()
 
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
-        {true,  100.0f*(20.0f/360.0f),                0,      10,        0,        15,           0,       250,      15,   FREQUENCY_TIMER1,      0},
-        {true,  1.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -15,        18,         -17,       150,       8,   FREQUENCY_TIMER1,    350},
-        {true,  1.0f*70.0f/20.0f*(200.0f/360.0f), 80.27,     140,       48,        64,          50,       210,      16,   FREQUENCY_TIMER1,    150},
+        {true,  100.0f*(20.0f/360.0f),                0,      10,        0,         4,           0,       250,       8,   FREQUENCY_TIMER1,      0},
+        {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -15,         4,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
+        {true, 16.0f*70.0f/20.0f*(200.0f/360.0f), 80.27,     140,       48,         8,          50,       210,       2,   FREQUENCY_TIMER1,    250},
         {false,  1.0f/1.0f,                       25.57,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
         {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       6,   FREQUENCY_TIMER1,      0},
-        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -45,         6,         -45,         0,       6,   FREQUENCY_TIMER1,      0}
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -45,         4,         -45,         0,       2,   FREQUENCY_TIMER1,    100}
     };
 
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
@@ -446,19 +446,10 @@ uint8_t ApplicationArduino::executePulseStepper2Wires(uint8_t statePulse,
   switch(statePulse){
     case STATE_COMMAND1: {
       *portRegister |= (1 << bit);
-      nextStatePulse = countPulse >= (uint32_t)(numWaitPulse/2-1) ? STATE_COMMAND2 : STATE_WAIT1;
+      nextStatePulse = STATE_COMMAND2;
 #ifdef DEBUG_PULSE
       Serial.print("STATE_COMMAND1 -> STATE_WAIT1\r\n");
 #endif
-    }
-    break;
-    case STATE_WAIT1: {
-      if(countPulse >= (uint32_t)(numWaitPulse/2-1)) {        
-#ifdef DEBUG_PULSE
-        Serial.print("STATE_WAIT1 -> STATE_COMMAND2\r\n");
-#endif
-        nextStatePulse = STATE_COMMAND2;
-      }
     }
     break;
     case STATE_COMMAND2: {
