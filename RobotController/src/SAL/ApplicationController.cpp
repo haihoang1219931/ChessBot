@@ -777,9 +777,16 @@ Point ApplicationController::currentPos()
 
 void ApplicationController::goToHome(int motorID)
 {
-    specificPlatformGohome(motorID);
-    m_robot->requestGoHome(motorID);
-    setMachineState(MACHINE_EXECUTE_HOME);
+    if(motorID == MOTOR_CAPTURE) {
+        specificPlatformGohome(MOTOR_CAPTURE);
+        m_robot->setState(ROBOT_EXECUTE_DONE);
+    } else {
+        if(motorID == MAX_MOTOR) {
+            specificPlatformGohome(MOTOR_CAPTURE);
+        }
+        m_robot->requestGoHome(motorID);
+        setMachineState(MACHINE_EXECUTE_HOME);
+    }
 }
 
 void ApplicationController::calibToHome(int motorID)

@@ -308,7 +308,7 @@ void ApplicationArduino::initDirection(int motorID, int direction)
 #endif
   switch(motorID){
     case MOTOR::MOTOR_ARM1: {
-      digitalWrite(dirPin1, direction > 0 ? LOW : HIGH);
+      digitalWrite(dirPin1, direction < 0 ? LOW : HIGH);
     }
     break;
     case MOTOR::MOTOR_ARM2: {
@@ -317,12 +317,12 @@ void ApplicationArduino::initDirection(int motorID, int direction)
     break;
     case MOTOR::MOTOR_ARM5:
     {
-      digitalWrite(dirPin5, direction > 0 ? LOW : HIGH);
+      digitalWrite(dirPin5, direction < 0 ? LOW : HIGH);
     }
     break;
     case MOTOR::MOTOR_CAPTURE: 
     {
-      digitalWrite(dirPinCapture, direction > 0 ? LOW : HIGH);
+      digitalWrite(dirPinCapture, direction < 0 ? LOW : HIGH);
     }
     break;
     default: break;

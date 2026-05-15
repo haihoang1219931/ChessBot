@@ -153,7 +153,7 @@ void Robot::requestGoHome(int motorID) {
 #endif
     m_app->enableHardwareTimer(false);
     m_requestMotorID = motorID;
-    int startID = motorID == MAX_MOTOR ? 0 : motorID;
+    int startID = motorID == MAX_MOTOR ? MOTOR_ARM1 : motorID;
     int stopID = motorID == MAX_MOTOR ? MAX_MOTOR-1 : motorID;
 #ifdef DEBUG_COMMAND
     m_app->printf("Request go home from [%d-%d]\r\n",startID,stopID);
