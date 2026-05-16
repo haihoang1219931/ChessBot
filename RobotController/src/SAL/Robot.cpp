@@ -46,22 +46,27 @@ int Robot::loop() {
     case ROBOT_EXECUTE_CALIBRATION: {
         if (executeCalib() == ROBOT_MOVE_DONE)
         {
-            m_state = ROBOT_EXECUTE_DONE;
+            m_state = ROBOT_STOP_MOTORS;
         }
     }
         break;
     case ROBOT_EXECUTE_GO_HOME: {
         if (executeGohome() == ROBOT_MOVE_DONE)
         {
-            m_state = ROBOT_EXECUTE_DONE;
+            m_state = ROBOT_STOP_MOTORS;
         }
     }
         break;
     case ROBOT_EXECUTE_SEQUENCE: {
         if (executeMoveSequence() == ROBOT_MOVE_DONE)
         {
-            m_state = ROBOT_EXECUTE_DONE;
+            m_state = ROBOT_STOP_MOTORS;
         }
+    }
+        break;
+    case ROBOT_STOP_MOTORS: {
+        m_app->hardwareStop(MAX_MOTOR);
+        m_state = ROBOT_EXECUTE_DONE;
     }
         break;
     case ROBOT_EXECUTE_DONE: {
@@ -81,6 +86,7 @@ void Robot::requestCalib(int motorID) {
 #ifdef DEBUG_COMMAND
     m_app->printf("CALIBRATION\r\n");
 #endif
+    m_app->enableEngine(true);
     m_app->enableHardwareTimer(false);
     m_requestMotorID = motorID;
     int startID = motorID == MAX_MOTOR ? 0 : motorID;
@@ -142,7 +148,6 @@ int Robot::executeCalib() {
                       motor,m_motorParamList[motor].calibStep);
 #endif
         }
-        m_app->harwareStop(m_requestMotorID);
     }
     return allMotorsAtHome ? ROBOT_MOVE_DONE : m_state;
 }
@@ -152,6 +157,7 @@ void Robot::requestGoHome(int motorID) {
     m_app->printf("GO HOME\r\n");
 #endif
     m_app->enableHardwareTimer(false);
+    m_app->enableEngine(true);
     m_requestMotorID = motorID;
     int startID = motorID == MAX_MOTOR ? MOTOR_ARM1 : motorID;
     int stopID = motorID == MAX_MOTOR ? MAX_MOTOR-1 : motorID;
@@ -210,7 +216,6 @@ int Robot::executeGohome() {
                       motor,m_motorParamList[motor].currentStep);
 #endif
         }
-        m_app->harwareStop(m_requestMotorID);
     }
     return allMotorsAtHome ? ROBOT_MOVE_DONE : m_state;
 }
@@ -387,6 +392,7 @@ void Robot::updateCurrentStep(int motorID)
 
 void Robot::setMoveTarget(int* jointSteps)
 {
+    m_app->enableEngine(true);
     m_app->enableHardwareTimer(false);
     for(int i=0; i< MAX_MOTOR; i++) {
         if(!m_motorParamList[i].active) continue;
@@ -495,6 +501,7 @@ void Robot::initMove(int motorIDFirst, int motorIDLast)
 #endif
     m_motorIDFirst = motorIDFirst;
     m_motorIDLast = motorIDLast;
+    m_app->enableEngine(true);
     m_app->enableHardwareTimer(false);              
     // Calculate time for each motor to reach target step, 
     // then start with the motor which has longest time to reach target step

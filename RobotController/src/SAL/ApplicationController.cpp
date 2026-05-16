@@ -794,9 +794,9 @@ void ApplicationController::calibToHome(int motorID)
     m_robot->requestCalib(motorID);
     setMachineState(MACHINE_EXECUTE_CALIBRATION);
 }
+int jointSteps[MAX_MOTOR];
 void ApplicationController::goToReadyPosition() {
-    int jointSteps[MAX_MOTOR];
-    jointSteps[MOTOR_CAPTURE] = 0;
+    jointSteps[MOTOR_CAPTURE] = m_robot->homeStep(MOTOR_CAPTURE);
     jointSteps[MOTOR_ARM1] = m_robot->angleToStep(MOTOR_ARM1,0);
     jointSteps[MOTOR_ARM2] = m_robot->angleToStep(MOTOR_ARM2,90+m_robot->homeAngle(MOTOR_ARM2));
     jointSteps[MOTOR_ARM3] = m_robot->homeAngle(MOTOR_ARM3);
@@ -808,8 +808,7 @@ void ApplicationController::goToReadyPosition() {
 }
 
 void ApplicationController::goToCalibPosition() {
-    int jointSteps[MAX_MOTOR];
-    jointSteps[MOTOR_CAPTURE] = 0;
+    jointSteps[MOTOR_CAPTURE] = m_robot->homeStep(MOTOR_CAPTURE);
     jointSteps[MOTOR_ARM1] = m_robot->calibStep(MOTOR_ARM1);
     jointSteps[MOTOR_ARM2] = m_robot->calibStep(MOTOR_ARM2);
     jointSteps[MOTOR_ARM3] = 0;
@@ -820,7 +819,6 @@ void ApplicationController::goToCalibPosition() {
     setMachineState(MACHINE_EXECUTE_POSITION);    
 }
 void ApplicationController::gotoPosition(float x, float y, float upAngleInDegree) {
-    int jointSteps[MAX_MOTOR];
     jointSteps[MOTOR_CAPTURE] = m_robot->homeStep(MOTOR_CAPTURE);
     jointSteps[MOTOR_ARM3] = m_robot->homeStep(MOTOR_ARM3);
     jointSteps[MOTOR_ARM4] = m_robot->homeStep(MOTOR_ARM4);
@@ -1014,8 +1012,8 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
                              -45.0f,0.0f,-45.0f};
         Point position[6] = {start,start,start,
                               stop,stop,stop};
-        int captureStep[6] = {0,490,490,
-                               490,0,0};
+        int captureStep[6] = {0,m_captureCountStep,m_captureCountStep,
+                               m_captureCountStep,0,0};
         int numStep = 6;
         for(int seqStep = 0; seqStep < numStep; seqStep++)
         {
@@ -1030,7 +1028,7 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
         float upAngles[6] = {-45.0f,0.0f,0.0f,0.0f,
                               0.0f,-45.0f};
         Point position[6] = {start,start,start,stop,stop,stop};
-        int captureStep[6] = {0,0,490,490,0,0};
+        int captureStep[6] = {0,0,m_captureCountStep,m_captureCountStep,0,0};
         int numStep = 6;
         for(int seqStep = 0; seqStep < numStep; seqStep++)
         {

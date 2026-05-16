@@ -11,8 +11,9 @@ typedef enum {
 typedef enum {
   STATE_CHECK_SENSOR,
   STATE_SET_DIR,
-  STATE_GO_HOME,
-  STATE_GO_TO_TARGET,
+  STATE_GO_HOME_1,
+  STATE_GO_TO_CAPTURE,
+  STATE_GO_HOME_2,
   STATE_HOME_DONE,
 } STATE_HOMING;
 
@@ -23,7 +24,7 @@ public:
   ~ApplicationArduino();
   void initRobot() override;
   void specificPlatformGohome(int motorID = MAX_MOTOR) override;
-  void harwareStop(int motorID = MAX_MOTOR) override;
+  void hardwareStop(int motorID = MAX_MOTOR) override;
   void checkInput() override;
   int printf(const char *fmt, ...) override;
   void msleep(int millis) override;
@@ -47,6 +48,7 @@ private:
   uint8_t m_incomingByte;
   // uint8_t m_buttonPin[MAX_BUTTON];
   int16_t m_limitGripperValue;
+
 };
 
 #endif // APPLICATIONARDUINO_H

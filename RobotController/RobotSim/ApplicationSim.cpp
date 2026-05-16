@@ -96,7 +96,7 @@ void ApplicationSim::specificPlatformGohome(int motorID)
     m_mainProcess->changeTimerPeriodInput(1000);
 }
 
-void ApplicationSim::harwareStop(int motorID)
+void ApplicationSim::hardwareStop(int motorID)
 {
     //@todo: consider to optimize code
 }

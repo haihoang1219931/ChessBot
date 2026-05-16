@@ -68,7 +68,7 @@ public:
     void executeSmoothMotionLoop(int motorID);
     virtual void initRobot() = 0;
     virtual void specificPlatformGohome(int motorID = MAX_MOTOR) = 0;
-    virtual void harwareStop(int motorID = MAX_MOTOR) = 0;
+    virtual void hardwareStop(int motorID = MAX_MOTOR) = 0;
     virtual void checkInput() = 0;
     virtual int printf(const char *fmt, ...) = 0;
     virtual void msleep(int millis) = 0;
@@ -108,6 +108,7 @@ public:
     bool m_calibrationRightDropzoneCalibrated[8][2];
     bool m_calibrationLeftDropzoneCalibrated[8][2];
     bool m_calibrationInProgress;
+    int m_captureCountStep;
     int m_appTimer;
     float m_minSpace;
     bool m_engineEnabled;

@@ -97,20 +97,20 @@ int16_t ApplicationArduino::readA13() {
 
 void ApplicationArduino::initRobot()
 {
-    m_chessBoard->setChessBoardPosX(-31+31*8/2);
-    m_chessBoard->setChessBoardPosY(100);
-    m_chessBoard->setChessBoardSize(31*8);
-    m_chessBoard->setDropZoneSpace(31);
+    m_chessBoard->setChessBoardPosX(77);
+    m_chessBoard->setChessBoardPosY(86);
+    m_chessBoard->setChessBoardSize(35*8);
+    m_chessBoard->setDropZoneSpace(35);
     m_minSpace = 2;
 
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
-        {true,  100.0f*(20.0f/360.0f),                0,      10,        0,         4,           0,       250,       8,   FREQUENCY_TIMER1,      0},
-        {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -15,         4,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
-        {true, 16.0f*70.0f/20.0f*(200.0f/360.0f), 80.27,     140,       48,         8,          50,       210,       2,   FREQUENCY_TIMER1,    250},
+        {true,  100.0f*(20.0f/360.0f),                0,      10,        0,         4,           0,       400,       8,   FREQUENCY_TIMER1,      0},
+        {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -22,         4,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
+        {true, 16.0f*70.0f/20.0f*(200.0f/360.0f), 80.27,     140,       52,         8,          50,       210,       2,   FREQUENCY_TIMER1,    250},
         {false,  1.0f/1.0f,                       25.57,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
         {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       6,   FREQUENCY_TIMER1,      0},
-        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -45,         4,         -45,         0,       2,   FREQUENCY_TIMER1,    100}
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -45,         8,         -45,         0,       8,   FREQUENCY_TIMER1,    100}
     };
 
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
@@ -146,8 +146,8 @@ void ApplicationArduino::specificPlatformGohome(int motorID)
     int sensorCaptureValue = 300;
     int sensorValue;
     int stateGoHome;
-    int countStep;
     int initDir;
+    int currentStep = 0;
     stateGoHome = STATE_CHECK_SENSOR;
     while(stateGoHome != STATE_HOME_DONE) {
       switch(stateGoHome){
@@ -159,11 +159,11 @@ void ApplicationArduino::specificPlatformGohome(int motorID)
         case STATE_SET_DIR:{
           digitalWrite(dirPin, sensorValue > sensorHomeValue ? LOW:HIGH);
           initDir = sensorValue > sensorHomeValue ? 1:-1;
-          stateGoHome = STATE_GO_HOME;
+          stateGoHome = STATE_GO_HOME_1;
           delay(100);
         }
         break;
-        case STATE_GO_HOME:{
+        case STATE_GO_HOME_1:{
           sensorValue = analogRead(dirAnalogRead);
           if(initDir*sensorValue>initDir*sensorHomeValue) {
             digitalWrite(stepPin, HIGH);
@@ -172,28 +172,43 @@ void ApplicationArduino::specificPlatformGohome(int motorID)
             delayMicroseconds(delayTime);
           } else {
             digitalWrite(dirPin, LOW);
-            stateGoHome = STATE_GO_TO_TARGET;
-            countStep = 0;
+            stateGoHome = STATE_GO_TO_CAPTURE;
+            m_captureCountStep = 0;
             delay(100);
           }
         }
         break;
-        case STATE_GO_TO_TARGET:{
+        case STATE_GO_TO_CAPTURE:{
           sensorValue = analogRead(dirAnalogRead);
           if(sensorValue>sensorCaptureValue) {
             digitalWrite(stepPin, HIGH);
             delayMicroseconds(delayTime);
             digitalWrite(stepPin, LOW);
             delayMicroseconds(delayTime);
-            countStep++;
+            m_captureCountStep++;
           } else {
-            stateGoHome = STATE_HOME_DONE;
+            stateGoHome = STATE_GO_HOME_2;
             Serial.print("countStep:");
-            Serial.println(countStep);
-            // delay(1000);
+            Serial.println(m_captureCountStep);
+            currentStep = m_captureCountStep;
+            digitalWrite(dirPin, HIGH);
+            delay(100);
           }
         }
         break;
+        case STATE_GO_HOME_2:{
+          if(currentStep > 0) {
+            currentStep --;
+            digitalWrite(stepPin, HIGH);
+            delayMicroseconds(delayTime);
+            digitalWrite(stepPin, LOW);
+            delayMicroseconds(delayTime);
+          } else {
+            m_robot->m_motorParamList[motorID].currentStep = 0;
+            stateGoHome = STATE_HOME_DONE;
+            delay(100);            
+          }
+        }
         case STATE_HOME_DONE:{
 
         }
@@ -203,9 +218,13 @@ void ApplicationArduino::specificPlatformGohome(int motorID)
   }
 }
 
-void ApplicationArduino::harwareStop(int motorID = MAX_MOTOR)
+void ApplicationArduino::hardwareStop(int motorID = MAX_MOTOR)
 {
   // Not used
+  // digitalWrite(enPin1, HIGH);
+  // digitalWrite(enPin2, HIGH);
+  digitalWrite(enPin5, HIGH);
+  digitalWrite(enPinCapture, HIGH);
 }
 
 void ApplicationArduino::checkInput(){
@@ -322,7 +341,7 @@ void ApplicationArduino::initDirection(int motorID, int direction)
     break;
     case MOTOR::MOTOR_CAPTURE: 
     {
-      digitalWrite(dirPinCapture, direction < 0 ? LOW : HIGH);
+      digitalWrite(dirPinCapture, direction > 0 ? LOW : HIGH);
     }
     break;
     default: break;
