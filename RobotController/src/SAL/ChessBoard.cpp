@@ -70,6 +70,11 @@ void ChessBoard::setDropZoneSpace(float value)
     m_dropZoneSpace = value;
 }
 
+void ChessBoard::setChessBoardSideSpace(float value)
+{
+    m_chessBoardSideSpace = value;
+}
+
 Point ChessBoard::getFreeDropPoint(ZONE_TYPE zone, uint8_t promotePiece)
 {
     Point freePoint;
@@ -100,6 +105,9 @@ Point ChessBoard::convertPoint(int row, int col)
                 - squareLength/2 + m_chessBoardPosX;
         convertValue.y = (float)(row-centerRow) * squareLength
                 + squareLength/2 + m_chessBoardPosY;
+        if(row >= 4) {
+            convertValue.y += m_chessBoardSideSpace;
+        }
     } else {
         convertValue = m_cellCalibsChessBoard[row][col];
     }

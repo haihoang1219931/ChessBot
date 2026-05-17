@@ -34,5 +34,5 @@ void setup() {
 }
 void loop() {
   app.loop();
-  delay(1);
+  delay(30);
 }

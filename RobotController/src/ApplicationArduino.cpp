@@ -98,9 +98,10 @@ int16_t ApplicationArduino::readA13() {
 void ApplicationArduino::initRobot()
 {
     m_chessBoard->setChessBoardPosX(77);
-    m_chessBoard->setChessBoardPosY(94);
+    m_chessBoard->setChessBoardPosY(89);
     m_chessBoard->setChessBoardSize(35*8);
     m_chessBoard->setDropZoneSpace(35);
+    m_chessBoard->setChessBoardSideSpace(4);
     m_minSpace = 2;
 
     JointParam armPrams[MAX_MOTOR] = {

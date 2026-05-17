@@ -13,6 +13,7 @@ public:
     void setChessBoardPosY(float value);
     void setChessBoardSize(float value);
     void setDropZoneSpace(float value);
+    void setChessBoardSideSpace(float value);
     Point getFreeDropPoint(ZONE_TYPE zone, uint8_t promote = 0);
     Point convertPoint(int row, int col);
     void updateDropZone(uint8_t piece, int row, int col, ZONE_TYPE zone);
@@ -26,6 +27,7 @@ public:
 private:
     float m_chessBoardPosX;
     float m_chessBoardPosY;
+    float m_chessBoardSideSpace;
     float m_chessBoardRect;
     float m_dropZoneSpace;
     Point m_cellCalibsChessBoard[8][8];
