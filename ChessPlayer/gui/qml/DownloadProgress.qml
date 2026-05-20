@@ -11,7 +11,12 @@ Item {
     signal overlayHidden()
 
     property int direction: 0
-    property var titleMap: ["Init communication","Upload calib to robot","Request calib from robot"]
+    property var titleMap: ["Init communication",
+        "Upload calib to robot",
+        "Request calib from robot",
+        "Enable robot",
+        "Homming"
+    ]
     property int progress: 0
     property bool finished: false
     property bool success: false

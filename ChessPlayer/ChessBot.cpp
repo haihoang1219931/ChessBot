@@ -30,18 +30,7 @@ ChessBot::ChessBot(QThread *parent) :
 #ifdef IMAGE_PROCESS_MOVE
     m_moveDetector = new ChessImageProcessing();
 #endif
-#ifdef IMAGE_PROCESS_MOVE
-    std::vector<cv::Rect> moves;
-    cv::Mat src1 = cv::imread("1.jpg");
-    cv::Mat src2 = cv::imread("2.jpg");
-    if(!src1.empty() && !src2.empty()) {
-        m_moveDetector->extractMove(src1, src2, moves);
-        std::vector<cv::Point> chessMoves;
-        m_moveDetector->convertChessMove(moves, chessMoves);
-        for(int i = 0; i< chessMoves.size(); i++) {
-            qDebug("Move(%d,%d)",chessMoves[i].x,chessMoves[i].y);
-        }
-    }
+#ifdef IMAGE_PROCESS_MOVE    
 #endif
     m_validCalibFileFound = loadCalibrationData();
 }
@@ -88,7 +77,17 @@ void ChessBot::updateCorners(QVariantList corners)
     m_chessboardConners.clear();
     for (const QVariant &val : corners) {
         QVariantMap map = val.toMap();
+        int x = map["x"].toInt();
+        int y = map["y"].toInt();
+
         m_chessboardConners.append(QPoint(map["x"].toInt(),map["y"].toInt()));
+    }
+
+    if(m_chessboardConners.size() == 4) {
+    m_moveDetector->setCorners(m_chessboardConners[0].x(),m_chessboardConners[0].y(),
+            m_chessboardConners[1].x(),m_chessboardConners[1].y(),
+            m_chessboardConners[2].x(),m_chessboardConners[2].y(),
+            m_chessboardConners[3].x(),m_chessboardConners[3].y());
     }
     saveCalibrationData();
 }
@@ -261,46 +260,24 @@ uint8_t ChessBot::playDetectMove()
     if(!readFrame(imageAfter)){
         return STATE_DONE;
     }
-    std::vector<cv::Rect> moves;
-    m_moveDetector->extractMove(imageBefore, imageAfter, moves);
-    std::vector<cv::Point> chessMoves;
-    m_moveDetector->convertChessMove(moves, chessMoves);
-//    chessMoves.push_back(cv::Point(0,6));
-//    chessMoves.push_back(cv::Point(2,5));
-    // convert
-    for(int i=0; i< chessMoves.size(); i++)
-    {
-        int temp = chessMoves[i].x;
-        chessMoves[i].x = chessMoves[i].y;
-        chessMoves[i].y = temp;
-    }
-    if(chessMoves.size()>=2) {
-        cv::Point startMove;
-        cv::Point stopMove;
-        for(int i=0; i< chessMoves.size(); i++) {
-            if(m_side == 1) {
-                chessMoves[i].x = 7 - chessMoves[i].x;
-                chessMoves[i].y = 7 - chessMoves[i].y;
-            }
-            qDebug("(%d,%d) name[%d] color[%d]",
-                   chessMoves[i].x,chessMoves[i].y,
-                   m_game->getPiece(chessMoves[i].x,chessMoves[i].y)->name,
-                   m_game->getPiece(chessMoves[i].x,chessMoves[i].y)->color);
-            if(m_game->getPiece(chessMoves[i].x,chessMoves[i].y)->name != pieceName::EMPTY &&
-               (int)m_game->getPiece(chessMoves[i].x,chessMoves[i].y)->color == (int)pieceColor::EMPTY+m_side+1){
-                startMove.x=chessMoves[i].x;
-                startMove.y=chessMoves[i].y;
-                qDebug("startMove (%d,%d)",startMove.x,startMove.y);
-            } else {
-                stopMove.x=chessMoves[i].x;
-                stopMove.y=chessMoves[i].y;
-                qDebug("stopMove (%d,%d)",stopMove.x,stopMove.y);
+    int g_threshold_val = 500;
+    int g_roi_percent = 50;
+    int g_canny_low = 50;
+    int g_diff_thresh = 30;
+    if(!imageBefore.empty() && !imageAfter.empty()) {
+        std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves(imageBefore, imageAfter,
+            g_threshold_val, g_roi_percent, g_canny_low, g_diff_thresh,
+            m_side == 0?"white":"black");
+        for(int i = 0; i< chessMoves.size(); i++) {
+            qDebug("Possible Move %s",chessMoves[i].c_str());
+            QString from = QString::fromStdString(chessMoves[i]).left(2);  // Result: "e2"
+            QString to = QString::fromStdString(chessMoves[i]).right(2);   // Result: "e4"
+            if(m_chessController->moveByCoordinates(from,to)) {
+                break;
             }
         }
-        m_game->move(Move(startMove.x,startMove.y,
-                        stopMove.x,stopMove.y));
-        print(*m_game);
     }
+
 #endif
     return STATE_DONE;
 }
@@ -314,14 +291,104 @@ uint8_t ChessBot::playRandomMove()
 
 uint8_t ChessBot::playCalculateNextMove()
 {
-
+    QString lastMove = m_chessController->moveHistory().last();
+    QString from = lastMove.left(2);  // Result: "e2"
+    QString to = lastMove.right(2);   // Result: "e4"
+    cv::Point fromCoord, toCoord;
+    fromCoord = m_moveDetector->notationToCoord(from.toStdString(),
+                                                m_side != 0?"white":"black");
+    toCoord = m_moveDetector->notationToCoord(to.toStdString(),
+                                                m_side != 0?"white":"black");
+    char robotCommand[32];
+    if(m_chessController->isChosenMoveCapture()) {
+        sprintf(robotCommand,"a%d%d%d%d",fromCoord.y,fromCoord.x,toCoord.y,toCoord.x);
+    } else if(m_chessController->chosenMove().isCastling()) {
+        sprintf(robotCommand,"CST%d%d%d%d",fromCoord.y,fromCoord.x,toCoord.y,toCoord.x);
+    } else if(m_chessController->chosenMove().isEnPassant()) {
+        sprintf(robotCommand,"pp%d%d%d%d",fromCoord.y,fromCoord.x,toCoord.y,toCoord.x);
+    } else if(m_chessController->chosenMove().isPromotion()) {
+        /**
+         * @brief promoChar
+         * 1	0	0	0	knight-promotion
+         * 1	0	0	1	bishop-promotion
+         * 1	0	1	0	rook-promotion
+         * 1	0	1	1	queen-promotion
+         * 1	1	0	0	knight-promo capture
+         * 1	1	0	1	bishop-promo capture
+         * 1	1	1	0	rook-promo capture
+         * 1	1	1	1	queen-promo capture
+         */
+        unsigned int promoPieceType = m_chessController->chosenMove().getPromotedPieceType();
+        // Todo: convet promoPieceType to promoChar
+        char promoChar = 'q';
+        sprintf(robotCommand,"p%c%d%d%d%d",promoChar,fromCoord.y,fromCoord.x,toCoord.y,toCoord.x);
+    } else {
+        sprintf(robotCommand,"c%d%d%d%d",fromCoord.y,fromCoord.x,toCoord.y,toCoord.x);
+    }
+    m_robotCommand = QString(robotCommand);
+    qDebug("playCalculateNextMove %s to cmd[%s]\r\n",
+           lastMove.toStdString().c_str(),
+           robotCommand);
     return STATE_DONE;
 }
 
 uint8_t ChessBot::playExecuteNextMove()
 {
     // TODO: Send command to robot and wait until execution is done
-    return STATE_DONE;
+    qDebug("Request Robot playExecuteNextMove");
+    if (!robotController->isOpen()) {
+        qDebug("Serial port is not open for abort.");
+        return STATE_DONE;
+    } else {
+        robotController->write(m_robotCommand.toUtf8());
+        robotController->waitForBytesWritten(1000);
+        sleep(1);
+        if (robotController->waitForReadyRead(500)) {
+            QByteArray chunk = robotController->readAll();
+            qDebug("Received progress chunk: %s", chunk.constData());
+        }
+        QString moveCmdID = "";
+        QString moveCmdRequest = "";
+        QString moveCmdState = "";
+        int retry = 0;
+        do {
+            robotController->write("cmd");
+            robotController->waitForBytesWritten(200);
+            if (robotController->waitForReadyRead(500)) {
+                QByteArray chunk = robotController->readAll();
+                qDebug("Received progress chunk: %s", chunk.constData());
+                QString moveCmdIDStr = QString::fromLatin1(chunk);
+                if(moveCmdIDStr.contains("[cmd]")) {
+                    moveCmdID = moveCmdIDStr.section(']', 1);
+                    qDebug("move: %s", moveCmdID.toStdString().c_str());
+                    break;
+                }
+            }
+            retry++;
+        } while(retry < 5);
+
+        if(moveCmdID != "") {
+            moveCmdRequest = "_"+moveCmdID;
+            retry = 0;
+            do {
+                robotController->write(moveCmdRequest.toStdString().c_str());
+                robotController->waitForBytesWritten(200);
+                if (robotController->waitForReadyRead(200)) {
+                    QByteArray chunk = robotController->readAll();
+                    qDebug("Received progress chunk: %s", chunk.constData());
+                    QString moveCmdStateStr = QString::fromLatin1(chunk);
+                    if(moveCmdStateStr.contains("]DONE")) {
+                        moveCmdState = moveCmdStateStr.section(']', 1);
+                        qDebug("move State: %s", moveCmdState.toStdString().c_str());
+                        break;
+                    }
+                }
+                sleep(1);
+                retry++;
+            } while(retry < 25);
+        }
+        return STATE_DONE;
+    }
 }
 
 uint8_t ChessBot::playInformResult()
@@ -689,7 +756,11 @@ void ChessBot::initRobot()
     case INIT_GET_VERSION: {
         qDebug("[Step 2] Getting Arduino version...");
         if (getArduinoVersion()) {
+#ifdef INIT_ROBOT_CALIBRATION
             m_stateInit = INIT_SEND_CALIBRATION;
+#else
+            m_stateInit = INIT_ENABLE_ROBOT;
+#endif
         } else {
             qDebug("Failed to get Arduino version. Initialization aborted.");
             Q_EMIT calibrationUploadComplete(INIT_COMMUNICATION, false);
@@ -809,12 +880,14 @@ void ChessBot::initRobot()
         break;
     case INIT_ENABLE_ROBOT: {
         if(enableRobot() == STATE_DONE){
+            Q_EMIT calibrationUploadComplete(ENABLE_ROBOT,true);
             m_stateInit = INIT_GO_HOME;
         }
     }
         break;
     case INIT_GO_HOME: {
         if(goHome() == STATE_DONE){
+            Q_EMIT calibrationUploadComplete(HOMING_ROBOT,true);
             m_stateInit = INIT_DONE;
         }
     }
@@ -1019,22 +1092,6 @@ bool ChessBot::loadCalibrationData(QString fileName)
                 grid[r][c] = QPoint(obj.value("x").toInt(), obj.value("y").toInt());
             }
         }
-#ifdef IMAGE_PROCESS_MOVE
-    m_moveDetector->corners().clear();
-    if(grid.size() && grid[0].size() >= 2 && grid[1].size() >= 2)
-    {
-        m_moveDetector->corners().push_back(
-                cv::Point(grid[0][1].x(),grid[0][1].y()));
-        m_moveDetector->corners().push_back(
-                cv::Point(grid[0][0].x(),grid[0][0].y()));
-        m_moveDetector->corners().push_back(
-                cv::Point(grid[1][0].x(),grid[1][0].y()));
-        m_moveDetector->corners().push_back(
-                cv::Point(grid[1][1].x(),grid[1][1].y()));
-    }
-    int threshold = 80;
-    m_moveDetector->setThreshold(threshold);
-#endif
         return grid;
     };
 
@@ -1051,6 +1108,27 @@ bool ChessBot::loadCalibrationData(QString fileName)
         QJsonObject obj = val.toObject();
         m_chessboardConners.append(QPoint(obj.value("x").toInt(), obj.value("y").toInt()));
     }
+#ifdef IMAGE_PROCESS_MOVE
+    if(m_chessboardConners.size() == 4)
+    {
+        m_moveDetector->setCorners(m_chessboardConners[0].x(),m_chessboardConners[0].y(),
+                m_chessboardConners[1].x(),m_chessboardConners[1].y(),
+                m_chessboardConners[2].x(),m_chessboardConners[2].y(),
+                m_chessboardConners[3].x(),m_chessboardConners[3].y());
+//        int g_threshold_val = 500;
+//        int g_roi_percent = 50;
+//        int g_canny_low = 50;
+//        int g_diff_thresh = 30;
+//        cv::Mat src1 = cv::imread("28_1.jpg");
+//        cv::Mat src2 = cv::imread("28_2.jpg");
+//        if(!src1.empty() && !src2.empty()) {
+//            std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves(src1, src2, g_threshold_val, g_roi_percent, g_canny_low, g_diff_thresh, "white");
+//            for(int i = 0; i< chessMoves.size(); i++) {
+//                qDebug("Possible Move %s",chessMoves[i].c_str());
+//            }
+//        }
+    }
+#endif
 
     return true;
 }
@@ -1244,7 +1322,10 @@ QVariantList ChessBot::chessboardCorners() const {
     QVariantList rootList;
     qDebug("Number of m_chessboardConners %d",m_chessboardConners.size());
     for (const QPoint &corner : m_chessboardConners) {
-        rootList.append(QVariant::fromValue(corner));
+        QVariantMap pointMap;
+        pointMap["x"] = corner.x();
+        pointMap["y"] = corner.y();
+        rootList.append(pointMap);
     }
     return rootList;
 }

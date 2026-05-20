@@ -14,6 +14,8 @@
 #include "opencv2/calib3d/calib3d.hpp"
 #include <iostream>
 #include <vector>
+#include <map>
+#include <math.h>
 #include <sys/time.h> // for clock_gettime()
 #include <unistd.h> // for usleep()
 class ChessImageProcessing
@@ -24,14 +26,21 @@ public:
     cv::Mat getNewImageSide();
     bool detectSide(cv::Mat image);
     bool isBlackSide();
-    void extractMove(const cv::Mat prevColor, const cv::Mat nextColor, std::vector<cv::Rect>& moves);
-    void convertChessMove(const std::vector<cv::Rect> moves, std::vector<cv::Point>& chessMoves);
-    std::vector<cv::Point>& corners();
+    void setCorners(float topLeftX, float topLeftY,
+                    float topRightX, float topRightY,
+                    float bottomRightX, float bottomRightY,
+                    float bottomLeftX, float bottomLeftY);
     cv::Mat getTranformMatrix();
     int chessBoardBox();
     int chessBoardRow();
     int chessBoardSize();
     void setThreshold(int threshold);
+    std::string coordToNotation(cv::Point pt, const std::string& playerSide);
+    cv::Point notationToCoord(const std::string& notation, const std::string& playerSide);
+    std::vector<std::string> findPossibleMoves(const cv::Mat& img_start, const cv::Mat& img_end,
+                                   int threshold_val, int roi_percent,
+                                   int canny_low, int diff_thresh,
+                                   const std::string& playerSide = "white");
 private:
     bool m_sourceConnected;
     bool m_isBlackSide;
@@ -42,8 +51,6 @@ private:
     cv::Mat m_prevImage;
     cv::Mat m_currImage;
     cv::Mat m_transformMatrix;
-    std::vector<cv::Point2f> m_chessBoardCorners;
-    std::vector<cv::Point> m_corners;
 
 };
 

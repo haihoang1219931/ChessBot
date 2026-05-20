@@ -35,6 +35,8 @@ public:
     int engineLevel() const;
     int playerColor() const;
     QString buildResultText() const;
+    Move chosenMove() const;
+    bool isChosenMoveCapture() const;
 
     Q_INVOKABLE void newGame();
     Q_INVOKABLE void clickSquare(int uiIndex);
@@ -82,4 +84,5 @@ private:
     std::vector<Move> m_pendingPromotionMoves;
     int m_engineDepth;
     int m_playerColor; // 0 = White, 1 = Black
+    Move m_chosenMove;
 };

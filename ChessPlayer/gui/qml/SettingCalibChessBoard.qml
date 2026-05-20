@@ -6,11 +6,10 @@ FocusScope {
     id: root
     width: 800; height: 480
     signal exitPressed()
-    property string filePath: "trapezoid_data.json"
-    // Trapezoid points: [Bottom-Left, Bottom-Right, Top-Right, Top-Left]
+    // Trapezoid points: [Top-Left, Top-Right, Bottom-Right, Bottom-Left]
     property var points: [
-        {"x": 150, "y": 350}, {"x": 450, "y": 350},
-        {"x": 350, "y": 150}, {"x": 250, "y": 150}
+        {"x": 0, "y": 0}, {"x": 640, "y": 0},
+        {"x": 640, "y": 480}, {"x": 0, "y": 480},
     ]
     property int activeIndex: 0
     property bool isEditing: false
@@ -30,16 +29,15 @@ FocusScope {
     Component.onCompleted: {
         var corners = backend.chessboardCorners();
         if(corners.length === 4) {
-            points = corners;
-        } else {
-            backend.updateCorners(points);
+            root.points = corners;
         }
-
         canvas.requestPaint();
     }
     Canvas {
         id: canvas
-        anchors.fill: parent
+        anchors.centerIn: parent
+        width: 640
+        height: 480
         focus: true
         onPaint: {
             var ctx = getContext("2d");
@@ -76,7 +74,7 @@ FocusScope {
         Keys.onPressed: (event) => {
             var step = 2;
             if (event.key === Qt.Key_Space) {
-                backend.updateCorners(points);
+                backend.updateCorners(root.points);
             }
             else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 isEditing = !isEditing; // Toggle mode
@@ -91,9 +89,9 @@ FocusScope {
             else {
                 // Navigation Mode
                 if (event.key === Qt.Key_Left || event.key === Qt.Key_Down)
-                    activeIndex = (activeIndex + 1) % 4;
-                if (event.key === Qt.Key_Right || event.key === Qt.Key_Up)
                     activeIndex = ((activeIndex >= 1? activeIndex:activeIndex+4) - 1) % 4;
+                if (event.key === Qt.Key_Right || event.key === Qt.Key_Up)
+                    activeIndex = (activeIndex + 1) % 4;
             }
 
             canvas.requestPaint();

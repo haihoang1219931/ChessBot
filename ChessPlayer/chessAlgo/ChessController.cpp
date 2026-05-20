@@ -199,6 +199,7 @@ bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex)
         Q_EMIT boardChanged();
         return false;
     }
+    m_chosenMove = chosenMove;
 
     m_board->executeMove(chosenMove);
     m_moveHistory.append(QString::fromStdString(chosenMove.toShortString()));
@@ -586,6 +587,31 @@ QString ChessController::buildResultText() const
     }
 
     return "";
+}
+
+Move ChessController::chosenMove() const
+{
+    return m_chosenMove;
+}
+
+bool ChessController::isChosenMoveCapture() const
+{
+    // Assume you have: Move chosenMove; std::shared_ptr<Board> m_board;
+    int dest = m_chosenMove.getDestination();
+    bool isCapture = false;
+
+    // Check if destination square is occupied by an opponent's piece
+    QString destPiece = pieceCodeAtSquare(dest);
+    if (!destPiece.isEmpty()) {
+        // There is a piece on the destination square before the move
+        // Optionally, check if it's an opponent's piece
+        bool isWhiteToMove = m_board->getColorToPlay() == WHITE;
+        if ((isWhiteToMove && destPiece.startsWith("b")) ||
+            (!isWhiteToMove && destPiece.startsWith("w"))) {
+            isCapture = true;
+        }
+    }
+    return isCapture;
 }
 
 int ChessController::uiIndexToSquare(int uiIndex)

@@ -12,7 +12,7 @@ Rectangle {
     signal gobackLevelSelection()
     Keys.onEscapePressed: root.goback()
     Keys.onReturnPressed: root.startGame()
-    Keys.onSpacePressed: backend.randomMove()
+    Keys.onSpacePressed: backend.processNextMove()
     property int levelType: 1
     property int levelScore: 200
     property int side: 0

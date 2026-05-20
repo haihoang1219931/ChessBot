@@ -23,6 +23,8 @@ typedef enum{
     INIT_COMMUNICATION,
     CALIB_UPLOAD_TO_ROBOT,
     CALIB_REQUEST_FROM_ROBOT,
+    ENABLE_ROBOT,
+    HOMING_ROBOT,
 } INIT_DIRECTION;
 
 typedef enum{
@@ -172,6 +174,7 @@ private:
     int m_calibCellCount;
     QString m_cmdId;
     bool m_validCalibFileFound;
+    QString m_robotCommand;
 };
 
 #endif // CHESSBOT_H

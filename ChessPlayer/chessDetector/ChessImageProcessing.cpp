@@ -7,10 +7,6 @@ ChessImageProcessing::ChessImageProcessing()
     m_chessBoardRow = 8;
     m_chessBoardBox = 60;
     m_chessBoardSize = m_chessBoardRow * m_chessBoardBox;
-    m_chessBoardCorners = {cv::Point2f (0,0),
-                         cv::Point2f (m_chessBoardSize,0),
-                         cv::Point2f (m_chessBoardSize,m_chessBoardSize),
-                         cv::Point2f (0,m_chessBoardSize)};
 }
 
 void ChessImageProcessing::connectSource(char* source) {
@@ -25,86 +21,17 @@ bool ChessImageProcessing::detectSide(cv::Mat image) {
 bool ChessImageProcessing::isBlackSide() {
     return m_isBlackSide;
 }
-std::vector<cv::Point>& ChessImageProcessing::corners() {
-    return m_corners;
-}
-
-void ChessImageProcessing::extractMove(const cv::Mat prevColor, const cv::Mat nextColor, std::vector<cv::Rect>& moves){
-    struct timeval start, end;
-    long secs_used,micros_used;
-    gettimeofday(&start, NULL);
-    cv::Mat prev, next;
-    cv::Mat motion;
-    moves.clear();
-    cvtColor( prevColor, prev, cv::COLOR_BGR2GRAY ); // Convert the image to Gray
-    cvtColor( nextColor, next, cv::COLOR_BGR2GRAY ); // Convert the image to Gray
-    cv::absdiff(prev, next, motion);
-    cv::imwrite("1.jpg",prevColor);
-    cv::imwrite("2.jpg",nextColor);
-    cv::imwrite("diff.jpg",motion);
-#ifdef DEBUG_SHOW
-    cv::imshow("Diff",motion);
-#endif
-    cv::threshold(motion, motion, m_threshold, 255, cv::THRESH_BINARY);
-    cv::erode(motion, motion, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3,3)));
-    cv::dilate(motion, motion, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(10,10)));
-    std::vector<std::vector<cv::Point>> contours;
-    std::vector<cv::Vec4i> hierarchy;
-    findContours(motion, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_NONE);
-    std::vector<std::vector<cv::Point> > contours_poly( contours.size() );
-    std::vector<cv::Rect> boundRect( contours.size() );
-
-    for( size_t i = 0; i < contours.size(); i++ )
-    {
-        approxPolyDP( contours[i], contours_poly[i], 3, true );
-        boundRect[i] = boundingRect( contours_poly[i] );
-        if(boundRect[i].width > 20 && boundRect[i].height > 20) {
-            moves.push_back(boundRect[i]);
-            rectangle( motion, boundRect[i].tl(), boundRect[i].br(), cv::Scalar(255,255,255), 2 );
-        }
-    }
-    gettimeofday(&end, NULL);
-    secs_used=(end.tv_sec - start.tv_sec); //avoid overflow by subtracting first
-    micros_used= ((secs_used*1000000) + end.tv_usec) - (start.tv_usec);
-
-    printf("micros_used: %d\n",micros_used);
-    cv::imwrite("motion.jpg",motion);
-#ifdef DEBUG_SHOW
-    cv::imshow("motion",motion);
-#endif
-}
-void ChessImageProcessing::convertChessMove(const std::vector<cv::Rect> moves, std::vector<cv::Point>& chessMoves) {
-    if(m_corners.size() != 4) {
-        return;
-    }
-    cv::Point2f source_points[4];
-    cv::Point2f dest_points[4];
-    for(int i=0; i< m_corners.size(); i++) {
-        source_points[i].x = (float)(m_corners[i].x);
-        source_points[i].y = (float)(m_corners[i].y);
-        dest_points[i].x = (float)(m_chessBoardCorners[i].x);
-        dest_points[i].y = (float)(m_chessBoardCorners[i].y);
-    }
-    m_transformMatrix = cv::getPerspectiveTransform(source_points, dest_points);
-#ifdef DEBUG_MOVE_DETECTOR
-    std::cout << "transformMatrix :" << m_transformMatrix << std::endl;
-#endif
-    std::vector<cv::Rect> warpedMoves;
-    for( size_t i = 0; i < moves.size(); i++ ){
-        std::vector<cv::Point2f> obj_corners,scene_corners;
-        obj_corners.push_back(cv::Point2f(moves[i].tl().x,moves[i].tl().y));
-        obj_corners.push_back(cv::Point2f(moves[i].tl().x,moves[i].br().y));
-        obj_corners.push_back(cv::Point2f(moves[i].br().x,moves[i].br().y));
-        obj_corners.push_back(cv::Point2f(moves[i].br().x,moves[i].tl().y));
-        cv::perspectiveTransform(obj_corners,scene_corners,m_transformMatrix);
-        warpedMoves.push_back(cv::Rect(scene_corners[0],scene_corners[2]));
-        int row = (warpedMoves[i].x + warpedMoves[i].width/2)/m_chessBoardBox;
-        int col = (warpedMoves[i].y + warpedMoves[i].height/2)/m_chessBoardBox;
-        if(row >=0 && row <m_chessBoardRow &&
-                col >=0 && col <m_chessBoardRow ) {
-            chessMoves.push_back(cv::Point(row,col));
-        }
-    }
+void ChessImageProcessing::setCorners(float topLeftX, float topLeftY,
+                                      float topRightX, float topRightY,
+                                      float bottomRightX, float bottomRightY,
+                                      float bottomLeftX, float bottomLeftY)
+{
+    std::vector<cv::Point2f> corners;
+    corners.push_back(cv::Point2f(topLeftX, topLeftY));
+    corners.push_back(cv::Point2f(topRightX, topRightY));
+    corners.push_back(cv::Point2f(bottomRightX, bottomRightY));
+    corners.push_back(cv::Point2f(bottomLeftX, bottomLeftY));
+    m_transformMatrix = getPerspectiveTransform(corners, std::vector<cv::Point2f>{{0,0},{640,0},{640,640},{0,640}});
 }
 cv::Mat ChessImageProcessing::getTranformMatrix() {
     return m_transformMatrix;
@@ -120,4 +47,102 @@ int ChessImageProcessing::chessBoardSize() {
 }
 void ChessImageProcessing::setThreshold(int threshold) {
     m_threshold = threshold;
+}
+
+// Helper: Convert board coordinates to chess notation
+std::string ChessImageProcessing::coordToNotation(cv::Point pt, const std::string& playerSide)
+{
+    if (pt.x < 0 || pt.x > 7 || pt.y < 0 || pt.y > 7) return "";
+    char file, rank;
+    if (playerSide == "black") {
+        file = 'a' + pt.x;
+        rank = '8' - pt.y;
+    } else { // black at bottom
+        file = 'h' - pt.x;
+        rank = '1' + pt.y;
+    }
+    return std::string(1, file) + std::string(1, rank);
+}
+
+cv::Point ChessImageProcessing::notationToCoord(const std::string& notation, const std::string& playerSide)
+{
+    // Validate input length
+    if (notation.length() < 2) return cv::Point(-1, -1);
+
+    char file = notation[0];
+    char rank = notation[1];
+
+    // Validate chess boundaries
+    if (file < 'a' || file > 'h' || rank < '1' || rank > '8') return cv::Point(-1, -1);
+
+    int x, y;
+
+    if (playerSide == "black") {
+        x = file - 'a';
+        y = '8' - rank;
+    } else { // white at bottom / black at top
+        x = 'h' - file;
+        y = rank - '1';
+    }
+
+    return cv::Point(x, y);
+}
+/**
+ * @brief Pure function to find the best move between two board states.
+ * @param playerSide: "white" or "black" at the bottom
+ * @param moveStr: output move string in chess notation (e.g., e2e4)
+ */
+std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& img_start, const cv::Mat& img_end,
+                               int threshold_val, int roi_percent,
+                               int canny_low, int diff_thresh,
+
+                               const std::string& playerSide)
+{
+    // No longer identify start/stop/occupied, just collect top 3 cells
+    std::vector<std::string> listMoves;
+    if (img_start.empty() || img_end.empty()) return listMoves;
+    std::vector<cv::Point> top3cells;
+    cv::Mat gray1, gray2, warped1, warped2, diff_bin, edges1, edges2;
+
+    // warp image before calculation
+    warpPerspective(img_start, warped1, m_transformMatrix, cv::Size(640, 640));
+    warpPerspective(img_end, warped2, m_transformMatrix, cv::Size(640, 640));
+
+    cvtColor(warped1, gray1, cv::COLOR_BGR2GRAY);
+    cvtColor(warped2, gray2, cv::COLOR_BGR2GRAY);
+
+    Canny(gray1, edges1, canny_low, canny_low * 3);
+    Canny(gray2, edges2, canny_low, canny_low * 3);
+
+    absdiff(gray1, gray2, diff_bin);
+    threshold(diff_bin, diff_bin, diff_thresh, 255, cv::THRESH_BINARY);
+    int sq = img_start.cols / 8;
+    int sub = MAX(1, (sq * roi_percent) / 100);
+    int off = (sq - sub) / 2;
+
+    std::vector<std::pair<int, cv::Point>> topCells;
+    for (int r = 0; r < 8; r++) {
+        for (int c = 0; c < 8; c++) {
+            cv::Rect roi(c * sq + off, r * sq + off, sub, sub);
+            int diff_px = countNonZero(diff_bin(roi));
+            topCells.push_back({diff_px, cv::Point(c, r)});
+        }
+    }
+    sort(topCells.begin(), topCells.end(), [](const std::pair<int, cv::Point>& a, const std::pair<int, cv::Point>& b){ return a.first > b.first; });
+    for (int i = 0; i < 3 && i < (int)topCells.size(); ++i) {
+        top3cells.push_back(topCells[i].second);
+    }
+    // Output move string in chess notation for all 2-cell combinations from top 3 cells
+    int n = (int)top3cells.size();
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            if (i == j) continue;
+            std::string fromStr = coordToNotation((top3cells)[i], playerSide);
+            std::string toStr = coordToNotation((top3cells)[j], playerSide);
+            if (!fromStr.empty() && !toStr.empty()) {
+                listMoves.push_back(fromStr + toStr);
+            }
+        }
+    }
+    return listMoves;
 }
