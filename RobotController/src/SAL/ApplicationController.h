@@ -108,7 +108,6 @@ public:
     bool m_calibrationRightDropzoneCalibrated[8][2];
     bool m_calibrationLeftDropzoneCalibrated[8][2];
     bool m_calibrationInProgress;
-    int m_captureCountStep;
     int m_appTimer;
     float m_minSpace;
     bool m_engineEnabled;

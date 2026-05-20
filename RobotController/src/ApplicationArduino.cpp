@@ -40,6 +40,7 @@ ApplicationArduino::ApplicationArduino()
     pinMode(limit1, INPUT_PULLUP);
     pinMode(limit2, INPUT_PULLUP);
     pinMode(limit5, INPUT_PULLUP);
+    pinMode(limitGripper, INPUT_PULLUP);
 
     pinMode(enPin1, OUTPUT);
     pinMode(dirPin1, OUTPUT);
@@ -72,14 +73,6 @@ ApplicationArduino::ApplicationArduino()
     digitalWrite(enPinCapture, HIGH);
     digitalWrite(dirPinCapture, LOW);
     digitalWrite(stepPinCapture, HIGH);
-  
-    // Clear the prescaler bits (bits 0, 1, 2)
-    ADCSRA &= ~( (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0) );
-
-    // Set prescaler to 16 (ADPS2 = 1, ADPS1 = 0, ADPS0 = 0)
-    ADCSRA |= (1 << ADPS2); 
-
-    analogRead(limitGripper);
 }
 
 ApplicationArduino::~ApplicationArduino()
@@ -106,12 +99,12 @@ void ApplicationArduino::initRobot()
 
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
-        {true,  100.0f*(20.0f/360.0f),                0,      10,        0,         4,           0,       400,       8,   FREQUENCY_TIMER1,      0},
+        {true,                                 1,     0,       0,      330,         8,           0,       450,       8,   FREQUENCY_TIMER1,      0},
         {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -22,         4,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
         {true, 16.0f*70.0f/20.0f*(200.0f/360.0f), 80.27,     140,       52,         8,          50,       210,       2,   FREQUENCY_TIMER1,    250},
         {false,  1.0f/1.0f,                       25.57,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
         {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       6,   FREQUENCY_TIMER1,      0},
-        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -45,         8,         -45,         0,       8,   FREQUENCY_TIMER1,    100}
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -45,         4,         -45,         0,       4,   FREQUENCY_TIMER1,    100}
     };
 
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
@@ -137,85 +130,94 @@ long ApplicationArduino::getSystemTime() {
 
 void ApplicationArduino::specificPlatformGohome(int motorID)
 {
-  // Not used, go home is handled in Robot::executeGoHome
   if(motorID == MOTOR_CAPTURE) {
+    uint8_t enPin = enPinCapture;
     uint8_t stepPin = stepPinCapture;
     uint8_t dirPin = dirPinCapture;
-    uint8_t dirAnalogRead = limitGripper;
-    int delayTime = 500;
-    int sensorHomeValue = 630;
-    int sensorCaptureValue = 300;
-    int sensorValue;
+    uint8_t limitPin = limitGripper;    
+    int delayTime = 1000;
     int stateGoHome;
-    int initDir;
     int currentStep = 0;
     stateGoHome = STATE_CHECK_SENSOR;
+    digitalWrite(enPin, LOW);
     while(stateGoHome != STATE_HOME_DONE) {
       switch(stateGoHome){
         case STATE_CHECK_SENSOR:{
-          sensorValue = analogRead(dirAnalogRead);
-          stateGoHome = STATE_SET_DIR;
-        }
-        break;
-        case STATE_SET_DIR:{
-          digitalWrite(dirPin, sensorValue > sensorHomeValue ? LOW:HIGH);
-          initDir = sensorValue > sensorHomeValue ? 1:-1;
-          stateGoHome = STATE_GO_HOME_1;
-          delay(100);
-        }
-        break;
-        case STATE_GO_HOME_1:{
-          sensorValue = analogRead(dirAnalogRead);
-          if(initDir*sensorValue>initDir*sensorHomeValue) {
-            digitalWrite(stepPin, HIGH);
-            delayMicroseconds(delayTime);
-            digitalWrite(stepPin, LOW);
-            delayMicroseconds(delayTime);
+          if( digitalRead(limitPin) == HIGH ) {
+            digitalWrite(dirPin, HIGH);
+            stateGoHome = STATE_FIND_HOME_POS_DIR_CAPTURE;
+            Serial.println("STATE_FIND_HOME_POS direction capture");
           } else {
             digitalWrite(dirPin, LOW);
+            stateGoHome = STATE_FIND_HOME_POS_DIR_HOME;
+            Serial.println("STATE_FIND_HOME_POS direction Home");
+          }
+        }
+        break;
+        case STATE_FIND_HOME_POS_DIR_CAPTURE: {
+          if(digitalRead(limitPin) == HIGH) {
+            digitalWrite(stepPin, HIGH);
+            delayMicroseconds(delayTime);
+            digitalWrite(stepPin, LOW);
+            delayMicroseconds(delayTime);
+          } else {
+            currentStep = 0;
+            digitalWrite(dirPin, LOW);
             stateGoHome = STATE_GO_TO_CAPTURE;
-            m_captureCountStep = 0;
-            delay(100);
           }
         }
         break;
-        case STATE_GO_TO_CAPTURE:{
-          sensorValue = analogRead(dirAnalogRead);
-          if(sensorValue>sensorCaptureValue) {
+        case STATE_FIND_HOME_POS_DIR_HOME: {
+          if(digitalRead(limitPin) == HIGH) {
             digitalWrite(stepPin, HIGH);
             delayMicroseconds(delayTime);
             digitalWrite(stepPin, LOW);
             delayMicroseconds(delayTime);
-            m_captureCountStep++;
           } else {
-            stateGoHome = STATE_GO_HOME_2;
-            Serial.print("countStep:");
-            Serial.println(m_captureCountStep);
-            currentStep = m_captureCountStep;
             digitalWrite(dirPin, HIGH);
-            delay(100);
+            stateGoHome = STATE_FIND_HOME_POS_DIR_CAPTURE;
           }
         }
         break;
-        case STATE_GO_HOME_2:{
-          if(currentStep > 0) {
-            currentStep --;
+        case STATE_GO_TO_CAPTURE: {
+          if(currentStep < m_robot->maxStep(MOTOR_CAPTURE))
+          {
             digitalWrite(stepPin, HIGH);
             delayMicroseconds(delayTime);
             digitalWrite(stepPin, LOW);
             delayMicroseconds(delayTime);
-          } else {
-            m_robot->m_motorParamList[motorID].currentStep = 0;
-            stateGoHome = STATE_HOME_DONE;
-            delay(100);            
+            currentStep ++;
+          } 
+          else {
+            digitalWrite(dirPin, HIGH);
+            stateGoHome = STATE_GO_HOME;
           }
         }
+        break;
+        case STATE_GO_HOME: {
+          if(currentStep > m_robot->homeStep(MOTOR_CAPTURE))
+          {
+            digitalWrite(stepPin, HIGH);
+            delayMicroseconds(delayTime);
+            digitalWrite(stepPin, LOW);
+            delayMicroseconds(delayTime);
+            currentStep --;
+          } 
+          else {
+            m_robot->m_motorParamList[motorID].currentStep = currentStep;
+            stateGoHome = STATE_HOME_DONE;
+          }
+        }
+        break;
         case STATE_HOME_DONE:{
 
         }
         break;
       }
+      delay(1);
     }
+    Serial.println("Homing Capture done");
+    digitalWrite(enPin, HIGH);
   }
 }
 

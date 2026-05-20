@@ -50,6 +50,7 @@ public:
     void updateCurrentStep(int motorID);
     int minStep(int motorID);
     int maxStep(int motorID);
+    float maxAngle(int motorID);
     float homeAngle(int motorID);
     int homeStep(int motorID);
     void executeSmoothMotion(int motorID);

@@ -309,6 +309,11 @@ int Robot::maxStep(int motorID)
     return (int)(m_motorParamList[motorID].scale * m_motorParamList[motorID].maxAngle);
 }
 
+float Robot::maxAngle(int motorID)
+{
+    return (int)(m_motorParamList[motorID].maxAngle);
+}
+
 float Robot::homeAngle(int motorID)
 {
     return m_motorParamList[motorID].homeAngle;

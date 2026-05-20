@@ -1008,12 +1008,12 @@ void ApplicationController::clearSequenceMove() {
 }
 void ApplicationController::appendSequenceMove(Point start, Point stop, bool straightMove) {
     if(!straightMove) {
-        float upAngles[6] = {-45.0f,0.0f,-45.0f,
-                             -45.0f,0.0f,-45.0f};
+        float upAngles[6] = {m_robot->homeAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),m_robot->homeAngle(MOTOR_ARM5),
+                             m_robot->homeAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),m_robot->homeAngle(MOTOR_ARM5)};
         Point position[6] = {start,start,start,
                               stop,stop,stop};
-        int captureStep[6] = {0,m_captureCountStep,m_captureCountStep,
-                               m_captureCountStep,0,0};
+        int captureStep[6] = {m_robot->homeStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE),
+                               m_robot->maxStep(MOTOR_CAPTURE),m_robot->homeStep(MOTOR_CAPTURE),m_robot->homeStep(MOTOR_CAPTURE)};
         int numStep = 6;
         for(int seqStep = 0; seqStep < numStep; seqStep++)
         {
@@ -1025,10 +1025,11 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
             m_numCommand++;
         }
     } else {
-        float upAngles[6] = {-45.0f,0.0f,0.0f,0.0f,
-                              0.0f,-45.0f};
+        float upAngles[6] = {m_robot->homeAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),
+                              m_robot->maxAngle(MOTOR_ARM5),m_robot->homeAngle(MOTOR_ARM5)};
         Point position[6] = {start,start,start,stop,stop,stop};
-        int captureStep[6] = {0,0,m_captureCountStep,m_captureCountStep,0,0};
+        int captureStep[6] = {m_robot->homeStep(MOTOR_CAPTURE),m_robot->homeStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE),
+            m_robot->maxStep(MOTOR_CAPTURE),m_robot->homeStep(MOTOR_CAPTURE),m_robot->homeStep(MOTOR_CAPTURE)};
         int numStep = 6;
         for(int seqStep = 0; seqStep < numStep; seqStep++)
         {
