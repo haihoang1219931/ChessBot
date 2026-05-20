@@ -291,6 +291,7 @@ uint8_t ChessBot::playRandomMove()
 
 uint8_t ChessBot::playCalculateNextMove()
 {
+#ifdef IMAGE_PROCESS_MOVE
     QString lastMove = m_chessController->moveHistory().last();
     QString from = lastMove.left(2);  // Result: "e2"
     QString to = lastMove.right(2);   // Result: "e4"
@@ -329,12 +330,15 @@ uint8_t ChessBot::playCalculateNextMove()
     qDebug("playCalculateNextMove %s to cmd[%s]\r\n",
            lastMove.toStdString().c_str(),
            robotCommand);
+#else
+#endif
     return STATE_DONE;
 }
 
 uint8_t ChessBot::playExecuteNextMove()
 {
     // TODO: Send command to robot and wait until execution is done
+#ifdef IMAGE_PROCESS_MOVE
     qDebug("Request Robot playExecuteNextMove");
     if (!robotController->isOpen()) {
         qDebug("Serial port is not open for abort.");
@@ -389,6 +393,9 @@ uint8_t ChessBot::playExecuteNextMove()
         }
         return STATE_DONE;
     }
+#else
+    return STATE_DONE;
+#endif
 }
 
 uint8_t ChessBot::playInformResult()
