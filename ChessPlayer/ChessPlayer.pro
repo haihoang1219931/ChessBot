@@ -6,7 +6,7 @@ CONFIG += c++11
 
 CONFIG += use_chess_algo
 
-CONFIG += use_image_processing
+#CONFIG += use_image_processing
 use_image_processing {
 DEFINES += IMAGE_PROCESS_MOVE
 unix:!macx: INCLUDEPATH += /usr/local/include/opencv4

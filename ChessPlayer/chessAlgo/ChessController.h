@@ -35,8 +35,8 @@ public:
     int engineLevel() const;
     int playerColor() const;
     QString buildResultText() const;
-    Move chosenMove() const;
-    bool isChosenMoveCapture() const;
+    Move botMove() const;
+    void playEngineMove();
 
     Q_INVOKABLE void newGame();
     Q_INVOKABLE void clickSquare(int uiIndex);
@@ -64,7 +64,6 @@ private:
     void refreshSelectionMoves();
     void refreshCheckState();
     void clearSelection();
-    void playEngineMove();
     bool tryFindLegalMove(int originSquare, int destinationSquare, Move& outMove, QChar promotionSuffix = QChar());
     QString pieceCodeAtSquare(int square) const;
     static bool tryParseCoordinate(const QString& coordinate, int& uiIndex);
@@ -84,5 +83,5 @@ private:
     std::vector<Move> m_pendingPromotionMoves;
     int m_engineDepth;
     int m_playerColor; // 0 = White, 1 = Black
-    Move m_chosenMove;
+    Move m_botMove;
 };

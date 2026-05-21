@@ -84,10 +84,12 @@ void ChessBot::updateCorners(QVariantList corners)
     }
 
     if(m_chessboardConners.size() == 4) {
+#ifdef IMAGE_PROCESS_MOVE
     m_moveDetector->setCorners(m_chessboardConners[0].x(),m_chessboardConners[0].y(),
             m_chessboardConners[1].x(),m_chessboardConners[1].y(),
             m_chessboardConners[2].x(),m_chessboardConners[2].y(),
             m_chessboardConners[3].x(),m_chessboardConners[3].y());
+#endif
     }
     saveCalibrationData();
 }
@@ -285,29 +287,139 @@ uint8_t ChessBot::playDetectMove()
 uint8_t ChessBot::playRandomMove()
 {
     QStringList randomMoves = m_chessController->findBestMoveCoordinates();
+    printf("=== Player move %s->%s\r\n",
+            randomMoves[0].toStdString().c_str(),
+            randomMoves[1].toStdString().c_str());
     m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1]);
     return STATE_DONE;
 }
 
+QPoint ChessBot::notationToCoord(const std::string& notation, const std::string& playerSide)
+{
+    // Validate input length
+    if (notation.length() < 2) return QPoint(-1,-1);
+
+    char file = notation[0];
+    char rank = notation[1];
+
+    // Validate chess boundaries
+    if (file < 'a' || file > 'h' || rank < '1' || rank > '8') return QPoint(-1,-1);
+
+    int x, y;
+
+    if (playerSide == "black") {
+        x = file - 'a';
+        y = '8' - rank;
+    } else { // white at bottom / black at top
+        x = 'h' - file;
+        y = rank - '1';
+    }
+
+    return QPoint(x,y);
+}
 uint8_t ChessBot::playCalculateNextMove()
 {
-#ifdef IMAGE_PROCESS_MOVE
+    m_chessController->playEngineMove();
     QString lastMove = m_chessController->moveHistory().last();
     QString from = lastMove.left(2);  // Result: "e2"
     QString to = lastMove.right(2);   // Result: "e4"
-    cv::Point fromCoord, toCoord;
-    fromCoord = m_moveDetector->notationToCoord(from.toStdString(),
+    QPoint fromCoord, toCoord;
+    fromCoord = notationToCoord(from.toStdString(),
                                                 m_side != 0?"white":"black");
-    toCoord = m_moveDetector->notationToCoord(to.toStdString(),
+    toCoord = notationToCoord(to.toStdString(),
                                                 m_side != 0?"white":"black");
+    printf("Bot move %s->%s\r\n",
+           from.toStdString().c_str(),
+           to.toStdString().c_str());
+    if(m_chessController->botMove().isQuiet())
+    {
+        printf("Move quited\r\n");
+    }
+    else //Castling or Promotion or Capture
+    {
+        if(m_chessController->botMove().isCastling())
+        {
+
+            //move King
+            printf("Castling move king\r\n");
+            Square rookOrigin = SQ_NONE;
+            Square rookDestination = SQ_NONE;
+
+            if(m_chessController->botMove().isKingSideCastling())
+            {
+                if(m_side == WHITE)
+                {
+                    rookOrigin = SQ_H1;
+                    rookDestination = SQ_F1;
+                    printf("Castling H1->F1\r\n");
+                }
+                else
+                {
+                    rookOrigin = SQ_H8;
+                    rookDestination = SQ_F8;
+                    printf("Castling H8->F8\r\n");
+                }
+            }
+            else // QueenSideCastling
+            {
+                if(m_side == WHITE)
+                {
+                    rookOrigin = SQ_A1;
+                    rookDestination = SQ_D1;
+                    printf("Castling A1->D1\r\n");
+                }
+                else
+                {
+                    rookOrigin = SQ_A8;
+                    rookDestination = SQ_D8;
+                    printf("Castling A8->D8\r\n");
+                }
+            }
+
+            //move rook
+            printf("Castling move rook\r\n");
+        }
+        else if (m_chessController->botMove().isPromotion())
+        {
+            unsigned int promotedType = m_chessController->botMove().getPromotedPieceType();
+
+            if(m_chessController->botMove().isCapture())
+            {
+                //remove the captured piece
+                unsigned int capturedPieceType = m_chessController->botMove().getCapturedPieceType();
+                printf("Capture remove piece %d \r\n",capturedPieceType);
+            }
+            printf("Capture remove pawn color[%d] \r\n",m_side == 0?"White":"Black");
+            printf("Capture Add piece[%d] color[%d] \r\n",promotedType,m_side == 0?"White":"Black");
+        }
+        else
+        {
+            if (m_chessController->botMove().isEnPassant()) // watch out ep capture is a capture
+            {
+                printf("Capture remove pawn color[%d] \r\n",m_side != 0?"White":"Black");
+            }
+            else //Move is capture
+            {
+                //remove the captured piece
+                unsigned int type(m_chessController->botMove().getCapturedPieceType());
+                printf("Capture remove captured piece[%d] color[%d] \r\n",type,m_side != 0?"White":"Black");
+
+            }
+
+            printf("Move piece from %s to %s\r\n",from.toStdString().c_str(),
+                   to.toStdString().c_str());
+        }
+    }
+
+
     char robotCommand[32];
-    if(m_chessController->isChosenMoveCapture()) {
-        sprintf(robotCommand,"a%d%d%d%d",fromCoord.y,fromCoord.x,toCoord.y,toCoord.x);
-    } else if(m_chessController->chosenMove().isCastling()) {
-        sprintf(robotCommand,"CST%d%d%d%d",fromCoord.y,fromCoord.x,toCoord.y,toCoord.x);
-    } else if(m_chessController->chosenMove().isEnPassant()) {
-        sprintf(robotCommand,"pp%d%d%d%d",fromCoord.y,fromCoord.x,toCoord.y,toCoord.x);
-    } else if(m_chessController->chosenMove().isPromotion()) {
+    if(m_chessController->botMove().isCapture()) {
+        sprintf(robotCommand,"a%d%d%d%d",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x());
+    } else if(m_chessController->botMove().isCastling()) {
+        sprintf(robotCommand,"CST%d%d%d%d",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x());
+    } else if(m_chessController->botMove().isEnPassant()) {
+        sprintf(robotCommand,"pp%d%d%d%d",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x());
+    } else if(m_chessController->botMove().isPromotion()) {
         /**
          * @brief promoChar
          * 1	0	0	0	knight-promotion
@@ -319,19 +431,17 @@ uint8_t ChessBot::playCalculateNextMove()
          * 1	1	1	0	rook-promo capture
          * 1	1	1	1	queen-promo capture
          */
-        unsigned int promoPieceType = m_chessController->chosenMove().getPromotedPieceType();
+        unsigned int promoPieceType = m_chessController->botMove().getPromotedPieceType();
         // Todo: convet promoPieceType to promoChar
         char promoChar = 'q';
-        sprintf(robotCommand,"p%c%d%d%d%d",promoChar,fromCoord.y,fromCoord.x,toCoord.y,toCoord.x);
+        sprintf(robotCommand,"p%c%d%d%d%d",promoChar,fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x());
     } else {
-        sprintf(robotCommand,"c%d%d%d%d",fromCoord.y,fromCoord.x,toCoord.y,toCoord.x);
+        sprintf(robotCommand,"c%d%d%d%d",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x());
     }
     m_robotCommand = QString(robotCommand);
     qDebug("playCalculateNextMove %s to cmd[%s]\r\n",
            lastMove.toStdString().c_str(),
            robotCommand);
-#else
-#endif
     return STATE_DONE;
 }
 

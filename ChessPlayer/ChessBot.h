@@ -144,6 +144,7 @@ private:
     uint8_t enableRobot();
     uint8_t goHome();
     bool isCalibDataLoaded();
+    QPoint notationToCoord(const std::string& notation, const std::string& playerSide);
 
 private:
     bool m_stopped = false;
