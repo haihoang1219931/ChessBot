@@ -174,29 +174,38 @@ void ChessBot::playLoop()
     }
         break;
     case PLAY_DETECT_MOVE: {
-        if(playDetectMove() == STATE_DONE){
+        if(playDetectMove() == STATE_DONE_SUCCESS){
             m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
+        } else {
+            m_statePlay = PLAY_INFORM_ERROR;
         }
     }
         break;
     case PLAY_CALCULATE_NEXT_MOVE: {
-        if(playCalculateNextMove() == STATE_DONE){
+        if(playCalculateNextMove() == STATE_DONE_SUCCESS){
             m_statePlay = PLAY_EXECUTE_NEXT_MOVE;
         }
     }
         break;
     case PLAY_EXECUTE_NEXT_MOVE: {
-        if(playExecuteNextMove()== STATE_DONE){
+        if(playExecuteNextMove()== STATE_DONE_SUCCESS){
             m_statePlay = PLAY_INFORM_RESULT;
         }
     }
         break;
     case PLAY_INFORM_RESULT: {
-        if(playInformResult()== STATE_DONE){
+        if(playInformResult()== STATE_DONE_SUCCESS){
             m_statePlay = PLAY_PROCESS_DONE;
         }
     }
         break;
+    case PLAY_INFORM_ERROR:{
+        printf("Can not detect move\r\n");
+        Q_EMIT detectFailed();
+        m_statePlay = PLAY_PROCESS_DONE;
+    }
+        break;
+
     case PLAY_PROCESS_DONE: {
         togglePause(true);
     }
@@ -208,19 +217,19 @@ void ChessBot::configureLoop()
 {
     switch (m_stateConfigure) {
     case CONFIGURE_CHESSBOARD: {
-        if(configureChessBoardCalib() == STATE_DONE){
+        if(configureChessBoardCalib() == STATE_DONE_SUCCESS){
             m_stateConfigure = CONFIGURE_DONE;
         }
     }
         break;
     case CONFIGURE_LEVEL: {
-        if(configureLevel() == STATE_DONE){
+        if(configureLevel() == STATE_DONE_SUCCESS){
             m_stateConfigure = CONFIGURE_DONE;
         }
     }
         break;
     case CONFIGURE_SIDE: {
-        if(configureSide() == STATE_DONE){
+        if(configureSide() == STATE_DONE_SUCCESS){
             m_stateConfigure = CONFIGURE_DONE;
         }
     }
@@ -236,12 +245,12 @@ void ChessBot::testLoop()
 {
     switch (m_stateTest) {
     case TEST_ROBOT: {
-        if(testRobot() == STATE_DONE){
+        if(testRobot() == STATE_DONE_SUCCESS){
             m_stateTest = TEST_DONE;
         }
     }
     case TEST_CHECK_RESULT: {
-        if(testCheckResult() == STATE_DONE){
+        if(testCheckResult() == STATE_DONE_SUCCESS){
             m_stateTest = TEST_DONE;
         }
     }
@@ -260,28 +269,25 @@ uint8_t ChessBot::playDetectMove()
     playRandomMove();
 #else
     if(!readFrame(imageAfter)){
-        return STATE_DONE;
+        return STATE_DONE_FAIL;
     }
-    int g_threshold_val = 500;
-    int g_roi_percent = 50;
-    int g_canny_low = 50;
-    int g_diff_thresh = 30;
+    bool foundValidMove = false;
     if(!imageBefore.empty() && !imageAfter.empty()) {
         std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves(imageBefore, imageAfter,
-            g_threshold_val, g_roi_percent, g_canny_low, g_diff_thresh,
             m_side == 0?"white":"black");
         for(int i = 0; i< chessMoves.size(); i++) {
             qDebug("Possible Move %s",chessMoves[i].c_str());
             QString from = QString::fromStdString(chessMoves[i]).left(2);  // Result: "e2"
             QString to = QString::fromStdString(chessMoves[i]).right(2);   // Result: "e4"
             if(m_chessController->moveByCoordinates(from,to)) {
+                foundValidMove = true;
                 break;
             }
         }
     }
 
 #endif
-    return STATE_DONE;
+    return foundValidMove?STATE_DONE_SUCCESS:STATE_DONE_FAIL;
 }
 
 uint8_t ChessBot::playRandomMove()
@@ -291,7 +297,7 @@ uint8_t ChessBot::playRandomMove()
             randomMoves[0].toStdString().c_str(),
             randomMoves[1].toStdString().c_str());
     m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1]);
-    return STATE_DONE;
+    return STATE_DONE_SUCCESS;
 }
 
 QPoint ChessBot::notationToCoord(const std::string& notation, const std::string& playerSide)
@@ -442,7 +448,7 @@ uint8_t ChessBot::playCalculateNextMove()
     qDebug("playCalculateNextMove %s to cmd[%s]\r\n",
            lastMove.toStdString().c_str(),
            robotCommand);
-    return STATE_DONE;
+    return STATE_DONE_SUCCESS;
 }
 
 uint8_t ChessBot::playExecuteNextMove()
@@ -452,7 +458,7 @@ uint8_t ChessBot::playExecuteNextMove()
     qDebug("Request Robot playExecuteNextMove");
     if (!robotController->isOpen()) {
         qDebug("Serial port is not open for abort.");
-        return STATE_DONE;
+        return STATE_DONE_SUCCESS;
     } else {
         robotController->write(m_robotCommand.toUtf8());
         robotController->waitForBytesWritten(1000);
@@ -501,10 +507,10 @@ uint8_t ChessBot::playExecuteNextMove()
                 retry++;
             } while(retry < 25);
         }
-        return STATE_DONE;
+        return STATE_DONE_SUCCESS;
     }
 #else
-    return STATE_DONE;
+    return STATE_DONE_SUCCESS;
 #endif
 }
 
@@ -514,22 +520,22 @@ uint8_t ChessBot::playInformResult()
 #ifdef IMAGE_PROCESS_MOVE
     readFrame(imageBefore);
 #endif
-    return STATE_DONE;
+    return STATE_DONE_SUCCESS;
 }
 
 uint8_t ChessBot::configureChessBoardCalib()
 {
-    return STATE_DONE;
+    return STATE_DONE_SUCCESS;
 }
 
 uint8_t ChessBot::configureSide()
 {
-    return STATE_DONE;
+    return STATE_DONE_SUCCESS;
 }
 
 uint8_t ChessBot::configureLevel()
 {
-    return STATE_DONE;
+    return STATE_DONE_SUCCESS;
 }
 
 uint8_t ChessBot::testRobot()
@@ -540,7 +546,7 @@ uint8_t ChessBot::testRobot()
     if (robotController->waitForReadyRead(500)) {
         QByteArray chunk = robotController->readAll();
         qDebug("Received progress chunk: %s", chunk.constData());
-        testState = STATE_DONE;
+        testState = STATE_DONE_SUCCESS;
     }
 //    sleep(1);
 //    robotController->write("cmd");
@@ -552,7 +558,7 @@ uint8_t ChessBot::testRobot()
 //        if(positionCmdIDStr.contains("[cmd]")) {
 //            m_cmdId = positionCmdIDStr.section(']', 1);
 //            qDebug("position Cmd ID: %s", m_cmdId.toStdString().c_str());
-//            testState = STATE_DONE;
+//            testState = STATE_DONE_SUCCESS;
 //        }
 //    }
     return testState;
@@ -569,11 +575,11 @@ uint8_t ChessBot::testCheckResult()
 //        QString positionCmdStateStr = QString::fromLatin1(chunk);
 //        if(positionCmdStateStr.contains("]DONE")) {
 //            qDebug("position command %s Done", m_cmdId.toStdString().c_str());
-//            testState = STATE_DONE;
+//            testState = STATE_DONE_SUCCESS;
 //        }
 //    }
 //    sleep(1);
-    return STATE_DONE;
+    return STATE_DONE_SUCCESS;
 }
 
 bool ChessBot::readCalibrationPoint(const QString &command,QPoint& point)
@@ -996,14 +1002,14 @@ void ChessBot::initRobot()
     }
         break;
     case INIT_ENABLE_ROBOT: {
-        if(enableRobot() == STATE_DONE){
+        if(enableRobot() == STATE_DONE_SUCCESS){
             Q_EMIT calibrationUploadComplete(ENABLE_ROBOT,true);
             m_stateInit = INIT_GO_HOME;
         }
     }
         break;
     case INIT_GO_HOME: {
-        if(goHome() == STATE_DONE){
+        if(goHome() == STATE_DONE_SUCCESS){
             Q_EMIT calibrationUploadComplete(HOMING_ROBOT,true);
             m_stateInit = INIT_DONE;
         }
@@ -1023,7 +1029,7 @@ uint8_t ChessBot::enableRobot()
     qDebug("Enable Robot");
     if (!robotController->isOpen()) {
         qDebug("Serial port is not open for abort.");
-        return STATE_DONE;
+        return STATE_DONE_SUCCESS;
     } else {
         robotController->write("ee");
         robotController->waitForBytesWritten(1000);
@@ -1042,7 +1048,7 @@ uint8_t ChessBot::enableRobot()
             }
         } while(!robotEnabled && retry < 5);
         sleep(1);
-        return STATE_DONE;
+        return STATE_DONE_SUCCESS;
     }
 }
 
@@ -1051,7 +1057,7 @@ uint8_t ChessBot::goHome()
     qDebug("Request Robot to go home");
     if (!robotController->isOpen()) {
         qDebug("Serial port is not open for abort.");
-        return STATE_DONE;
+        return STATE_DONE_SUCCESS;
     } else {
         robotController->write("ha");
         robotController->waitForBytesWritten(1000);
@@ -1100,7 +1106,7 @@ uint8_t ChessBot::goHome()
                 retry++;
             } while(retry < 25);
         }
-        return STATE_DONE;
+        return STATE_DONE_SUCCESS;
     }
 }
 
@@ -1232,14 +1238,11 @@ bool ChessBot::loadCalibrationData(QString fileName)
                 m_chessboardConners[1].x(),m_chessboardConners[1].y(),
                 m_chessboardConners[2].x(),m_chessboardConners[2].y(),
                 m_chessboardConners[3].x(),m_chessboardConners[3].y());
-//        int g_threshold_val = 500;
-//        int g_roi_percent = 50;
-//        int g_canny_low = 50;
-//        int g_diff_thresh = 30;
+
 //        cv::Mat src1 = cv::imread("28_1.jpg");
 //        cv::Mat src2 = cv::imread("28_2.jpg");
 //        if(!src1.empty() && !src2.empty()) {
-//            std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves(src1, src2, g_threshold_val, g_roi_percent, g_canny_low, g_diff_thresh, "white");
+//            std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves(src1, src2, "white");
 //            for(int i = 0; i< chessMoves.size(); i++) {
 //                qDebug("Possible Move %s",chessMoves[i].c_str());
 //            }

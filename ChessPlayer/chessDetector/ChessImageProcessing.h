@@ -35,11 +35,22 @@ public:
     int chessBoardRow();
     int chessBoardSize();
     void setThreshold(int threshold);
+    bool detectMovePhase1Binary(const cv::Mat& img1, const cv::Mat& img2,
+                                cv::Point& start, std::vector<cv::Point>& ends,
+                                int min_points, int roi_percent, int canny_low,
+                                const std::string& playerSide = "white");
+    bool detectMovePhase2Substraction(const cv::Mat& img_start, const cv::Mat& img_end,
+                                      int threshold_val, int roi_percent,
+                                      int canny_low, int diff_thresh,
+                                      std::vector<cv::Point>* top3cells,
+                                      const std::string& playerSide = "white");
+    bool detectMovePhase3Classification();
     std::string coordToNotation(cv::Point pt, const std::string& playerSide);
     cv::Point notationToCoord(const std::string& notation, const std::string& playerSide);
+    bool isChessPieceCell(const cv::Mat& edges, int c, int r, int sq, int min_points, int roi_percent, cv::Mat& display);
+    std::vector<std::vector<int>> getPieceMatrix(const cv::Mat& img, int sq, int min_points, int roi_percent, int canny_low, std::string show_name);
+    void comparePieceMatrices(const std::vector<std::vector<int>>& mat1, const std::vector<std::vector<int>>& mat2, cv::Point& start, std::vector<cv::Point>& ends);
     std::vector<std::string> findPossibleMoves(const cv::Mat& img_start, const cv::Mat& img_end,
-                                   int threshold_val, int roi_percent,
-                                   int canny_low, int diff_thresh,
                                    const std::string& playerSide = "white");
 private:
     bool m_sourceConnected;
@@ -51,7 +62,7 @@ private:
     cv::Mat m_prevImage;
     cv::Mat m_currImage;
     cv::Mat m_transformMatrix;
-
+    int m_detectState;
 };
 
 #endif // CHESSIMAGEPROCESSING_H

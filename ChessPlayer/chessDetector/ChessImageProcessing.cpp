@@ -1,5 +1,13 @@
 #include "ChessImageProcessing.h"
 
+typedef enum {
+    DETECT_MOVE_PHASE1_BINARY,
+    DETECT_MOVE_PHASE2_SUBSTRACTION,
+    DETECT_MOVE_PHASE3_CLASSIFICATION,
+    DETECT_MOVE_VERIFY_RESULT,
+    DETECT_MOVE_DONE_SUCCESS,
+    DETECT_MOVE_DONE_FAIL,
+} CHESSBOARD_DETECT_STATE;
 ChessImageProcessing::ChessImageProcessing()
 {
     m_sourceConnected = false;
@@ -93,9 +101,6 @@ cv::Point ChessImageProcessing::notationToCoord(const std::string& notation, con
  * @param moveStr: output move string in chess notation (e.g., e2e4)
  */
 std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& img_start, const cv::Mat& img_end,
-                               int threshold_val, int roi_percent,
-                               int canny_low, int diff_thresh,
-
                                const std::string& playerSide)
 {
     // No longer identify start/stop/occupied, just collect top 3 cells
@@ -104,6 +109,16 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& 
     std::vector<cv::Point> top3cells;
     cv::Mat gray1, gray2, warped1, warped2, diff_bin, edges1, edges2;
 
+    // --- ADJUSTABLE PARAMETERS (Controlled by Trackbars) ---
+    int g_threshold_val = 500;
+    int g_roi_percent = 50;
+    int g_canny_low = 50;
+    int g_diff_thresh = 30;
+
+    // --- NEW PARAMETERS FOR PIECE DETECTION ---
+    int g_piece_min_points = 500; // Default threshold for number of edge points
+    int g_piece_roi_percent = 80; // Default percent of square area to check (from center)
+
     // warp image before calculation
     warpPerspective(img_start, warped1, m_transformMatrix, cv::Size(640, 640));
     warpPerspective(img_end, warped2, m_transformMatrix, cv::Size(640, 640));
@@ -111,12 +126,82 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& 
     cvtColor(warped1, gray1, cv::COLOR_BGR2GRAY);
     cvtColor(warped2, gray2, cv::COLOR_BGR2GRAY);
 
-    Canny(gray1, edges1, canny_low, canny_low * 3);
-    Canny(gray2, edges2, canny_low, canny_low * 3);
+    Canny(gray1, edges1, g_canny_low, g_canny_low * 3);
+    Canny(gray2, edges2, g_canny_low, g_canny_low * 3);
 
+    cv::Point start;
+    std::vector<cv::Point> ends;
+    detectMovePhase1Binary(edges1,edges2,
+                           start,ends,
+                           g_piece_min_points,g_piece_roi_percent, g_canny_low,
+                           playerSide);
+
+    std::vector<cv::Point> listChangedCell;
+    detectMovePhase2Substraction(edges1,edges2,
+                                 g_threshold_val,g_roi_percent,g_canny_low,g_diff_thresh,
+                                 &listChangedCell,
+                                 playerSide);
+
+    detectMovePhase3Classification();
+
+
+    return listMoves;
+}
+
+bool ChessImageProcessing::detectMovePhase1Binary(const cv::Mat& img1, const cv::Mat& img2,
+                                                  cv::Point& start, std::vector<cv::Point>& ends,
+                                                  int min_points, int roi_percent, int canny_low, const std::string& playerSide)
+{
+    if (img1.empty() || img2.empty()) return false;
+    int sq = img1.cols / 8;
+    std::vector<std::vector<int>> mat1 = getPieceMatrix(img1, sq, min_points, roi_percent, canny_low,"warp1");
+    std::vector<std::vector<int>> mat2 = getPieceMatrix(img2, sq, min_points, roi_percent, canny_low,"warp2");
+
+    comparePieceMatrices(mat1, mat2, start, ends);
+    std::string startStr = coordToNotation(start, playerSide);
+    std::cout << "Move start: " << startStr << std::endl;
+    std::cout << "Possible ends: ";
+    for (const auto& pt : ends) {
+        std::cout << coordToNotation(pt, playerSide) << " ";
+    }
+    std::cout << std::endl;
+#ifdef DEBUG_SHOW_IMAGE
+    // --- Draw on output image ---
+    cv::Mat out = img2.clone();
+    // Draw start position (red rectangle)
+    if (start.x >= 0 && start.y >= 0) {
+        cv::Rect box(start.x * sq, start.y * sq, sq, sq);
+        rectangle(out, box, cv::Scalar(0, 0, 255), 3);
+        putText(out, "FROM", box.tl() + cv::Point(5, 25), 1, 1.0, cv::Scalar(0, 0, 255), 2);
+    }
+    // Draw end positions (green rectangles)
+    for (const auto& pt : ends) {
+        cv::Rect box(pt.x * sq, pt.y * sq, sq, sq);
+        rectangle(out, box, cv::Scalar(0, 255, 0), 3);
+        putText(out, "TO", box.tl() + cv::Point(5, 25), 1, 1.0, cv::Scalar(0, 255, 0), 2);
+    }
+    imshow("Move Detection", out);
+#endif
+    if(start.x = -1 || start.y == -1 || ends.size() == 0) {
+        return false;
+    } else {
+        return false;
+    }
+}
+
+bool ChessImageProcessing::detectMovePhase2Substraction(const cv::Mat& gray1, const cv::Mat& gray2,
+                                                        int threshold_val, int roi_percent,
+                                                        int canny_low, int diff_thresh,
+                                                        std::vector<cv::Point>* top3cells,
+                                                        const std::string& playerSide)
+{
+    cv::Mat diff_bin, edges1, edges2;
     absdiff(gray1, gray2, diff_bin);
     threshold(diff_bin, diff_bin, diff_thresh, 255, cv::THRESH_BINARY);
-    int sq = img_start.cols / 8;
+#ifdef DEBUG_SHOW_IMAGE
+    imshow("diff_bin",diff_bin);
+#endif
+    int sq = gray1.cols / 8;
     int sub = MAX(1, (sq * roi_percent) / 100);
     int off = (sq - sub) / 2;
 
@@ -129,20 +214,89 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& 
         }
     }
     sort(topCells.begin(), topCells.end(), [](const std::pair<int, cv::Point>& a, const std::pair<int, cv::Point>& b){ return a.first > b.first; });
-    for (int i = 0; i < 3 && i < (int)topCells.size(); ++i) {
-        top3cells.push_back(topCells[i].second);
+    if (top3cells) {
+        top3cells->clear();
+        for (int i = 0; i < 3 && i < (int)topCells.size(); ++i) {
+            top3cells->push_back(topCells[i].second);
+        }
     }
-    // Output move string in chess notation for all 2-cell combinations from top 3 cells
-    int n = (int)top3cells.size();
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            if (i == j) continue;
-            std::string fromStr = coordToNotation((top3cells)[i], playerSide);
-            std::string toStr = coordToNotation((top3cells)[j], playerSide);
-            if (!fromStr.empty() && !toStr.empty()) {
-                listMoves.push_back(fromStr + toStr);
+    return true;
+}
+
+bool ChessImageProcessing::detectMovePhase3Classification()
+{
+    return true;
+}
+//    DETECT_MOVE_PHASE1_BINARY,
+//    DETECT_MOVE_PHASE2_SUBSTRACTION,
+//    DETECT_MOVE_PHASE3_CLASSIFICATION,
+std::vector<std::vector<int>> ChessImageProcessing::getPieceMatrix(const cv::Mat& img, int sq, int min_points, int roi_percent, int canny_low, std::string show_name) {
+    cv::Mat gray, edges, edgesClone;
+    cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+    Canny(gray, edges, canny_low, canny_low * 3);
+    edgesClone = edges.clone();
+    std::vector<std::vector<int>> mat(8, std::vector<int>(8, 0));
+    for (int r = 0; r < 8; r++) {
+        for (int c = 0; c < 8; c++) {
+            if (isChessPieceCell(edges, c, r, sq, min_points, roi_percent, edgesClone)) {
+                mat[r][c] = 1;
             }
         }
     }
-    return listMoves;
+    cv::imshow(show_name, edgesClone);
+    return mat;
 }
+
+// Overload isChessPieceCell to allow passing max_bbox_percent (for use in getPieceMatrix)
+bool ChessImageProcessing::isChessPieceCell(const cv::Mat& edges, int c, int r, int sq, int min_points, int roi_percent, cv::Mat& display) {
+    int sub = MAX(1, (sq * roi_percent) / 100);
+    int off = (sq - sub) / 2;
+    cv::Rect roi(c * sq + off, r * sq + off, sub, sub);
+    cv::Mat roiMat = edges(roi);
+    int points = countNonZero(roiMat);
+    if (points > min_points) {
+        std::vector<cv::Point> nz;
+        findNonZero(roiMat, nz);
+        if (!nz.empty()) {
+            rectangle(display,roi,cv::Scalar(255,255,255),2);
+            char buffer[10];
+            int value = nz.size();
+            sprintf(buffer,"%d",value);
+            putText(display, std::string(buffer) ,cv::Point(c * sq + sq/2,r * sq+ sq/2), 1, 1.5, cv::Scalar(255, 255, 255), 3);
+            return true;
+        }
+    }
+    return false;
+}
+
+// Compare two 8x8 matrices, return start (1->0) and list of possible ends (0->1)
+void ChessImageProcessing::comparePieceMatrices(const std::vector<std::vector<int>>& mat1, const std::vector<std::vector<int>>& mat2, cv::Point& start, std::vector<cv::Point>& ends) {
+    // Print mat1
+    std::cout << "mat1 (before):" << std::endl;
+    for (int r = 0; r < 8; r++) {
+        for (int c = 0; c < 8; c++) {
+            std::cout << mat1[r][c] << " ";
+        }
+        std::cout << std::endl;
+    }
+    // Print mat2
+    std::cout << "mat2 (after):" << std::endl;
+    for (int r = 0; r < 8; r++) {
+        for (int c = 0; c < 8; c++) {
+            std::cout << mat2[r][c] << " ";
+        }
+        std::cout << std::endl;
+    }
+    start = cv::Point(-1, -1);
+    ends.clear();
+    for (int r = 0; r < 8; r++) {
+        for (int c = 0; c < 8; c++) {
+            if (mat1[r][c] == 1 && mat2[r][c] == 0) {
+                start = cv::Point(c, r);
+            } else if (mat1[r][c] == 0 && mat2[r][c] == 1) {
+                ends.push_back(cv::Point(c, r));
+            }
+        }
+    }
+}
+

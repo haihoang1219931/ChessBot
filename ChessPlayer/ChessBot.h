@@ -30,7 +30,8 @@ typedef enum{
 typedef enum{
     STATE_INIT,
     STATE_PENDING,
-    STATE_DONE
+    STATE_DONE_FAIL,
+    STATE_DONE_SUCCESS
 } STATE_ACTION;
 
 typedef enum {
@@ -48,6 +49,7 @@ typedef enum{
     PLAY_CALCULATE_NEXT_MOVE,
     PLAY_EXECUTE_NEXT_MOVE,
     PLAY_INFORM_RESULT,
+    PLAY_INFORM_ERROR,
     PLAY_PROCESS_DONE,
 } STATE_PLAY_PHASE;
 
@@ -113,6 +115,7 @@ public Q_SLOTS:
     void disconnectCamera();
 
 Q_SIGNALS:
+    void detectFailed();
     void gameEnded(int endState);
     void sideChanged(int side);
     void levelTypeChanged(int type);
