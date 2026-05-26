@@ -99,12 +99,12 @@ void ApplicationArduino::initRobot()
 
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
-        {true,                                 1,     0,       0,      330,         8,           0,       450,       8,   FREQUENCY_TIMER1,      0},
+        {true,                                 1,     0,       0,      200,         8,           0,       330,       8,   FREQUENCY_TIMER1,      0},
         {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -22,         4,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
         {true, 16.0f*70.0f/20.0f*(200.0f/360.0f), 80.27,     140,       52,         8,          50,       210,       2,   FREQUENCY_TIMER1,    250},
         {false,  1.0f/1.0f,                       25.57,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
         {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       6,   FREQUENCY_TIMER1,      0},
-        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -45,         4,         -45,         0,       4,   FREQUENCY_TIMER1,    100}
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -45,         6,         -45,         0,       6,   FREQUENCY_TIMER1,    100}
     };
 
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
@@ -131,6 +131,11 @@ long ApplicationArduino::getSystemTime() {
 void ApplicationArduino::specificPlatformGohome(int motorID)
 {
   if(motorID == MOTOR_CAPTURE) {
+    // Disable arm1, arm 2 and arm 5 to prevent collision when homing capture
+    digitalWrite(enPin1, HIGH);
+    digitalWrite(enPin2, HIGH);
+    digitalWrite(enPin5, HIGH);
+
     uint8_t enPin = enPinCapture;
     uint8_t stepPin = stepPinCapture;
     uint8_t dirPin = dirPinCapture;
@@ -218,6 +223,10 @@ void ApplicationArduino::specificPlatformGohome(int motorID)
     }
     Serial.println("Homing Capture done");
     digitalWrite(enPin, HIGH);
+    // Enable arm1, arm 2 and arm 5 after homing capture
+    digitalWrite(enPin1, LOW);
+    digitalWrite(enPin2, LOW);
+    digitalWrite(enPin5, LOW);
   }
 }
 
