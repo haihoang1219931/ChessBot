@@ -186,7 +186,17 @@ void ChessBot::playLoop()
     }
         break;
     case PLAY_INIT: {
-        m_statePlay = PLAY_DETECT_MOVE;
+        if(playCheckEndGame() == true)
+            m_statePlay = PLAY_CHECK_CURRENT_MOVE;
+        else
+            m_statePlay = PLAY_PROCESS_DONE;
+    }
+        break;
+    case PLAY_CHECK_CURRENT_MOVE:{
+        if(!playCheckDoubleMove())
+            m_statePlay = PLAY_DETECT_MOVE;
+        else
+            m_statePlay = PLAY_PROCESS_DONE;
     }
         break;
     case PLAY_DETECT_MOVE: {
@@ -224,6 +234,7 @@ void ChessBot::playLoop()
         break;
 
     case PLAY_PROCESS_DONE: {
+        playCheckEndGame();
         togglePause(true);
     }
         break;
@@ -278,13 +289,53 @@ void ChessBot::testLoop()
         break;
     }
 }
+bool ChessBot::playCheckDoubleMove()
+{
+    QString gameState = m_chessController->buildResultText();
+    if(gameState == "BLACK_CHECK") {
+        return m_side == 0;
+    } else if(gameState == "WHITE_CHECK") {
+        return m_side == 1;
+    }
+    return false;
+}
 
+bool ChessBot::playCheckEndGame()
+{
+    QString gameState = m_chessController->buildResultText();
+    if(gameState != "") {
+        if(gameState == "DRAW_STALEMATE" ||
+                gameState == "DRAW_PIECE") {
+            speakText("Game draw");
+            Q_EMIT gameEnded(0);
+            return false;
+        } else if(gameState == "WHITE_WIN") {
+            speakText(m_side == 0?"Check mate. You win":
+                                  "Check mate. You lost");
+            Q_EMIT gameEnded(m_side == 0?1:2);
+            return false;
+        } else if(gameState == "BLACK_WIN") {
+            speakText(m_side == 1?"Check mate. You win":
+                                  "Check mate. You lost");
+            Q_EMIT gameEnded(m_side == 1?1:2);
+            return false;
+        } else if(gameState == "BLACK_CHECK") {
+            speakText(m_side == 0?"Check mate":"Good checkmate");
+            return true;
+        } else if(gameState == "WHITE_CHECK") {
+            speakText(m_side == 1?"Check mate":"Good checkmate");
+            return true;
+        }
+    } else {
+        return true;
+    }
+}
 uint8_t ChessBot::playDetectMove()
 {
     qDebug("playDetectMove");
     bool foundValidMove = false;
 #ifndef IMAGE_PROCESS_MOVE
-    playRandomMove();
+    if(playRandomMove() == STATE_DONE_SUCCESS)
     foundValidMove = true;
 #else
     if(!readFrame(imageAfter)){
@@ -315,10 +366,15 @@ uint8_t ChessBot::playRandomMove()
     printf("=== Player move %s->%s\r\n",
             randomMoves[0].toStdString().c_str(),
             randomMoves[1].toStdString().c_str());
-    speakMove(m_chessController->pieceType(randomMoves[0]),
-            randomMoves[1]);
-    m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1]);
-    return STATE_DONE_SUCCESS;
+    if(randomMoves[0] != randomMoves[1]) {
+        speakMove(m_chessController->pieceType(randomMoves[0]),
+                randomMoves[1]);
+        m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1]);
+        return STATE_DONE_SUCCESS;
+    } else {
+        speakText("No invalid move found\r\n");
+        return STATE_DONE_FAIL;
+    }
 }
 
 QPoint ChessBot::notationToCoord(const std::string& notation, const std::string& playerSide)
@@ -1039,6 +1095,7 @@ void ChessBot::initRobot()
         break;
     case INIT_DONE: {
         qDebug("=== Robot Initialization Complete ===");
+        Q_EMIT calibrationUploadComplete(HOMING_ROBOT,true);
         m_state = STATE_CONFIGURE;
         togglePause(true);
     }
@@ -1395,7 +1452,8 @@ void ChessBot::sendTestCommand(QString command)
 void ChessBot::initRobotCommunication() {
     qDebug("ChessBot::initRobotCommunication");
     m_state = STATE_INIT_COM;
-    m_stateInit = INIT_DETECT_PORT;
+//    m_stateInit = INIT_DETECT_PORT;
+    m_stateInit = INIT_DONE;
     m_calibRow = 0;
     m_calibCol = 0;
     togglePause(false);
@@ -1444,22 +1502,6 @@ int ChessBot::side()
     return m_side;
 }
 
-void ChessBot::randomMove()
-{
-    QString gameState = m_chessController->buildResultText();
-    if(gameState != "") {
-        if(gameState == "DRAW_STALEMATE" ||
-                gameState == "DRAW_PIECE") {
-            Q_EMIT gameEnded(0);
-        } else if(gameState == "WHITE_WIN") {
-            Q_EMIT gameEnded(m_side == 0?1:2);
-        } else if(gameState == "BLACK_WIN") {
-            Q_EMIT gameEnded(m_side == 1?1:2);
-        }
-    } else {
-        processNextMove();
-    }
-}
 QVariantList ChessBot::chessboardCorners() const {
     QVariantList rootList;
     qDebug("Number of m_chessboardConners %d",m_chessboardConners.size());

@@ -51,6 +51,14 @@ QString ChessController::status() const
     return m_status;
 }
 
+void ChessController::setStatus(QString status)
+{
+    if(m_status != status) {
+        m_status = status;
+        Q_EMIT statusChanged();
+    }
+}
+
 QStringList ChessController::moveHistory() const
 {
     return m_moveHistory;
@@ -93,20 +101,24 @@ void ChessController::setPlayerColor(int color)
     Q_EMIT playerColorChanged();
 }
 
+const std::string whiteMateFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
+const std::string blackMateFen = "7K/6q1/6k1/8/8/8/8/8 w - - 0 1";
+const std::string staleMateFen = "7k/5Q2/7K/8/8/8/8/8 b - - 0 1";
+const std::string ongoingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
 void ChessController::newGame()
 {
-    m_board = std::make_shared<Board>();
+    m_board = std::make_shared<Board>("7n/8/k2R4/3r4/8/8/4K3/8 b - -");
     globalTT.clearTT();
     m_moveHistory.clear();
     Q_EMIT moveHistoryChanged();
     m_promotionPending = false;
     m_pendingPromotionMoves.clear();
     Q_EMIT promotionPendingChanged();
-    m_status = "New game";
     clearSelection();
     refreshBoardModel();
     refreshCheckState();
-    Q_EMIT statusChanged();
+    setStatus("NEW_GAME");
     Q_EMIT sideToMoveChanged();
 
     if (m_playerColor == 1) // player is Black — engine plays White's first move
@@ -143,8 +155,7 @@ void ChessController::clickSquare(int uiIndex)
         const bool isWhitePiece = piece.startsWith("w");
         if ((isWhitePiece && m_board->getColorToPlay() != WHITE) || (!isWhitePiece && m_board->getColorToPlay() != BLACK))
         {
-            m_status = "Select your own piece";
-            Q_EMIT statusChanged();
+            setStatus("OWN_PIECE_SELECTED");
             return;
         }
 
@@ -174,8 +185,7 @@ bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex)
 
     if (m_promotionPending)
     {
-        m_status = "Promotion pending";
-        Q_EMIT statusChanged();
+        setStatus("PROMOTION_PENDING");
         return false;
     }
 
@@ -191,8 +201,7 @@ bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex)
     const bool isWhitePiece = piece.startsWith("w");
     if ((isWhitePiece && m_board->getColorToPlay() != WHITE) || (!isWhitePiece && m_board->getColorToPlay() != BLACK))
     {
-        m_status = "Select your own piece";
-        Q_EMIT statusChanged();
+        setStatus("OWN_PIECE_SELECTED");
         return false;
     }
 
@@ -213,8 +222,7 @@ bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex)
     const QString resultAfterPlayer = buildResultText();
     if (!resultAfterPlayer.isEmpty())
     {
-        m_status = resultAfterPlayer;
-        Q_EMIT statusChanged();
+        setStatus(resultAfterPlayer);
         Q_EMIT boardChanged();
         return true;
     }
@@ -228,24 +236,21 @@ bool ChessController::moveByCoordinates(const QString& startSquare, const QStrin
     int startUiIndex = -1;
     if (!tryParseCoordinate(startSquare, startUiIndex))
     {
-        m_status = "Invalid coordinate";
-        Q_EMIT statusChanged();
+        setStatus("INVALID_COORDINATE");
         return false;
     }
 
     const QString stopTrimmed = stopSquare.trimmed().toLower();
     if (stopTrimmed.size() != 2 && stopTrimmed.size() != 3)
     {
-        m_status = "Invalid coordinate";
-        Q_EMIT statusChanged();
+        setStatus("INVALID_COORDINATE");
         return false;
     }
 
     int stopUiIndex = -1;
     if (!tryParseCoordinate(stopTrimmed.left(2), stopUiIndex))
     {
-        m_status = "Invalid coordinate";
-        Q_EMIT statusChanged();
+        setStatus("INVALID_COORDINATE");
         return false;
     }
 
@@ -255,8 +260,7 @@ bool ChessController::moveByCoordinates(const QString& startSquare, const QStrin
         promotionSuffix = stopTrimmed.at(2);
         if (promotionSuffix != 'q' && promotionSuffix != 'r' && promotionSuffix != 'b' && promotionSuffix != 'n')
         {
-            m_status = "Invalid promotion piece";
-            Q_EMIT statusChanged();
+            setStatus("INVALID_PROMOTION_PIECE");
             return false;
         }
     }
@@ -268,8 +272,7 @@ bool ChessController::moveByCoordinates(const QString& startSquare, const QStrin
 
     if (m_promotionPending)
     {
-        m_status = "Promotion pending";
-        Q_EMIT statusChanged();
+        setStatus("PROTOMTION_PENDING");
         return false;
     }
 
@@ -285,8 +288,7 @@ bool ChessController::moveByCoordinates(const QString& startSquare, const QStrin
     const bool isWhitePiece = piece.startsWith("w");
     if ((isWhitePiece && m_board->getColorToPlay() != WHITE) || (!isWhitePiece && m_board->getColorToPlay() != BLACK))
     {
-        m_status = "Select your own piece";
-        Q_EMIT statusChanged();
+        setStatus("OWN_PIECE_SELECTED");
         return false;
     }
 
@@ -308,8 +310,7 @@ bool ChessController::moveByCoordinates(const QString& startSquare, const QStrin
     const QString resultAfterPlayer = buildResultText();
     if (!resultAfterPlayer.isEmpty())
     {
-        m_status = resultAfterPlayer;
-        Q_EMIT statusChanged();
+        setStatus(resultAfterPlayer);
         Q_EMIT boardChanged();
         return true;
     }
@@ -376,8 +377,7 @@ void ChessController::choosePromotion(const QString& pieceLetter)
 
     if (!found)
     {
-        m_status = "Promotion selection failed";
-        Q_EMIT statusChanged();
+        setStatus("PROMOTION_SELECTION_FAILED");
         return;
     }
 
@@ -392,8 +392,7 @@ void ChessController::choosePromotion(const QString& pieceLetter)
     const QString resultAfterPlayer = buildResultText();
     if (!resultAfterPlayer.isEmpty())
     {
-        m_status = resultAfterPlayer;
-        Q_EMIT statusChanged();
+        setStatus(resultAfterPlayer);
         Q_EMIT boardChanged();
         return;
     }
@@ -478,14 +477,11 @@ void ChessController::playEngineMove()
             Q_EMIT sideToMoveChanged();
 
             const QString result = buildResultText();
-            m_status = result.isEmpty() ? QString("Engine played ") + bestMoveText : result;
-            Q_EMIT statusChanged();
+            setStatus(result.isEmpty() ? QString("ENGINE_PLAY_") + bestMoveText : result);
             return;
         }
     }
-
-    m_status = "No legal engine move";
-    Q_EMIT statusChanged();
+    setStatus("NO_LEGAL_ENGINE_MOVE_FOUND");
 }
 
 QString ChessController::convertPieceText(QString pieceShortName)
@@ -559,17 +555,15 @@ bool ChessController::tryFindLegalMove(int originSquare, int destinationSquare, 
 
     if (!promotionSuffix.isNull() && hasMatchingPromotion)
     {
-        m_status = "Invalid promotion piece for move";
-        Q_EMIT statusChanged();
+        setStatus("INVALID_PROMOTION_PIECE_FOR_MOVE");
         return false;
     }
 
     if (!m_pendingPromotionMoves.empty())
     {
         m_promotionPending = true;
-        m_status = "Choose promotion piece";
         Q_EMIT promotionPendingChanged();
-        Q_EMIT statusChanged();
+        setStatus("CHOOSE_PROMOTION_PIECE");
         return false;
     }
 
@@ -610,6 +604,12 @@ QString ChessController::buildResultText() const
             return m_board->getColorToPlay() == WHITE ? "BLACK_WIN" : "WHITE_WIN";
         }
         return "DRAW_STALEMATE";
+    } else {
+        m_board->updateKingAttackers();
+        if (m_board->isCheck())
+        {
+            return m_board->getColorToPlay() == WHITE ? "BLACK_CHECK" : "WHITE_CHECK";
+        }
     }
 
     Search search(m_board);

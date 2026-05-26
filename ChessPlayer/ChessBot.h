@@ -46,6 +46,7 @@ typedef enum {
 typedef enum{
     PLAY_SETUP,
     PLAY_INIT,
+    PLAY_CHECK_CURRENT_MOVE,
     PLAY_DETECT_MOVE,
     PLAY_CALCULATE_NEXT_MOVE,
     PLAY_EXECUTE_NEXT_MOVE,
@@ -110,7 +111,6 @@ public Q_SLOTS:
     void processNextMove();
     void setLevel(int level);
     void setSide(int side);
-    void randomMove();
     void resetGame();
     void connectCamera();
     void disconnectCamera();
@@ -130,6 +130,8 @@ private:
     void playLoop();
     void configureLoop();
     void testLoop();
+    bool playCheckEndGame();
+    bool playCheckDoubleMove();
     uint8_t playDetectMove();
     uint8_t playRandomMove();
     uint8_t playCalculateNextMove();

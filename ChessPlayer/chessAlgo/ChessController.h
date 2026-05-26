@@ -15,7 +15,7 @@ class ChessController : public QObject
     Q_PROPERTY(QStringList board READ board NOTIFY boardChanged)
     Q_PROPERTY(int selectedSquare READ selectedSquare NOTIFY selectedSquareChanged)
     Q_PROPERTY(QString sideToMove READ sideToMove NOTIFY sideToMoveChanged)
-    Q_PROPERTY(QString status READ status NOTIFY statusChanged)
+    Q_PROPERTY(QString status READ status WRITE setStatus NOTIFY statusChanged)
     Q_PROPERTY(QStringList moveHistory READ moveHistory NOTIFY moveHistoryChanged)
     Q_PROPERTY(bool promotionPending READ promotionPending NOTIFY promotionPendingChanged)
     Q_PROPERTY(int checkedKingSquare READ checkedKingSquare NOTIFY checkedKingSquareChanged)
@@ -29,6 +29,7 @@ public:
     int selectedSquare() const;
     QString sideToMove() const;
     QString status() const;
+    void setStatus(QString status);
     QStringList moveHistory() const;
     bool promotionPending() const;
     int checkedKingSquare() const;
