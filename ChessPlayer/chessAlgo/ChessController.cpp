@@ -9,6 +9,7 @@
 #include "TT.hpp"
 #include "Tables.hpp"
 #include "Utils.hpp"
+#include "Piece.hpp"
 
 ChessController::ChessController(QObject* parent)
     : QObject(parent)
@@ -116,7 +117,7 @@ void ChessController::newGame()
 }
 
 void ChessController::clickSquare(int uiIndex)
-{
+{    
     if (uiIndex < 0 || uiIndex >= 64)
     {
         return;
@@ -132,6 +133,8 @@ void ChessController::clickSquare(int uiIndex)
     if (m_selectedUiSquare < 0)
     {
         QString piece = pieceCodeAtSquare(square);
+        QString pieceName =  convertPieceText(piece);
+        printf("Click at %s\r\n",pieceName.toStdString().c_str());
         if (piece.isEmpty())
         {
             return;
@@ -483,6 +486,38 @@ void ChessController::playEngineMove()
 
     m_status = "No legal engine move";
     Q_EMIT statusChanged();
+}
+
+QString ChessController::convertPieceText(QString pieceShortName)
+{
+    if (pieceShortName == "wP") return "White Pawn";
+    else if (pieceShortName == "wN") return "White Knight";
+    else if (pieceShortName == "wB") return "White Bishop";
+    else if (pieceShortName == "wR") return "White Rook";
+    else if (pieceShortName == "wQ") return "White Queen";
+    else if (pieceShortName == "wK") return "White King";
+    else if (pieceShortName == "bP") return "Black Pawn";
+    else if (pieceShortName == "bN") return "Black Knight";
+    else if (pieceShortName == "bB") return "Black Bishop";
+    else if (pieceShortName == "bR") return "Black Rook";
+    else if (pieceShortName == "bQ") return "Black Queen";
+    else if (pieceShortName == "bK") return "Black King";
+    else if (pieceShortName == "") return "Empty Square";
+    else return "Unknown Piece ID";
+}
+
+QString ChessController::pieceType(QString square)
+{
+    int uiIndex = -1;
+    if(!tryParseCoordinate(square,uiIndex)) return "Unknown Piece ID";
+    if (uiIndex < 0 || uiIndex >= 64)
+    {
+        return "";
+    }
+    int squareIndex = uiIndexToSquare(uiIndex);
+    QString piece = pieceCodeAtSquare(squareIndex);
+    QString pieceName =  convertPieceText(piece);
+    return pieceName;
 }
 
 bool ChessController::tryFindLegalMove(int originSquare, int destinationSquare, Move& outMove, QChar promotionSuffix)

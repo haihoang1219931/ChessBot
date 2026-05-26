@@ -11,6 +11,7 @@
 #include <QVariantList>
 #include <QPoint>
 #include <QVector>
+#include <QTextToSpeech>
 
 #define CONFIGURE_CHESSBOARD_CALIB_FILE "calib_data.json"
 
@@ -113,6 +114,8 @@ public Q_SLOTS:
     void resetGame();
     void connectCamera();
     void disconnectCamera();
+    void speakText(const QString &text);
+    void speakMove(const QString &piece, const QString &move);
 
 Q_SIGNALS:
     void detectFailed();
@@ -154,6 +157,7 @@ private:
     QMutex *m_mutex;
     QWaitCondition* m_pauseCond;
     ChessController* m_chessController;
+    QTextToSpeech *m_speech;
 #ifdef IMAGE_PROCESS_MOVE
     ChessImageProcessing* m_moveDetector;
 #endif

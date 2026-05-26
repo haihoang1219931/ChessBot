@@ -1,7 +1,7 @@
 TEMPLATE = app
 CONFIG += c++11 no_keywords console
 
-QT += qml quick qml serialport
+QT += qml quick qml serialport texttospeech
 CONFIG += c++11
 
 CONFIG += use_chess_algo

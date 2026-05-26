@@ -66,6 +66,7 @@ private:
     void clearSelection();
     bool tryFindLegalMove(int originSquare, int destinationSquare, Move& outMove, QChar promotionSuffix = QChar());
     QString pieceCodeAtSquare(int square) const;
+    QString convertPieceText(QString pieceShortName);
     static bool tryParseCoordinate(const QString& coordinate, int& uiIndex);
 
     static int uiIndexToSquare(int uiIndex);

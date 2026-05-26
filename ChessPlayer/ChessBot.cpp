@@ -6,6 +6,7 @@
 #include <QFile>
 #include <QSerialPortInfo>
 #include <QTime>
+#include <QDebug>
 #include "ChessBot.h"
 #include "chessAlgo/ChessController.h"
 
@@ -24,6 +25,21 @@ ChessBot::ChessBot(QThread *parent) :
     m_mutex = new QMutex;
     m_pauseCond = new QWaitCondition;
     m_chessController = new ChessController();
+    // 1. Check if engines exist on your OS
+    qDebug() << "Available TTS Engines:" << QTextToSpeech::availableEngines();
+
+    m_speech = new QTextToSpeech(this);
+    // Explicitly enforce the system language to kickstart SAPI
+    m_speech->setLocale(QLocale::system());
+    // 2. Print current engine state (Should be Ready)
+    qDebug() << "Current TTS Engine:" << m_speech->availableEngines();
+    qDebug() << "Initial State:" << m_speech->state();
+
+    // 3. Optional: Connect a debug log to trace status changes
+    connect(m_speech, &QTextToSpeech::stateChanged, [](QTextToSpeech::State state) {
+        qDebug() << "TTS State Changed to:" << state;
+    });
+    m_speech->say("Welcome to Daddy chess robot");
     m_chessboardCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(8));
     m_dropzoneRightCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(2));
     m_dropzoneLeftCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(2));
@@ -201,6 +217,7 @@ void ChessBot::playLoop()
         break;
     case PLAY_INFORM_ERROR:{
         printf("Can not detect move\r\n");
+        speakText("Can not detect move");
         Q_EMIT detectFailed();
         m_statePlay = PLAY_PROCESS_DONE;
     }
@@ -265,13 +282,15 @@ void ChessBot::testLoop()
 uint8_t ChessBot::playDetectMove()
 {
     qDebug("playDetectMove");
+    bool foundValidMove = false;
 #ifndef IMAGE_PROCESS_MOVE
     playRandomMove();
+    foundValidMove = true;
 #else
     if(!readFrame(imageAfter)){
         return STATE_DONE_FAIL;
     }
-    bool foundValidMove = false;
+
     if(!imageBefore.empty() && !imageAfter.empty()) {
         std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves(imageBefore, imageAfter,
             m_side == 0?"white":"black");
@@ -296,6 +315,8 @@ uint8_t ChessBot::playRandomMove()
     printf("=== Player move %s->%s\r\n",
             randomMoves[0].toStdString().c_str(),
             randomMoves[1].toStdString().c_str());
+    speakMove(m_chessController->pieceType(randomMoves[0]),
+            randomMoves[1]);
     m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1]);
     return STATE_DONE_SUCCESS;
 }
@@ -330,6 +351,7 @@ uint8_t ChessBot::playCalculateNextMove()
     QString from = lastMove.left(2);  // Result: "e2"
     QString to = lastMove.right(2);   // Result: "e4"
     QPoint fromCoord, toCoord;
+//    speakMove(m_chessController->pieceType(to), to);
     fromCoord = notationToCoord(from.toStdString(),
                                                 m_side != 0?"white":"black");
     toCoord = notationToCoord(to.toStdString(),
@@ -1591,4 +1613,23 @@ bool ChessBot::getArduinoVersion()
     
     qDebug("No valid response found with '[v]' pattern");
     return false;
+}
+
+void ChessBot::speakText(const QString &text)
+{
+    m_speech->say(text.trimmed());
+}
+
+void ChessBot::speakMove(const QString &piece, const QString &move)
+{
+    if (move.isEmpty()) return;
+    qDebug("Speak %s",move.toStdString().c_str());
+    QString formattedMove = "Detect move " + piece + " to ";
+    // Format "E4E5" to "E 4 E 5 " for proper spelling pronunciation
+    for (int i = 0; i < move.length(); ++i) {
+        formattedMove.append(move.at(i).toUpper());
+        formattedMove.append(" ");
+    }
+
+    m_speech->say(formattedMove.trimmed());
 }
