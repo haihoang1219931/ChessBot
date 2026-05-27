@@ -22,6 +22,10 @@ unix:!macx: LIBS += -L/usr/local/lib/  \
     -lopencv_imgproc \
     -lopencv_videoio
 
+OPENCV_WINDOWS = $$PWD/../../ImageProcessing/opencv-4.7.0/build/install
+win32: INCLUDEPATH += "$$OPENCV_WINDOWS/include"
+win32: DEPENDPATH += "$$OPENCV_WINDOWS/include"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_world470.dll.a"
 win32: LIBS += -lpthread
 
 INCLUDEPATH += \
