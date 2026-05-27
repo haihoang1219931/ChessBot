@@ -293,9 +293,9 @@ bool ChessBot::playCheckDoubleMove()
 {
     QString gameState = m_chessController->buildResultText();
     if(gameState == "BLACK_CHECK") {
-        return m_side == 0;
-    } else if(gameState == "WHITE_CHECK") {
         return m_side == 1;
+    } else if(gameState == "WHITE_CHECK") {
+        return m_side == 0;
     }
     return false;
 }
@@ -303,6 +303,7 @@ bool ChessBot::playCheckDoubleMove()
 bool ChessBot::playCheckEndGame()
 {
     QString gameState = m_chessController->buildResultText();
+    printf("gameState[%s]\r\n",gameState.toStdString().c_str());
     if(gameState != "") {
         if(gameState == "DRAW_STALEMATE" ||
                 gameState == "DRAW_PIECE") {

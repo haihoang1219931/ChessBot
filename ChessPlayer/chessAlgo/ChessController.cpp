@@ -108,7 +108,7 @@ const std::string ongoingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ
 
 void ChessController::newGame()
 {
-    m_board = std::make_shared<Board>("7n/8/k2R4/3r4/8/8/4K3/8 b - -");
+    m_board = std::make_shared<Board>("2B3Rn/1r6/k7/8/2b5/8/4K3/8 w - -");
     globalTT.clearTT();
     m_moveHistory.clear();
     Q_EMIT moveHistoryChanged();
