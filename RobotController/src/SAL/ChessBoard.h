@@ -14,7 +14,7 @@ public:
     void setChessBoardSize(float value);
     void setDropZoneSpace(float value);
     void setChessBoardSideSpace(float value);
-    Point getFreeDropPoint(ZONE_TYPE zone, uint8_t promote = 0);
+    DropPoint getFreeDropPoint(ZONE_TYPE zone, uint8_t promote = 0);
     Point convertPoint(int row, int col);
     void updateDropZone(uint8_t piece, int row, int col, ZONE_TYPE zone);
     void moveGuestPieceOut(uint8_t piece);
@@ -31,8 +31,8 @@ private:
     float m_chessBoardRect;
     float m_dropZoneSpace;
     Point m_cellCalibsChessBoard[8][8];
-    Point m_cellCalibsDropZonePlayer[8][8];
-    Point m_cellCalibsDropZoneBot[8][8];
+    Point m_cellCalibsDropZonePlayer[8][2];
+    Point m_cellCalibsDropZoneBot[8][2];
     uint8_t m_dropZoneMapPlayer[8][2];
     uint8_t m_dropZoneMapBot[8][2];
 };

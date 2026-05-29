@@ -37,23 +37,24 @@ public:
     void goToHome(int motorID);
     void calibToHome(int motorID);
     void goToReadyPosition();
+    int executeReadyPositionLoop();
     void goToCalibPosition();
     void gotoPosition(float x, float y, float upAngleInDegree);
     void executeSequence(MOVE_TYPE moveType,
                          int startCol, int startRow,
                          int stopCol, int stopRow,
-                         char promotePiece = 0);
+                         char attackPiece = 0, char promotePiece = 0);
     void sendCalibrationProgress();
     void calculateSequenceMoveStraight(int startCol, int startRow,int stopCol, int stopRow);
     void calculateSequenceMove(int startCol, int startRow, int upAngleInDegree, bool isCapture);
     void calculateSequenceMoveNormal(int startCol, int startRow,
                          int stopCol, int stopRow);
     void calculateSequenceAttack(int startCol, int startRow,
-                         int stopCol, int stopRow);
+                         int stopCol, int stopRow, char attackPiece);
     void calculateSequencePastPawn(int startCol, int startRow,
                          int stopCol, int stopRow);
     void calculateSequencePromotePiece(int startCol, int startRow,
-                         int stopCol, int stopRow, char promotePiece);
+                         int stopCol, int stopRow, char attackPiece, char promotePiece);
     void calculateSequenceCastle(int kingCol, int kingRow,
                                  int rookCol, int rookRow);
     void calculatePolygonEdgeA2345(float upAngleInDegree, float* edge, float* angleA2A2345);
@@ -67,7 +68,7 @@ public:
     void initSequenceMove(int numberOfJoints);
     void executeSmoothMotionLoop(int motorID);
     virtual void initRobot() = 0;
-    virtual void specificPlatformGohome(int motorID = MAX_MOTOR) = 0;
+    virtual void specificPlatformGohome(int motorID = MAX_MOTOR, bool stopOtherStepper = true) = 0;
     virtual void hardwareStop(int motorID = MAX_MOTOR) = 0;
     virtual void checkInput() = 0;
     virtual int printf(const char *fmt, ...) = 0;
@@ -91,6 +92,7 @@ public:
     Command m_sequenceCommand[MAX_MOVE_SEQUENCE];
     Command m_nextPoint;
     char m_commandRead[64];
+    uint8_t m_standByCommandState;
     uint8_t m_numCommand;
     uint8_t m_curCommandId;
     uint8_t m_commandState;

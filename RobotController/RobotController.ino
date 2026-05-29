@@ -19,7 +19,7 @@ void setup() {
   //   app.executeSmoothMotionLoop(MOTOR_ARM2);
   //   app.executeSmoothMotionLoop(MOTOR_ARM5);
   //   app.executeSmoothMotionLoop(MOTOR_CAPTURE);
-  //   endTime = micros();
+  //   endTime = micros(); 
   //   duration = endTime - startTime;
   //   // if(duration > 500) {
   //   //   Serial.print("i[");

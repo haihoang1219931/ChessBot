@@ -90,7 +90,7 @@ void ApplicationSim::initRobot()
 
 }
 
-void ApplicationSim::specificPlatformGohome(int motorID)
+void ApplicationSim::specificPlatformGohome(int motorID, bool stopOtherStepper)
 {
     m_mainProcess->changeTimerPeriodMotion(1);
     m_mainProcess->changeTimerPeriodInput(1000);

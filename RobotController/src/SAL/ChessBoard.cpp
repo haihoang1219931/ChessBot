@@ -17,10 +17,15 @@ ChessBoard::ChessBoard(float x, float y, float rect, float dropZoneSpace):
 //    m_dropZoneMap[2][0] = 'c';
 //    m_dropZoneMap[2][1] = 'c';
 
-    m_dropZoneMapBot[0][0] = 'q';
-    m_dropZoneMapBot[1][0] = 'r';
-    m_dropZoneMapBot[2][0] = 'k';
-    m_dropZoneMapBot[3][0] = 'b';
+    m_dropZoneMapPlayer[0][0] = 'q';
+    m_dropZoneMapPlayer[1][0] = 'r';
+    m_dropZoneMapPlayer[2][0] = 'k';
+    m_dropZoneMapPlayer[3][0] = 'b';
+
+    m_dropZoneMapBot[4][0] = 'q';
+    m_dropZoneMapBot[6][0] = 'r';
+    m_dropZoneMapBot[6][0] = 'k';
+    m_dropZoneMapBot[7][0] = 'b';
 
     for(int rowId = 0; rowId < 8; rowId ++){
         for(int colId = 0; colId < 2; colId ++){
@@ -75,16 +80,19 @@ void ChessBoard::setChessBoardSideSpace(float value)
     m_chessBoardSideSpace = value;
 }
 
-Point ChessBoard::getFreeDropPoint(ZONE_TYPE zone, uint8_t promotePiece)
+DropPoint ChessBoard::getFreeDropPoint(ZONE_TYPE zone, uint8_t promotePiece)
 {
-    Point freePoint;
+    DropPoint freePoint;
     bool foundDropPoint = false;
     for(int rowId = 0; rowId < 8; rowId ++){
         for(int colId = 0; colId < 2; colId ++){
             if(zone == ZONE_PLAYER?
                     m_dropZoneMapPlayer[rowId][colId] == promotePiece:
-                    m_dropZoneMapBot[rowId][colId] == promotePiece) {
-                freePoint = convertDropPoint(rowId,colId, zone);
+                    m_dropZoneMapBot[rowId][colId] == 0) {
+                freePoint.location = convertDropPoint(rowId,colId, zone);
+                freePoint.rowID = rowId;
+                freePoint.colID = colId;
+                freePoint.zoneType = zone;
                 foundDropPoint = true;
                 break;
             }
@@ -118,15 +126,15 @@ Point ChessBoard::convertPoint(int row, int col)
 Point ChessBoard::convertDropPoint(int row, int col, ZONE_TYPE zone) {
     Point convertValue;
     if(!(zone == ZONE_PLAYER?
-                m_cellCalibsDropZonePlayer[row][col]:
-                m_cellCalibsDropZoneBot[row][col]).calibbed) {
+                m_cellCalibsDropZonePlayer[row][col].calibbed:
+                m_cellCalibsDropZoneBot[row][col].calibbed)) {
         convertValue.x = zone == ZONE_PLAYER?
                 m_chessBoardPosX - 8*m_chessBoardRect - m_dropZoneSpace
-                    - col*m_chessBoardRect - m_chessBoardRect/2:
+                    - (float)col*m_chessBoardRect - m_chessBoardRect/2:
                 m_chessBoardPosX + 2*m_chessBoardRect + m_dropZoneSpace
-                    - col*m_chessBoardRect - m_chessBoardRect/2;
+                    - (float)col*m_chessBoardRect - m_chessBoardRect/2;
         convertValue.y = m_chessBoardPosY +
-                    row * m_chessBoardRect +
+                    (float)row * m_chessBoardRect +
                     m_chessBoardRect/2;
     } else {
         convertValue = zone == ZONE_PLAYER?
@@ -134,10 +142,10 @@ Point ChessBoard::convertDropPoint(int row, int col, ZONE_TYPE zone) {
                 m_cellCalibsDropZoneBot[row][col];
     }
 #ifdef DEBUG_COMMAND
-    printf("Drop[%s] (%d,%d) = [%.02f,%.02f]\r\n",
+    printf("Drop[%s] (%d,%d) = [%d,%d]\r\n",
            zone == ZONE_PLAYER?"Player":"Bot",
            row,col,
-           convertValue.x,convertValue.y);
+           (int)convertValue.x,(int)convertValue.y);
 #endif
            return convertValue;
 }

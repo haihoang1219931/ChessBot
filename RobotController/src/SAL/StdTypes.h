@@ -158,12 +158,28 @@ typedef enum {
     CALIB_SEQUENCE_STATE_DONE,
 }CALIB_SEQUENCE_STATE;
 
+typedef enum {
+    COMMAND_STANDBY_INIT,
+    COMMAND_STANDBY_EXECUTE,
+    COMMAND_STANDBY_PREDONE,
+    COMMAND_STANDBY_DONE,
+}COMMAND_STANDBY_STATE;
+
 typedef struct{
     float x;
     float y;
     float z;
     bool calibbed;
 }Point;
+
+typedef struct{
+    int rowID;
+    int colID;
+    int zoneType;
+    Point location;
+}DropPoint;
+
+
 
 typedef struct {
     double length;
