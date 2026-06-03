@@ -28,7 +28,8 @@ win32: LIBS += -lpthread
 INCLUDEPATH += \
     chessDetector
 SOURCES += chessDetector/ChessImageProcessing.cpp \
-    main_simple_test.cpp
+    main_simple_test.cpp \
+    main_color.cpp
 HEADERS += chessDetector/ChessImageProcessing.h
 }
 
