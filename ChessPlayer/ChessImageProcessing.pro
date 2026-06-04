@@ -19,10 +19,24 @@ unix:!macx: LIBS += -L/usr/local/lib/  \
     -lopencv_imgproc \
     -lopencv_videoio
 
-OPENCV_WINDOWS = $$PWD/../../ImageProcessing/opencv-4.7.0/build/install
+OPENCV_WINDOWS = $$PWD/../../ImageProcessing/compiledopencv
 win32: INCLUDEPATH += "$$OPENCV_WINDOWS/include"
 win32: DEPENDPATH += "$$OPENCV_WINDOWS/include"
-win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_world470.dll.a"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_calib3d4130.dll.a"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_core4130.dll.a"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_dnn4130.dll.a"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_features2d4130.dll.a"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_flann4130.dll.a"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_gapi4130.dll.a"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_highgui4130.dll.a"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_imgcodecs4130.dll.a"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_imgproc4130.dll.a"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_ml4130.dll.a"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_objdetect4130.dll.a"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_photo4130.dll.a"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_stitching4130.dll.a"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_video4130.dll.a"
+win32: LIBS += "$$OPENCV_WINDOWS/x64/mingw/lib/libopencv_videoio4130.dll.a"
 win32: LIBS += -lpthread
 
 INCLUDEPATH += \
