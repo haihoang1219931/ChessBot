@@ -129,11 +129,11 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& 
                            pieceMinPoints,pieceRoiPercent, cannyLow,
                            playerSide);
 
-//    std::vector<cv::Point> listChangedCell;
-//    detectMovePhase2Substraction(edges1,edges2,
-//                                 threshold,roiPercent,cannyLow,diffThresh,
-//                                 &listChangedCell,
-//                                 playerSide);
+    std::vector<cv::Point> listChangedCell;
+    detectMovePhase2Substraction(edges1,edges2,
+                                 threshold,roiPercent,cannyLow,diffThresh,
+                                 &listChangedCell,
+                                 playerSide);
 
 //    detectMovePhase3Classification();
     return listMoves;
@@ -186,31 +186,83 @@ bool ChessImageProcessing::detectMovePhase2Substraction(const cv::Mat& gray1, co
                                                         std::vector<cv::Point>* top3cells,
                                                         const std::string& playerSide)
 {
-    cv::Mat diff_bin, edges1, edges2;
+    cv::Mat diff_bin;
     absdiff(gray1, gray2, diff_bin);
     threshold(diff_bin, diff_bin, diff_thresh, 255, cv::THRESH_BINARY);
-#ifdef DEBUG_SHOW_IMAGE
-    imshow("diff_bin",diff_bin);
-#endif
+
     int sq = gray1.cols / 8;
     int sub = MAX(1, (sq * roi_percent) / 100);
     int off = (sq - sub) / 2;
 
-    std::vector<std::pair<int, cv::Point>> topCells;
-    for (int r = 0; r < 8; r++) {
-        for (int c = 0; c < 8; c++) {
-            cv::Rect roi(c * sq + off, r * sq + off, sub, sub);
-            int diff_px = countNonZero(diff_bin(roi));
-            topCells.push_back({diff_px, cv::Point(c, r)});
+    // Prepare visualization image (color) from diff for drawing counts
+    cv::Mat vis;
+    cv::cvtColor(diff_bin, vis, cv::COLOR_GRAY2BGR);
+
+    // Compute count of non-zero pixels in each cell's ROI (centered)
+    std::vector<std::tuple<int, int, int>> counts; // (count, col, row)
+    counts.reserve(64);
+    for (int r = 0; r < 8; ++r) {
+        for (int c = 0; c < 8; ++c) {
+            int x = c * sq + off;
+            int y = r * sq + off;
+            cv::Rect roiRect(x, y, sub, sub);
+            // clamp
+            roiRect &= cv::Rect(0, 0, diff_bin.cols, diff_bin.rows);
+            int diff_px = 0;
+            if (roiRect.width > 0 && roiRect.height > 0)
+                diff_px = countNonZero(diff_bin(roiRect));
+            counts.emplace_back(diff_px, c, r);
+
+            // draw small rectangle and count
+            cv::Scalar col = diff_px > 0 ? cv::Scalar(0, 0, 255) : cv::Scalar(120, 120, 120);
+            cv::rectangle(vis, roiRect, col, 1);
+            std::string txt = std::to_string(diff_px);
+            int font = cv::FONT_HERSHEY_SIMPLEX;
+            double fs = 0.5;
+            int thickness = 3;
+            cv::Point textOrg(roiRect.x + 2, roiRect.y + std::max(12, roiRect.height/5));
+            cv::putText(vis, txt, textOrg, font, fs, col, thickness);
         }
     }
-    sort(topCells.begin(), topCells.end(), [](const std::pair<int, cv::Point>& a, const std::pair<int, cv::Point>& b){ return a.first > b.first; });
+
+    // Highlight center cell(s)
+    int centerR = 3; int centerC = 3; // choose (3,3) as center-ish
+    int cx = centerC * sq + off;
+    int cy = centerR * sq + off;
+    cv::Rect centerRect(cx, cy, sub, sub);
+    centerRect &= cv::Rect(0,0,diff_bin.cols,diff_bin.rows);
+    cv::rectangle(vis, centerRect, cv::Scalar(0,255,0), 2);
+    cv::putText(vis, "CENTER", cv::Point(centerRect.x+2, centerRect.y+centerRect.height-2), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0,255,0), 2);
+
+    // Sort counts descending to get top changed cells
+    std::sort(counts.begin(), counts.end(), [](const std::tuple<int,int,int>& a, const std::tuple<int,int,int>& b){
+        return std::get<0>(a) > std::get<0>(b);
+    });
+
     if (top3cells) {
         top3cells->clear();
-        for (int i = 0; i < 3 && i < (int)topCells.size(); ++i) {
-            top3cells->push_back(topCells[i].second);
+        for (int i = 0; i < 3 && i < (int)counts.size(); ++i) {
+            int cnt = std::get<0>(counts[i]);
+            int c = std::get<1>(counts[i]);
+            int r = std::get<2>(counts[i]);
+            top3cells->push_back(cv::Point(c, r));
+            // mark top cells with thicker rectangle
+            int x = c * sq + off; int y = r * sq + off;
+            cv::Rect roiRect(x, y, sub, sub);
+            roiRect &= cv::Rect(0,0,diff_bin.cols,diff_bin.rows);
+            cv::rectangle(vis, roiRect, cv::Scalar(255,0,0), 2);
+            cv::putText(vis, "TOP", cv::Point(roiRect.x+2, roiRect.y+12), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255,0,0), 2);
         }
     }
+
+#ifdef DEBUG_SHOW_IMAGE
+    cv::imshow("diff_bin", diff_bin);
+    cv::imshow("diff_counts", vis);
+#else
+    // always show the counts visualization to user as requested
+    cv::imshow("diff_counts", vis);
+#endif
+
     return true;
 }
 
