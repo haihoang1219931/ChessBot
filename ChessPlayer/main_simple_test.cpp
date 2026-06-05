@@ -10,23 +10,14 @@ using namespace std;
 Mat img1, img2, warped1, warped2;
 vector<Point2f> corners;
 ChessImageProcessing* m_chessDetector;
-// --- ADJUSTABLE PARAMETERS (Controlled by Trackbars) ---
-int g_threshold_val = 500;
-int g_roi_percent = 50;
-int g_canny_low = 103;
-int g_diff_thresh = 30;
 
-// --- NEW PARAMETERS FOR PIECE DETECTION ---
-int g_piece_min_points = 350; // Default threshold for number of edge points
-int g_piece_roi_percent = 80; // Default percent of square area to check (from center)
-int g_piece_max_bbox_percent = 60; // Maximum percent of ROI area for bounding box to be considered clustered
-
-void processAndDisplay(const string& playerSide = "white") {
+void processAndDisplay(const MoveDetectParams& params, const string& playerSide = "white") {
     if (img1.empty() || img2.empty()) return;
-    m_chessDetector->findPossibleMoves(img1,img2,
-                                       g_threshold_val,g_roi_percent,g_canny_low,g_diff_thresh,
-                                       g_piece_min_points,g_piece_roi_percent,
-                                       "white");
+    std::vector<std::string> listMoves;
+    listMoves = m_chessDetector->findPossibleMoves(img1, img2, params, playerSide);
+    for(std::string move: listMoves) {
+        std::cout << "Possible move: " << move << std::endl;
+    }
 }
 
 void onMouse(int event, int x, int y, int flags, void* userdata) {
@@ -39,7 +30,9 @@ void onMouse(int event, int x, int y, int flags, void* userdata) {
                     corners[1].x,corners[1].y,
                     corners[2].x,corners[2].y,
                     corners[3].x,corners[3].y);
-            processAndDisplay();
+            // run once with current controls
+            MoveDetectParams p = m_chessDetector->readControlsFromWindow();
+            processAndDisplay(p);
         }
     }
 }
@@ -59,18 +52,26 @@ int main(int argc, char** argv) {
 
     m_chessDetector = new ChessImageProcessing();
 
-namedWindow("Setup"); namedWindow("Controls");
-   createTrackbar("Min Pixels", "Controls", &g_threshold_val, 2000, [](int, void*){ processAndDisplay(); });
-   createTrackbar("ROI %", "Controls", &g_roi_percent, 100, [](int, void*){ processAndDisplay(); });
-   createTrackbar("Canny Low", "Controls", &g_canny_low, 255, [](int, void*){ processAndDisplay(); });
-   createTrackbar("Diff Thresh", "Controls", &g_diff_thresh, 255, [](int, void*){ processAndDisplay(); });
-   // --- Add trackbars for piece detection ---
-   createTrackbar("Piece MinPts", "Controls", &g_piece_min_points, 2000, [](int, void*){ processAndDisplay(); });
-   createTrackbar("Piece ROI%", "Controls", &g_piece_roi_percent, 100, [](int, void*){ processAndDisplay(); });
-   createTrackbar("Piece MaxBBox%", "Controls", &g_piece_max_bbox_percent, 100, [](int, void*){ processAndDisplay(); });
+    namedWindow("Setup");
 
-   setMouseCallback("Setup", onMouse);
-   imshow("Setup", img1);
-   while(waitKey(1) != 27);
-   return 0;
+    // create a Controls window via the detector helper, with defaults mapped from existing globals
+    MoveDetectParams defaults;
+
+    m_chessDetector->createControlsWindow(defaults);
+
+    setMouseCallback("Setup", onMouse);
+    imshow("Setup", img1);
+
+    // Main loop: read controls each frame and re-run detection
+    while (true) {
+        int key = waitKey();
+        if (key == 27) break; // ESC
+        MoveDetectParams params = m_chessDetector->readControlsFromWindow();
+        // Only process after corners set
+        if (corners.size() == 4) {
+            processAndDisplay(params);
+        }
+    }
+
+    return 0;
 }

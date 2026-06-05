@@ -16,6 +16,16 @@
 #include <math.h>
 #include <sys/time.h> // for clock_gettime()
 #include <unistd.h> // for usleep()
+// Parameters container for detection (expandable)
+struct MoveDetectParams {
+    int threshold = 500;         // general threshold (unused currently)
+    int roi_percent = 50;       // ROI percent of cell used for diff counting
+    int canny_low = 93;         // Canny low threshold
+    int diff_thresh = 30;       // threshold for absdiff -> binary
+    int pieceMinPoints = 500;   // minimum edge points to consider a piece present
+    int pieceRoiPercent = 80;  // ROI percent for piece detection
+    int colorThreshold = 93;  // Color threshold
+};
 class ChessImageProcessing
 {
 public:
@@ -33,25 +43,44 @@ public:
     int chessBoardRow();
     int chessBoardSize();
     void setThreshold(int threshold);
+
     bool detectMovePhase1Binary(const cv::Mat& edges1, const cv::Mat& edges2,
                                 cv::Point& start, std::vector<cv::Point>& ends,
                                 int min_points, int roi_percent, int canny_low,
                                 const std::string& playerSide = "white");
+    // now accepts a params struct rather than many separate arguments
     bool detectMovePhase2Substraction(const cv::Mat& img_start, const cv::Mat& img_end,
-                                      int threshold_val, int roi_percent,
-                                      int canny_low, int diff_thresh,
-                                      std::vector<cv::Point>* top3cells,
+                                      const MoveDetectParams& params,
+                                      std::vector<cv::Point>& top3cells,
                                       const std::string& playerSide = "white");
+    std::vector<std::string> detectMovePhase3ColorMatching(const cv::Mat& warped1, const cv::Mat& warped2,
+                                                                                 cv::Point startCell, std::vector<cv::Point> listChangedCell,
+                                                                                 const MoveDetectParams& params, const std::string& playerSide);
     bool detectMovePhase3Classification();
     std::string coordToNotation(cv::Point pt, const std::string& playerSide);
     cv::Point notationToCoord(const std::string& notation, const std::string& playerSide);
     bool isChessPieceCell(const cv::Mat& edges, int c, int r, int sq, int min_points, int roi_percent, cv::Mat& display);
     std::vector<std::vector<int>> getPieceMatrix(const cv::Mat& gray, int sq, int min_points, int roi_percent, int canny_low, std::string show_name);
     void comparePieceMatrices(const std::vector<std::vector<int>>& mat1, const std::vector<std::vector<int>>& mat2, cv::Point& start, std::vector<cv::Point>& ends);
+    // findPossibleMoves now takes a MoveDetectParams struct
     std::vector<std::string> findPossibleMoves(const cv::Mat& img_start, const cv::Mat& img_end,
-                                    int threshold, int roiPercent, int cannyLow, int diffThresh,
-                                    int pieceMinPoints, int pieceRoiPercent,
+                                    const MoveDetectParams& params,
                                     const std::string& playerSide = "white");
+
+    // GUI helpers: create a shared Controls window (main should call) and read current params
+    void createControlsWindow(const MoveDetectParams& defaults);
+    MoveDetectParams readControlsFromWindow();
+
+    // Find two cells (from a list of cell coordinates) whose ROI colors in a warped color image are similar.
+    // Returns a pair of points (first, second). If not found, returns pair of (-1,-1).
+    std::pair<cv::Point, cv::Point> findSameColoredCellsInImage(const cv::Mat& warpedColor, const std::vector<cv::Point>& cells, const MoveDetectParams& params, double colorThreshold = 30.0);
+
+    // Match a start cell color (from warpedStartColor) to candidate cells (from warpedEndColor).
+    // Returns matched candidate cell or (-1,-1) if none found. Also shows visualization windows.
+    cv::Point matchStartToCandidates(const cv::Mat& warpedStartColor, const cv::Mat& warpedEndColor,
+                                     const cv::Point& startCell, const std::vector<cv::Point>& candidates,
+                                     const MoveDetectParams& params, double colorThreshold = 30.0);
+
 private:
     bool m_sourceConnected;
     bool m_isBlackSide;
