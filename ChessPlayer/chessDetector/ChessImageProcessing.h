@@ -25,6 +25,7 @@ struct MoveDetectParams {
     int pieceMinPoints = 500;   // minimum edge points to consider a piece present
     int pieceRoiPercent = 80;  // ROI percent for piece detection
     int colorThreshold = 93;  // Color threshold
+    std::string playerSide = "white";
 };
 class ChessImageProcessing
 {
@@ -51,11 +52,10 @@ public:
     // now accepts a params struct rather than many separate arguments
     bool detectMovePhase2Substraction(const cv::Mat& img_start, const cv::Mat& img_end,
                                       const MoveDetectParams& params,
-                                      std::vector<cv::Point>& top3cells,
-                                      const std::string& playerSide = "white");
+                                      std::vector<cv::Point>& top3cells);
     std::vector<std::string> detectMovePhase3ColorMatching(const cv::Mat& warped1, const cv::Mat& warped2,
                                     const std::vector<cv::Point>& startCells, std::vector<cv::Point> listChangedCell,
-                                    const MoveDetectParams& params, const std::string& playerSide);
+                                    const MoveDetectParams& params);
     bool detectMovePhase3Classification();
     std::string coordToNotation(cv::Point pt, const std::string& playerSide);
     cv::Point notationToCoord(const std::string& notation, const std::string& playerSide);
@@ -81,6 +81,11 @@ public:
     cv::Point matchStartToCandidates(const cv::Mat& warpedStartColor, const cv::Mat& warpedEndColor,
                                      const cv::Point& startCell, const std::vector<cv::Point>& candidates,
                                      const MoveDetectParams& params, double colorThreshold = 30.0);
+    bool filterCellColor(
+      cv::Mat warpedCell, cv::Vec3b targetHSV,
+      int hTol, int sTol, int vTol,
+      int roiPercent, int minWhitePercent, int maxBlackPercent,
+      std::string nameToShow);
 
 private:
     bool m_sourceConnected;

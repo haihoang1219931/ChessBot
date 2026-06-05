@@ -129,8 +129,8 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& 
                            params.pieceMinPoints, params.pieceRoiPercent, params.canny_low,
                            playerSide);
     std::vector<cv::Point> listChangedCell;
-    detectMovePhase2Substraction(edges1, edges2, params, listChangedCell, playerSide);
-    listMoves = detectMovePhase3ColorMatching(warped1, warped2, startCells, listChangedCell, params, playerSide);
+    detectMovePhase2Substraction(edges1, edges2, params, listChangedCell);
+    listMoves = detectMovePhase3ColorMatching(warped1, warped2, startCells, listChangedCell, params);
 
     return listMoves;
 }
@@ -176,8 +176,7 @@ bool ChessImageProcessing::detectMovePhase1Binary(const cv::Mat& edges1, const c
 
 bool ChessImageProcessing::detectMovePhase2Substraction(const cv::Mat& img_start, const cv::Mat& img_end,
                                                         const MoveDetectParams& params,
-                                                        std::vector<cv::Point>& top3cells,
-                                                        const std::string& playerSide)
+                                                        std::vector<cv::Point>& top3cells)
 {
     // use passed images (expected to be warped/grayscale or edge images)
     const cv::Mat& gray1 = img_start;
@@ -265,7 +264,7 @@ bool ChessImageProcessing::detectMovePhase2Substraction(const cv::Mat& img_start
 
 std::vector<std::string> ChessImageProcessing::detectMovePhase3ColorMatching(const cv::Mat& warped1, const cv::Mat& warped2,
                                                                              const std::vector<cv::Point>& startCells, std::vector<cv::Point> listChangedCell,
-                                                       const MoveDetectParams& params, const std::string& playerSide) {
+                                                       const MoveDetectParams& params) {
     std::vector<std::string> listMoves;
     for (int i=0; i< listChangedCell.size(); i++) {
         std::cout << "detectMovePhase2Substraction: end " << listChangedCell[i] << std::endl;
@@ -301,20 +300,22 @@ std::vector<std::string> ChessImageProcessing::detectMovePhase3ColorMatching(con
         // read interactive colorThreshold from Controls window (default created with 30)
         int colorThresh = cv::getTrackbarPos("colorThreshold", "Controls");
         double colorThreshold = static_cast<double>(colorThresh);
-        cv::Point match = matchStartToCandidates(warped1, warped2, startCell, listChangedCell, params, colorThreshold);
+        cv::Point match = matchStartToCandidates(warped1, warped2,
+                                                 startCell, listChangedCell,
+                                                 params, colorThreshold);
         if (match.x >= 0) {
-            std::string from = coordToNotation(startCell, playerSide);
-            std::string to = coordToNotation(match, playerSide);
+            std::string from = coordToNotation(startCell, params.playerSide);
+            std::string to = coordToNotation(match, params.playerSide);
             std::cout << "Color match: " << from << " -> " << to << std::endl;
             // build a move string and return as candidate
             listMoves.push_back(from + to);
         } else {
-            std::cout << "No color match found for start cell " << coordToNotation(startCell, playerSide) << std::endl;
+            std::cout << "No color match found for start cell " << coordToNotation(startCell, params.playerSide) << std::endl;
         }
     } else if (!listChangedCell.empty()) {
         // No binary start found; if only changed cells remain, return their notations as possible moves
         for (const auto& pt : listChangedCell) {
-            listMoves.push_back(coordToNotation(pt, playerSide));
+            listMoves.push_back(coordToNotation(pt, params.playerSide));
         }
     }
     return listMoves;
@@ -517,6 +518,85 @@ std::pair<cv::Point, cv::Point> ChessImageProcessing::findSameColoredCellsInImag
     return {cv::Point(-1,-1), cv::Point(-1,-1)};
 }
 
+bool ChessImageProcessing::filterCellColor(
+      cv::Mat warpedCell, cv::Vec3b targetHSV,
+      int hTol, int sTol, int vTol,
+      int roiPercent, int minWhitePercent, int maxBlackPercent,
+      std::string nameToShow) {
+    std::vector < std::vector < int >> matrix(8, std::vector < int > (8, 0));
+    cv::Mat display = warpedCell.clone();
+    cv::Mat maskAll = cv::Mat::zeros(warpedCell.size(), CV_8UC1);
+    cv::Mat hsvWarp;
+    cvtColor(warpedCell, hsvWarp, cv::COLOR_BGR2HSV);
+
+    int h = targetHSV[0];
+    int s = targetHSV[1];
+    int v = targetHSV[2];
+
+    int lowH = h - hTol;
+    int highH = h + hTol;
+    int lowS = std::max(0, s - sTol);
+    int highS = std::min(255, s + sTol);
+    int lowV = std::max(0, v - vTol);
+    int highV = std::min(255, v + vTol);
+
+    cv::Mat mask;
+    if (lowH < 0) {
+        cv::Mat m1, m2;
+        cv::inRange(hsvWarp, cv::Scalar(0, lowS, lowV), cv::Scalar(highH, highS, highV), m1);
+        inRange(hsvWarp, cv::Scalar(180 + lowH, lowS, lowV), cv::Scalar(180, highS, highV), m2);
+        bitwise_or(m1, m2, mask);
+    } else if (highH > 180) {
+        cv::Mat m1, m2;
+        inRange(hsvWarp, cv::Scalar(lowH, lowS, lowV), cv::Scalar(180, highS, highV), m1);
+        inRange(hsvWarp, cv::Scalar(0, lowS, lowV), cv::Scalar(highH - 180, highS, highV), m2);
+        bitwise_or(m1, m2, mask);
+    } else {
+        inRange(hsvWarp, cv::Scalar(lowH, lowS, lowV), cv::Scalar(highH, highS, highV), mask);
+    }
+
+    cv::Mat kernel = getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3));
+    morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);
+    morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
+
+    const int cellW = warpedCell.cols;
+    const int cellH = warpedCell.rows;
+    const int roiW = std::max(2, (cellW * roiPercent) / 100);
+    const int roiH = std::max(2, (cellH * roiPercent) / 100);
+
+    int cx = cellW / 2;
+    int cy = cellH / 2;
+    int x0 = cx - roiW / 2;
+    int y0 = cy - roiH / 2;
+    cv::Rect roiRect(x0, y0, roiW, roiH);
+    std::cout << nameToShow << "before: " << roiRect << std::endl;
+    roiRect &= cv::Rect(0, 0, warpedCell.cols, warpedCell.rows);
+    std::cout << nameToShow << "after: " << roiRect << std::endl;
+    cv::Mat roiMask = mask(roiRect);
+    double whitePixels = countNonZero(roiMask);
+    double area = roiRect.width * roiRect.height;
+    double blackPixels = area - whitePixels;
+
+    double whiteFrac = area > 0 ? (whitePixels / area) : 0.0;
+    double blackFrac = area > 0 ? (blackPixels / area) : 0.0;
+
+    double minWhiteThresh = minWhitePercent / 100.0;
+    double maxBlackThresh = maxBlackPercent / 100.0;
+
+    // Logic: Mostly the selected input color backdrop containing a small edge profile/shadow
+    //      bool isColorDetected = (whiteFrac >= minWhiteThresh) && (blackFrac > 0.01) && (blackFrac <= maxBlackThresh);
+    bool isColorDetected = whiteFrac >= minWhiteThresh;
+#ifdef DEBUG_SHOW_IMAGE
+    cv::imshow(nameToShow,mask);
+    std::cout << nameToShow << roiRect
+              <<" cellW:" << cellW
+              <<" cellH:" << cellH
+              <<" roiW:" << roiW
+              <<" roiH:" << roiH
+              <<" whiteFrac:" << whiteFrac << " minWhiteThresh:" <<minWhiteThresh << std::endl;
+#endif
+    return isColorDetected;
+}
 cv::Point ChessImageProcessing::matchStartToCandidates(const cv::Mat& warpedStartColor, const cv::Mat& warpedEndColor,
                                                      const cv::Point& startCell, const std::vector<cv::Point>& candidates,
                                                      const MoveDetectParams& params, double colorThreshold) {
@@ -535,7 +615,6 @@ cv::Point ChessImageProcessing::matchStartToCandidates(const cv::Mat& warpedStar
     sroi &= cv::Rect(0,0,warpedStartColor.cols, warpedStartColor.rows);
     cv::Scalar savg = cv::mean(warpedStartColor(sroi));
     cv::Vec3d sColor(savg[0], savg[1], savg[2]);
-
 #ifdef DEBUG_SHOW_IMAGE
     // visualize start cell on its image
     cv::Mat visStart = warpedStartColor.clone();
@@ -554,10 +633,19 @@ cv::Point ChessImageProcessing::matchStartToCandidates(const cv::Mat& warpedStar
         int cy = cand.y * sq + off;
         cv::Rect croi(cx, cy, sub, sub);
         croi &= cv::Rect(0,0,warpedEndColor.cols, warpedEndColor.rows);
-        cv::Scalar cavg = cv::mean(warpedEndColor(croi));
-        cv::Vec3d cColor(cavg[0], cavg[1], cavg[2]);
-        double dist = cv::norm(sColor - cColor);
-        if (dist <= colorThreshold) {
+//        cv::Scalar cavg = cv::mean(warpedEndColor(croi));
+//        cv::Vec3d cColor(cavg[0], cavg[1], cavg[2]);
+//        double dist = cv::norm(sColor - cColor);
+//        if (dist <= colorThreshold) {
+        bool cellIsSameColor = false;
+        if(params.playerSide == "white") {
+            cellIsSameColor = !filterCellColor(warpedEndColor(croi),cv::Vec3b(20,124,157),10,156,106,59,50,25,
+                                                  std::to_string(cand.x)+","+std::to_string(cand.y));
+        } else {
+            cellIsSameColor = filterCellColor(warpedEndColor(croi),cv::Vec3b(20,124,157),10,156,106,59,50,25,
+                                                  std::to_string(cand.x)+","+std::to_string(cand.y));
+        }
+        if(cellIsSameColor) {
 #ifdef DEBUG_SHOW_IMAGE
             // matched - draw full cell box plus ROI
             cv::Rect fullCandRect(cand.x * sq, cand.y * sq, sq, sq);
@@ -575,7 +663,7 @@ cv::Point ChessImageProcessing::matchStartToCandidates(const cv::Mat& warpedStar
             fullCandRect &= cv::Rect(0,0,warpedEndColor.cols, warpedEndColor.rows);
             cv::rectangle(visEnd, fullCandRect, cv::Scalar(0,0,255), 1);
             cv::rectangle(visEnd, croi, cv::Scalar(0,0,255), 1);
-            cv::putText(visEnd, std::to_string((int)dist), cv::Point(croi.x+2, croi.y+12), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0,0,255), 1);
+//            cv::putText(visEnd, std::to_string((int)dist), cv::Point(croi.x+2, croi.y+12), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0,0,255), 1);
 #endif
          }
      }
