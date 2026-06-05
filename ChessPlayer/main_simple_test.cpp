@@ -18,6 +18,52 @@ void processAndDisplay(const MoveDetectParams& params, const string& playerSide 
     for(std::string move: listMoves) {
         std::cout << "Possible move: " << move << std::endl;
     }
+
+    // Visualize first detected move on the original (unwarped) image
+    Mat vis = img2.clone();
+    if (!listMoves.empty()) {
+        // get transform matrix (maps source -> warped). We need inverse to map warped->source
+        Mat T = m_chessDetector->getTranformMatrix();
+        Mat Tinv;
+        if (!T.empty()) cv::invert(T, Tinv);
+
+        float sq = 640.0f / 8.0f; // warped square size used by detector
+
+        for (const auto &mv : listMoves) {
+            if (mv.size() >= 4) {
+                string from = mv.substr(0,2);
+                string to = mv.substr(2,2);
+                Point fromCoord = m_chessDetector->notationToCoord(from, playerSide);
+                Point toCoord = m_chessDetector->notationToCoord(to, playerSide);
+                if (fromCoord.x >= 0 && toCoord.x >= 0) {
+                    // centers in warped image
+                    Point2f wp_from((fromCoord.x * sq) + sq/2.0f, (fromCoord.y * sq) + sq/2.0f);
+                    Point2f wp_to((toCoord.x * sq) + sq/2.0f, (toCoord.y * sq) + sq/2.0f);
+                    std::vector<Point2f> wpts{wp_from, wp_to};
+                    std::vector<Point2f> srcpts(2);
+                    if (!Tinv.empty()) cv::perspectiveTransform(wpts, srcpts, Tinv);
+                    // draw start/end and arrow
+                    circle(vis, srcpts[0], 8, Scalar(0,255,0), -1);
+                    circle(vis, srcpts[1], 8, Scalar(0,0,255), -1);
+                    arrowedLine(vis, srcpts[0], srcpts[1], Scalar(255,0,0), 3, LINE_AA, 0, 0.3);
+                    // annotate notation
+                    putText(vis, from + "->" + to, Point((int)srcpts[0].x+5, (int)srcpts[0].y-5), FONT_HERSHEY_SIMPLEX, 0.6, Scalar(255,255,255), 2);
+                }
+            } else if (mv.size() == 2) {
+                // single cell notation: highlight only
+                Point pt = m_chessDetector->notationToCoord(mv, playerSide);
+                if (pt.x >= 0) {
+                    Point2f wp((pt.x * sq) + sq/2.0f, (pt.y * sq) + sq/2.0f);
+                    std::vector<Point2f> wpts{wp}; std::vector<Point2f> srcpts(1);
+                    if (!Tinv.empty()) cv::perspectiveTransform(wpts, srcpts, Tinv);
+                    circle(vis, srcpts[0], 10, Scalar(0,255,255), 3);
+                }
+            }
+            // only display the first move visually for clarity
+            break;
+        }
+    }
+    imshow("Result", vis);
 }
 
 void onMouse(int event, int x, int y, int flags, void* userdata) {
