@@ -122,22 +122,21 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& 
     cv::Canny(gray2, edges2, params.canny_low, params.canny_low * 3);
 
     // 1) detect binary start cell and candidate end cells
-    cv::Point startCell;
+    std::vector<cv::Point> startCells;
     std::vector<cv::Point> ends;
     detectMovePhase1Binary(edges1, edges2,
-                           startCell, ends,
+                           startCells, ends,
                            params.pieceMinPoints, params.pieceRoiPercent, params.canny_low,
                            playerSide);
-    std::cout << "detectMovePhase1Binary: start " << startCell << std::endl;
     std::vector<cv::Point> listChangedCell;
     detectMovePhase2Substraction(edges1, edges2, params, listChangedCell, playerSide);
-    listMoves = detectMovePhase3ColorMatching(warped1, warped2, startCell, listChangedCell, params, playerSide);
+    listMoves = detectMovePhase3ColorMatching(warped1, warped2, startCells, listChangedCell, params, playerSide);
 
     return listMoves;
 }
 
 bool ChessImageProcessing::detectMovePhase1Binary(const cv::Mat& edges1, const cv::Mat& edges2,
-                                                  cv::Point& start, std::vector<cv::Point>& ends,
+                                                  std::vector<cv::Point>& starts, std::vector<cv::Point>& ends,
                                                   int min_points, int roi_percent, int canny_low, const std::string& playerSide)
 {
     if (edges1.empty() || edges2.empty()) return false;
@@ -145,28 +144,30 @@ bool ChessImageProcessing::detectMovePhase1Binary(const cv::Mat& edges1, const c
     std::vector<std::vector<int>> mat1 = getPieceMatrix(edges1, sq, min_points, roi_percent, canny_low,"warp1");
     std::vector<std::vector<int>> mat2 = getPieceMatrix(edges2, sq, min_points, roi_percent, canny_low,"warp2");
 
-    comparePieceMatrices(mat1, mat2, start, ends);
-    std::cout << "Move start: " << start << std::endl;
+    comparePieceMatrices(mat1, mat2, starts, ends);
+    for(cv::Point start: starts) {
+        std::cout << "Possible start: " << start << std::endl;
 #ifdef DEBUG_SHOW_IMAGE
-    // --- Draw on output image ---
-    cv::Mat out = edges1.clone();
-    // Draw start position (red rectangle)
-    if (start.x >= 0 && start.y >= 0) {
-        cv::Rect box(start.x * sq, start.y * sq, sq, sq);
-        cv::rectangle(out, box, cv::Scalar::all(255),3);
-        putText(out, "FROM", box.tl() + cv::Point(5, 25), 1, 1.0, cv::Scalar::all(255), 2);
-    }
-    // Draw end positions (green rectangles)
-    for (const auto& pt : ends) {
-        cv::Rect box(pt.x * sq, pt.y * sq, sq, sq);
-        cv::rectangle(out, box, cv::Scalar::all(255),3);
-        putText(out, "TO", box.tl() + cv::Point(5, 25), 1, 1.0, cv::Scalar::all(255), 2);
-    }
-    imshow("Move Detection", out);
+        // --- Draw on output image ---
+        cv::Mat out = edges1.clone();
+        // Draw start position (red rectangle)
+        if (start.x >= 0 && start.y >= 0) {
+            cv::Rect box(start.x * sq, start.y * sq, sq, sq);
+            cv::rectangle(out, box, cv::Scalar::all(255),3);
+            putText(out, "FROM", box.tl() + cv::Point(5, 25), 1, 1.0, cv::Scalar::all(255), 2);
+        }
+        // Draw end positions (green rectangles)
+        for (const auto& pt : ends) {
+            cv::Rect box(pt.x * sq, pt.y * sq, sq, sq);
+            cv::rectangle(out, box, cv::Scalar::all(255),3);
+            putText(out, "TO", box.tl() + cv::Point(5, 25), 1, 1.0, cv::Scalar::all(255), 2);
+        }
+        imshow("Move Detection", out);
 #endif
+    }
     // Return true only when we have a valid start and at least one end.
     // NOTE: fixed '=' -> '==' bug so 'start' value is not overwritten.
-    if (start.x == -1 || start.y == -1 || ends.empty()) {
+    if (starts.empty()) {
         return false;
     } else {
         return true;
@@ -238,7 +239,7 @@ bool ChessImageProcessing::detectMovePhase2Substraction(const cv::Mat& img_start
     });
 
     top3cells.clear();
-    for (int i = 0; i < 3 && i < (int)counts.size(); ++i) {
+    for (int i = 0; i < 5 && i < (int)counts.size(); ++i) {
         int cnt = std::get<0>(counts[i]);
         int c = std::get<1>(counts[i]);
         int r = std::get<2>(counts[i]);
@@ -263,13 +264,25 @@ bool ChessImageProcessing::detectMovePhase2Substraction(const cv::Mat& img_start
 }
 
 std::vector<std::string> ChessImageProcessing::detectMovePhase3ColorMatching(const cv::Mat& warped1, const cv::Mat& warped2,
-                                                                             cv::Point startCell, std::vector<cv::Point> listChangedCell,
+                                                                             const std::vector<cv::Point>& startCells, std::vector<cv::Point> listChangedCell,
                                                        const MoveDetectParams& params, const std::string& playerSide) {
     std::vector<std::string> listMoves;
     for (int i=0; i< listChangedCell.size(); i++) {
         std::cout << "detectMovePhase2Substraction: end " << listChangedCell[i] << std::endl;
     }
-
+    cv::Point startCell(-1,-1);
+    bool foundValidStartCell = false;
+    for(cv::Point tmpStartCell: startCells) {
+        for(cv::Point tmpMoveCell: listChangedCell) {
+            if(tmpStartCell.x == tmpMoveCell.x && tmpStartCell.y == tmpMoveCell.y) {
+                startCell.x = tmpMoveCell.x;
+                startCell.y = tmpMoveCell.y;
+                foundValidStartCell = true;
+                break;
+            }
+        }
+        if(foundValidStartCell) break;
+    }
     // 2) Exclude the start cell from changed-cell candidates (if present)
     if (startCell.x >= 0 && startCell.y >= 0 && !listChangedCell.empty()) {
         for (int i=0; i< listChangedCell.size(); i++) {
@@ -314,6 +327,7 @@ bool ChessImageProcessing::detectMovePhase3Classification()
 //    DETECT_MOVE_PHASE1_BINARY,
 //    DETECT_MOVE_PHASE2_SUBSTRACTION,
 //    DETECT_MOVE_PHASE3_CLASSIFICATION,
+
 std::vector<std::vector<int>> ChessImageProcessing::getPieceMatrix(const cv::Mat& edges, int sq, int min_points, int roi_percent, int canny_low, std::string show_name) {
     cv::Mat edgesClone;
     edgesClone = edges.clone();
@@ -402,7 +416,9 @@ bool ChessImageProcessing::isChessPieceCell(const cv::Mat& edges, int c, int r, 
 }
 
 // Compare two 8x8 matrices, return start (1->0) and list of possible ends (0->1)
-void ChessImageProcessing::comparePieceMatrices(const std::vector<std::vector<int>>& mat1, const std::vector<std::vector<int>>& mat2, cv::Point& start, std::vector<cv::Point>& ends) {
+void ChessImageProcessing::comparePieceMatrices(const std::vector<std::vector<int>>& mat1,
+                                                const std::vector<std::vector<int>>& mat2,
+                                                std::vector<cv::Point>& starts, std::vector<cv::Point>& ends) {
     // Print mat1
     std::cout << "mat1 (before):" << std::endl;
     for (int r = 0; r < 8; r++) {
@@ -419,12 +435,12 @@ void ChessImageProcessing::comparePieceMatrices(const std::vector<std::vector<in
         }
         std::cout << std::endl;
     }
-    start = cv::Point(-1, -1);
+    starts.clear();
     ends.clear();
     for (int r = 0; r < 8; r++) {
         for (int c = 0; c < 8; c++) {
             if (mat1[r][c] == 1 && mat2[r][c] == 0) {
-                start = cv::Point(c, r);
+                starts.push_back(cv::Point(c, r));
             } else if (mat1[r][c] == 0 && mat2[r][c] == 1) {
                 ends.push_back(cv::Point(c, r));
             }

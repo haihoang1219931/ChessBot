@@ -45,7 +45,7 @@ public:
     void setThreshold(int threshold);
 
     bool detectMovePhase1Binary(const cv::Mat& edges1, const cv::Mat& edges2,
-                                cv::Point& start, std::vector<cv::Point>& ends,
+                                std::vector<cv::Point>& starts, std::vector<cv::Point>& ends,
                                 int min_points, int roi_percent, int canny_low,
                                 const std::string& playerSide = "white");
     // now accepts a params struct rather than many separate arguments
@@ -54,14 +54,15 @@ public:
                                       std::vector<cv::Point>& top3cells,
                                       const std::string& playerSide = "white");
     std::vector<std::string> detectMovePhase3ColorMatching(const cv::Mat& warped1, const cv::Mat& warped2,
-                                                                                 cv::Point startCell, std::vector<cv::Point> listChangedCell,
-                                                                                 const MoveDetectParams& params, const std::string& playerSide);
+                                    const std::vector<cv::Point>& startCells, std::vector<cv::Point> listChangedCell,
+                                    const MoveDetectParams& params, const std::string& playerSide);
     bool detectMovePhase3Classification();
     std::string coordToNotation(cv::Point pt, const std::string& playerSide);
     cv::Point notationToCoord(const std::string& notation, const std::string& playerSide);
     bool isChessPieceCell(const cv::Mat& edges, int c, int r, int sq, int min_points, int roi_percent, cv::Mat& display);
     std::vector<std::vector<int>> getPieceMatrix(const cv::Mat& gray, int sq, int min_points, int roi_percent, int canny_low, std::string show_name);
-    void comparePieceMatrices(const std::vector<std::vector<int>>& mat1, const std::vector<std::vector<int>>& mat2, cv::Point& start, std::vector<cv::Point>& ends);
+    void comparePieceMatrices(const std::vector<std::vector<int>>& mat1, const std::vector<std::vector<int>>& mat2,
+                              std::vector<cv::Point>& starts, std::vector<cv::Point>& ends);
     // findPossibleMoves now takes a MoveDetectParams struct
     std::vector<std::string> findPossibleMoves(const cv::Mat& img_start, const cv::Mat& img_end,
                                     const MoveDetectParams& params,
