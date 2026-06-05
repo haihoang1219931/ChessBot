@@ -19,7 +19,7 @@
 // Parameters container for detection (expandable)
 struct MoveDetectParams {
     int threshold = 500;         // general threshold (unused currently)
-    int roi_percent = 50;       // ROI percent of cell used for diff counting
+    int roi_percent = 65;       // ROI percent of cell used for diff counting
     int canny_low = 93;         // Canny low threshold
     int diff_thresh = 30;       // threshold for absdiff -> binary
     int pieceMinPoints = 500;   // minimum edge points to consider a piece present
@@ -78,7 +78,7 @@ public:
 
     // Match a start cell color (from warpedStartColor) to candidate cells (from warpedEndColor).
     // Returns matched candidate cell or (-1,-1) if none found. Also shows visualization windows.
-    cv::Point matchStartToCandidates(const cv::Mat& warpedStartColor, const cv::Mat& warpedEndColor,
+    std::vector<cv::Point> matchStartToCandidates(const cv::Mat& warpedStartColor, const cv::Mat& warpedEndColor,
                                      const cv::Point& startCell, const std::vector<cv::Point>& candidates,
                                      const MoveDetectParams& params, double colorThreshold = 30.0);
     bool filterCellColor(

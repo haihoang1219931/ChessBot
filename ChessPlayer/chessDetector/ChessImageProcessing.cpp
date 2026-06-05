@@ -129,7 +129,7 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& 
                            params.pieceMinPoints, params.pieceRoiPercent, params.canny_low,
                            playerSide);
     std::vector<cv::Point> listChangedCell;
-    detectMovePhase2Substraction(edges1, edges2, params, listChangedCell);
+    detectMovePhase2Substraction(gray1, gray2, params, listChangedCell);
     listMoves = detectMovePhase3ColorMatching(warped1, warped2, startCells, listChangedCell, params);
 
     return listMoves;
@@ -185,6 +185,7 @@ bool ChessImageProcessing::detectMovePhase2Substraction(const cv::Mat& img_start
 
     cv::Mat diff_bin;
     cv::absdiff(gray1, gray2, diff_bin);
+    cv::imshow("diff_bin_gray",diff_bin);
     cv::threshold(diff_bin, diff_bin, params.diff_thresh, 255, cv::THRESH_BINARY);
 
     int sq = gray1.cols / 8;
@@ -238,7 +239,7 @@ bool ChessImageProcessing::detectMovePhase2Substraction(const cv::Mat& img_start
     });
 
     top3cells.clear();
-    for (int i = 0; i < 5 && i < (int)counts.size(); ++i) {
+    for (int i = 0; i < 3 && i < (int)counts.size(); ++i) {
         int cnt = std::get<0>(counts[i]);
         int c = std::get<1>(counts[i]);
         int r = std::get<2>(counts[i]);
@@ -300,15 +301,17 @@ std::vector<std::string> ChessImageProcessing::detectMovePhase3ColorMatching(con
         // read interactive colorThreshold from Controls window (default created with 30)
         int colorThresh = cv::getTrackbarPos("colorThreshold", "Controls");
         double colorThreshold = static_cast<double>(colorThresh);
-        cv::Point match = matchStartToCandidates(warped1, warped2,
+        std::vector<cv::Point> matches = matchStartToCandidates(warped1, warped2,
                                                  startCell, listChangedCell,
                                                  params, colorThreshold);
-        if (match.x >= 0) {
+        if (matches.size() >= 0) {
             std::string from = coordToNotation(startCell, params.playerSide);
-            std::string to = coordToNotation(match, params.playerSide);
-            std::cout << "Color match: " << from << " -> " << to << std::endl;
-            // build a move string and return as candidate
-            listMoves.push_back(from + to);
+            for(cv::Point match: matches) {
+                std::string to = coordToNotation(match, params.playerSide);
+                std::cout << "Color match: " << from << " -> " << to << std::endl;
+                // build a move string and return as candidate
+                listMoves.push_back(from + to);
+            }
         } else {
             std::cout << "No color match found for start cell " << coordToNotation(startCell, params.playerSide) << std::endl;
         }
@@ -569,9 +572,7 @@ bool ChessImageProcessing::filterCellColor(
     int x0 = cx - roiW / 2;
     int y0 = cy - roiH / 2;
     cv::Rect roiRect(x0, y0, roiW, roiH);
-    std::cout << nameToShow << "before: " << roiRect << std::endl;
     roiRect &= cv::Rect(0, 0, warpedCell.cols, warpedCell.rows);
-    std::cout << nameToShow << "after: " << roiRect << std::endl;
     cv::Mat roiMask = mask(roiRect);
     double whitePixels = countNonZero(roiMask);
     double area = roiRect.width * roiRect.height;
@@ -597,12 +598,13 @@ bool ChessImageProcessing::filterCellColor(
 #endif
     return isColorDetected;
 }
-cv::Point ChessImageProcessing::matchStartToCandidates(const cv::Mat& warpedStartColor, const cv::Mat& warpedEndColor,
+std::vector<cv::Point> ChessImageProcessing::matchStartToCandidates(const cv::Mat& warpedStartColor, const cv::Mat& warpedEndColor,
                                                      const cv::Point& startCell, const std::vector<cv::Point>& candidates,
                                                      const MoveDetectParams& params, double colorThreshold) {
-    if (warpedStartColor.empty() || warpedEndColor.empty()) return cv::Point(-1,-1);
-    if (startCell.x < 0 || startCell.y < 0) return cv::Point(-1,-1);
-    if (candidates.empty()) return cv::Point(-1,-1);
+    std::vector<cv::Point> listEndPos;
+    if (warpedStartColor.empty() || warpedEndColor.empty()) return listEndPos;
+    if (startCell.x < 0 || startCell.y < 0) return listEndPos;
+    if (candidates.empty()) return listEndPos;
 
     int sq = warpedStartColor.cols / 8;
     int sub = std::max(1, (sq * params.pieceRoiPercent) / 100);
@@ -655,7 +657,7 @@ cv::Point ChessImageProcessing::matchStartToCandidates(const cv::Mat& warpedStar
             cv::putText(visEnd, "MATCH", cv::Point(fullCandRect.x+5, fullCandRect.y+20), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0,255,0), 2);
             cv::imshow("matched_candidate", visEnd);
 #endif
-            return cand;
+            listEndPos.push_back(cand);
          } else {
 #ifdef DEBUG_SHOW_IMAGE
              // draw non-matching in red
@@ -673,5 +675,5 @@ cv::Point ChessImageProcessing::matchStartToCandidates(const cv::Mat& warpedStar
 #ifdef DEBUG_SHOW_IMAGE
     cv::imshow("matched_candidate", visEnd);
 #endif
-    return cv::Point(-1,-1);
+    return listEndPos;
 }
