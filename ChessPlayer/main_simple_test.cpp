@@ -11,10 +11,10 @@ Mat img1, img2, warped1, warped2;
 vector<Point2f> corners;
 ChessImageProcessing* m_chessDetector;
 
-void processAndDisplay(const MoveDetectParams& params, const string& playerSide = "white") {
+void processAndDisplay(const MoveDetectParams& params) {
     if (img1.empty() || img2.empty()) return;
     std::vector<std::string> listMoves;
-    listMoves = m_chessDetector->findPossibleMoves(img1, img2, params, playerSide);
+    listMoves = m_chessDetector->findPossibleMoves(img1, img2, params);
     for(std::string move: listMoves) {
         std::cout << "Possible move: " << move << std::endl;
     }
@@ -33,8 +33,8 @@ void processAndDisplay(const MoveDetectParams& params, const string& playerSide 
             if (mv.size() >= 4) {
                 string from = mv.substr(0,2);
                 string to = mv.substr(2,2);
-                Point fromCoord = m_chessDetector->notationToCoord(from, playerSide);
-                Point toCoord = m_chessDetector->notationToCoord(to, playerSide);
+                Point fromCoord = m_chessDetector->notationToCoord(from, params.playerSide);
+                Point toCoord = m_chessDetector->notationToCoord(to, params.playerSide);
                 if (fromCoord.x >= 0 && toCoord.x >= 0) {
                     // centers in warped image
                     Point2f wp_from((fromCoord.x * sq) + sq/2.0f, (fromCoord.y * sq) + sq/2.0f);
@@ -51,7 +51,7 @@ void processAndDisplay(const MoveDetectParams& params, const string& playerSide 
                 }
             } else if (mv.size() == 2) {
                 // single cell notation: highlight only
-                Point pt = m_chessDetector->notationToCoord(mv, playerSide);
+                Point pt = m_chessDetector->notationToCoord(mv, params.playerSide);
                 if (pt.x >= 0) {
                     Point2f wp((pt.x * sq) + sq/2.0f, (pt.y * sq) + sq/2.0f);
                     std::vector<Point2f> wpts{wp}; std::vector<Point2f> srcpts(1);

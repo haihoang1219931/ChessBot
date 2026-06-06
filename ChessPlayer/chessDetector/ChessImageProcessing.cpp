@@ -103,8 +103,7 @@ cv::Point ChessImageProcessing::notationToCoord(const std::string& notation, con
  * @param moveStr: output move string in chess notation (e.g., e2e4)
  */
 std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& img_start, const cv::Mat& img_end,
-                                                                  const MoveDetectParams& params,
-                                                                  const std::string& playerSide)
+                                                                  const MoveDetectParams& params)
 {
     // No longer identify start/stop/occupied, just collect top 3 cells
     std::vector<std::string> listMoves;
@@ -126,8 +125,7 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& 
     std::vector<cv::Point> ends;
     detectMovePhase1Binary(edges1, edges2,
                            startCells, ends,
-                           params.pieceMinPoints, params.pieceRoiPercent, params.canny_low,
-                           playerSide);
+                           params);
     std::vector<cv::Point> listChangedCell;
     detectMovePhase2Substraction(gray1, gray2, params, listChangedCell);
     listMoves = detectMovePhase3ColorMatching(warped1, warped2, startCells, listChangedCell, params);
@@ -137,12 +135,12 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& 
 
 bool ChessImageProcessing::detectMovePhase1Binary(const cv::Mat& edges1, const cv::Mat& edges2,
                                                   std::vector<cv::Point>& starts, std::vector<cv::Point>& ends,
-                                                  int min_points, int roi_percent, int canny_low, const std::string& playerSide)
+                                                  const MoveDetectParams& params)
 {
     if (edges1.empty() || edges2.empty()) return false;
     int sq = edges1.cols / 8;
-    std::vector<std::vector<int>> mat1 = getPieceMatrix(edges1, sq, min_points, roi_percent, canny_low,"warp1");
-    std::vector<std::vector<int>> mat2 = getPieceMatrix(edges2, sq, min_points, roi_percent, canny_low,"warp2");
+    std::vector<std::vector<int>> mat1 = getPieceMatrix(edges1, sq, params.pieceMinPoints, params.roi_percent, params.canny_low,"warp1");
+    std::vector<std::vector<int>> mat2 = getPieceMatrix(edges2, sq, params.pieceMinPoints, params.roi_percent, params.canny_low,"warp2");
 
     comparePieceMatrices(mat1, mat2, starts, ends);
     for(cv::Point start: starts) {
@@ -308,7 +306,8 @@ std::vector<std::string> ChessImageProcessing::detectMovePhase3ColorMatching(con
             std::string from = coordToNotation(startCell, params.playerSide);
             for(cv::Point match: matches) {
                 std::string to = coordToNotation(match, params.playerSide);
-                std::cout << "Color match: " << from << " -> " << to << std::endl;
+                std::cout << "Player:" << params.playerSide
+                          << " Color match: " << from << " -> " << to << std::endl;
                 // build a move string and return as candidate
                 listMoves.push_back(from + to);
             }
@@ -455,6 +454,7 @@ void ChessImageProcessing::comparePieceMatrices(const std::vector<std::vector<in
 // GUI helpers implementation
 void ChessImageProcessing::createControlsWindow(const MoveDetectParams& defaults) {
     cv::namedWindow("Controls", cv::WINDOW_NORMAL);
+    cv::createTrackbar("White(0)/Black(1)", "Controls", nullptr, 1);
     // create trackbars and initialize with defaults
     cv::createTrackbar("roi_percent", "Controls", nullptr, 100);
     cv::createTrackbar("diff_thresh", "Controls", nullptr, 255);
@@ -467,6 +467,7 @@ void ChessImageProcessing::createControlsWindow(const MoveDetectParams& defaults
     cv::createTrackbar("bottomTopThresh", "Controls", nullptr, 200);
 
     // set initial positions
+    cv::setTrackbarPos("White(0)/Black(1)", "Controls", defaults.playerSide == "white"?0:1);
     cv::setTrackbarPos("roi_percent", "Controls", defaults.roi_percent);
     cv::setTrackbarPos("diff_thresh", "Controls", defaults.diff_thresh);
     cv::setTrackbarPos("canny_low", "Controls", defaults.canny_low);
@@ -476,6 +477,7 @@ void ChessImageProcessing::createControlsWindow(const MoveDetectParams& defaults
     cv::setTrackbarPos("colorThreshold", "Controls", defaults.colorThreshold);
     // default bottom/top diff threshold
     cv::setTrackbarPos("bottomTopThresh", "Controls", 150);
+
 }
 
 MoveDetectParams ChessImageProcessing::readControlsFromWindow() {
@@ -485,6 +487,8 @@ MoveDetectParams ChessImageProcessing::readControlsFromWindow() {
     p.canny_low = cv::getTrackbarPos("canny_low", "Controls");
     p.pieceMinPoints = cv::getTrackbarPos("pieceMinPoints", "Controls");
     p.pieceRoiPercent = cv::getTrackbarPos("pieceRoiPercent", "Controls");
+    p.playerSide = cv::getTrackbarPos("White(0)/Black(1)", "Controls") == 0?
+                "white":"black";
     // Note: colorThreshold is read directly where needed (not stored in params)
     return p;
 }

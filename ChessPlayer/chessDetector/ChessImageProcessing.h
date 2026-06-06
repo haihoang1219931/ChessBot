@@ -47,8 +47,7 @@ public:
 
     bool detectMovePhase1Binary(const cv::Mat& edges1, const cv::Mat& edges2,
                                 std::vector<cv::Point>& starts, std::vector<cv::Point>& ends,
-                                int min_points, int roi_percent, int canny_low,
-                                const std::string& playerSide = "white");
+                                const MoveDetectParams& params);
     // now accepts a params struct rather than many separate arguments
     bool detectMovePhase2Substraction(const cv::Mat& img_start, const cv::Mat& img_end,
                                       const MoveDetectParams& params,
@@ -65,8 +64,7 @@ public:
                               std::vector<cv::Point>& starts, std::vector<cv::Point>& ends);
     // findPossibleMoves now takes a MoveDetectParams struct
     std::vector<std::string> findPossibleMoves(const cv::Mat& img_start, const cv::Mat& img_end,
-                                    const MoveDetectParams& params,
-                                    const std::string& playerSide = "white");
+                                    const MoveDetectParams& params);
 
     // GUI helpers: create a shared Controls window (main should call) and read current params
     void createControlsWindow(const MoveDetectParams& defaults);
