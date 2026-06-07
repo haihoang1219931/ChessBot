@@ -139,8 +139,8 @@ bool ChessImageProcessing::detectMovePhase1Binary(const cv::Mat& edges1, const c
 {
     if (edges1.empty() || edges2.empty()) return false;
     int sq = edges1.cols / 8;
-    std::vector<std::vector<int>> mat1 = getPieceMatrix(edges1, sq, params.pieceMinPoints, params.roi_percent, params.canny_low,"warp1");
-    std::vector<std::vector<int>> mat2 = getPieceMatrix(edges2, sq, params.pieceMinPoints, params.roi_percent, params.canny_low,"warp2");
+    std::vector<std::vector<int>> mat1 = getPieceMatrix(edges1, sq, params,"warp1");
+    std::vector<std::vector<int>> mat2 = getPieceMatrix(edges2, sq, params,"warp2");
 
     comparePieceMatrices(mat1, mat2, starts, ends);
     for(cv::Point start: starts) {
@@ -331,23 +331,148 @@ bool ChessImageProcessing::detectMovePhase3Classification()
 //    DETECT_MOVE_PHASE2_SUBSTRACTION,
 //    DETECT_MOVE_PHASE3_CLASSIFICATION,
 
-std::vector<std::vector<int>> ChessImageProcessing::getPieceMatrix(const cv::Mat& edges, int sq, int min_points, int roi_percent, int canny_low, std::string show_name) {
+std::vector<std::vector<int>> ChessImageProcessing::getPieceMatrix(const cv::Mat& edges, int sq,
+                                                                   const MoveDetectParams& params, std::string show_name) {
     cv::Mat edgesClone;
-    edgesClone = edges.clone();
+
     std::vector<std::vector<int>> mat(8, std::vector<int>(8, 0));
-    for (int r = 0; r < 8; r++) {
-        for (int c = 0; c < 8; c++) {
-            if (isChessPieceCell(edges, c, r, sq, min_points, roi_percent, edgesClone)) {
-                mat[r][c] = 1;
+    // 1. Create a structural element (kernel size 3x3 or 5x5)
+//    for(int loop = 0; loop < params.numLoopCheckPiece; loop++)
+    {
+
+        int loop = 7;
+        cv::Mat closed;
+        if(loop == 0) {
+            closed = edges.clone();
+        } else {
+            cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(loop*2+1, loop*2+1));
+            // 2. Apply Closing (Dilation then Erosion) to bridge gaps
+            cv::morphologyEx(edges, closed, cv::MORPH_CLOSE, kernel);
+#ifdef DEBUG_SHOW_IMAGE
+            cv::cvtColor(closed, edgesClone, cv::COLOR_GRAY2BGR);
+#endif
+        }
+
+        for (int r = 0; r < 8; r++) {
+            for (int c = 0; c < 8; c++) {
+//                if(r!=6 || c!= 3) continue;
+                if (isChessPieceCell(closed, c, r, sq, params.pieceMinPoints, params.roi_percent, edgesClone)) {
+                    mat[r][c]++;
+                }
             }
         }
     }
+//    cv::Mat edgesClone2;
+//    edgesClone2 = edges.clone();
+//    // 1. Create a structural element (kernel size 3x3 or 5x5)
+//    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
+
+//    // 2. Apply Closing (Dilation then Erosion) to bridge gaps
+//    cv::Mat closed;
+//    cv::morphologyEx(edges, edgesClone2, cv::MORPH_CLOSE, kernel);
+//    std::vector<std::vector<cv::Point>> contours;
+//    cv::findContours(edgesClone2, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+
+//    for (const auto& contour : contours) {
+//        // Filter out tiny noise contours
+//        if (contour.size() < 20) {
+//            continue;
+//        }
+
+//        int N = contour.size();
+
+//        // 3. Formulate the Algebraic Least-Squares system: A * X = B
+//        // Matrix A size: (N x 3), Matrix B size: (N x 1)
+//        cv::Mat A(N, 3, CV_64F);
+//        cv::Mat B(N, 1, CV_64F);
+
+//        for (int i = 0; i < N; ++i) {
+//            double x = contour[i].x;
+//            double y = contour[i].y;
+
+//            A.at<double>(i, 0) = x;
+//            A.at<double>(i, 1) = y;
+//            A.at<double>(i, 2) = 1.0;
+
+//            B.at<double>(i, 0) = x * x + y * y;
+//        }
+
+//        // Solve for parameters vector X = [c1, c2, c3]^T using pseudo-inverse method
+//        cv::Mat X;
+//        cv::solve(A, B, X, cv::DECOMP_SVD);
+
+//        double c1 = X.at<double>(0, 0);
+//        double c2 = X.at<double>(1, 0);
+//        double c3 = X.at<double>(2, 0);
+
+//        // Extract center coordinates and radius from parameters
+//        int xc = cvRound(c1 / 2.0);
+//        int yc = cvRound(c2 / 2.0);
+//        int radius = cvRound(std::sqrt(c3 + (c1 * c1 / 4.0) + (c2 * c2 / 4.0)));
+
+//        // Validating geometry logic to prevent NaN values
+//        if (radius <= 0) continue;
+
+//        // 4. Filter the arc by assessing fit quality (Residuals)
+//        double total_error = 0.0;
+//        for (int i = 0; i < N; ++i) {
+//            double dx = contour[i].x - xc;
+//            double dy = contour[i].y - yc;
+//            double distance = std::sqrt(dx * dx + dy * dy);
+//            total_error += std::abs(distance - radius);
+//        }
+//        double mean_error = total_error / N;
+
+//        // If the average distance error is low, it is a clean mathematical arc
+//        if (mean_error < 3.0 && radius > 10 && radius < 40) {
+//            // Draw the reconstructed full circle from the arc
+//            cv::circle(edgesClone2, cv::Point(xc, yc), radius, cv::Scalar(255, 255, 255), 5);
+//            // Draw center point
+//            cv::circle(edgesClone2, cv::Point(xc, yc), 3, cv::Scalar(255, 255, 255), 3);
+//        }
+//    }
 #ifdef DEBUG_SHOW_IMAGE
+//    cv::imshow("circle:"+show_name, edgesClone2);
     cv::imshow(show_name, edgesClone);
 #endif
     return mat;
 }
 
+bool getCenterOfPoints(const cv::Mat& binary_img, cv::Point& center) {
+    if (binary_img.empty()) {
+        return false;
+    }
+
+    double sum_x = 0.0;
+    double sum_y = 0.0;
+    int numWhitePixels = 0;
+    for (int r= 0; r < binary_img.rows; r++) {
+        for (int c= 0; c < binary_img.cols; c++) {
+            if(binary_img.at<unsigned char>(r,c) != 255) {
+                sum_x += r;
+                sum_y += c;
+                numWhitePixels ++;
+            }
+        }
+    }
+
+    center.x = static_cast<int>(sum_x / numWhitePixels);
+    center.y = static_cast<int>(sum_y / numWhitePixels);
+    return true;
+}
+bool getCenterOfWhitePixels(const cv::Mat& binary_img, cv::Point& center) {
+    // Treat the image as binary (non-zero pixels have weight 1.0)
+    cv::Moments m = cv::moments(binary_img, true);
+
+    // Prevent division by zero if the image contains no white pixels
+    if (m.m00 > 0.0) {
+        center.x = static_cast<int>(m.m10 / m.m00);
+        center.y = static_cast<int>(m.m01 / m.m00);
+        return true;
+    }
+
+    return false;
+}
 // Overload isChessPieceCell to allow passing max_bbox_percent (for use in getPieceMatrix)
 bool ChessImageProcessing::isChessPieceCell(const cv::Mat& edges, int c, int r, int sq, int min_points, int roi_percent, cv::Mat& display) {
     int sub = MAX(1, (sq * roi_percent) / 100);
@@ -362,8 +487,8 @@ bool ChessImageProcessing::isChessPieceCell(const cv::Mat& edges, int c, int r, 
             // Find connected components / contours in the ROI to identify individual objects
             cv::Mat roiClone = roiMat.clone();
             // apply a small dilation first to connect nearby white pixels
-            cv::Mat element = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3,3));
-            cv::dilate(roiClone, roiClone, element, cv::Point(-1,-1), 1);
+//            cv::Mat element = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3,3));
+//            cv::dilate(roiClone, roiClone, element, cv::Point(-1,-1), 1);
             std::vector<std::vector<cv::Point>> contours;
             std::vector<cv::Vec4i> hierarchy;
             cv::findContours(roiClone, contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
@@ -374,7 +499,7 @@ bool ChessImageProcessing::isChessPieceCell(const cv::Mat& edges, int c, int r, 
                 char buffer[10];
                 int value = nz.size();
                 sprintf(buffer,"%d",value);
-                putText(display, std::string(buffer) ,cv::Point(c * sq + sq/2,r * sq+ sq/2), 1, 1.5, cv::Scalar(255, 255, 255), 3);
+                putText(display, std::string(buffer) ,cv::Point(c * sq + sq/2,r * sq+ sq/2), 1, 1.5, cv::Scalar(255, 255, 255), 2);
                 return true;
             }
 
@@ -401,17 +526,37 @@ bool ChessImageProcessing::isChessPieceCell(const cv::Mat& edges, int c, int r, 
                 double roiArea = static_cast<double>(roiMat.cols * roiMat.rows);
                 double occPercent = (static_cast<double>(largestRect.width * largestRect.height) / roiArea) * 100.0;
                 char info[128];
-                sprintf(info, "A:%.0f P:%.1f%%", largestArea, occPercent);
-                putText(display, std::string(info), cv::Point(largestRect.x + 2, largestRect.y + 12), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255,255,255), 1);
-                if(occPercent < 50) return false;
+                sprintf(info, "%d%d A:%.0f P:%.1f%%", r, c, largestArea, occPercent);
+//                putText(display, std::string(info), cv::Point(largestRect.x + 2, largestRect.y + 12), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0,0,255), 1);
+//                std::cout << "largestRect:" << largestRect.y + largestRect.height/2 <<std::endl;
+//                std::cout << "roi:" << roi.y + roi.height/2 <<std::endl;
+//                if((float)largestRect.height/(float)largestRect.width<0.6f) {
+//                    std::cout << "fail case: c" << c << ",r" << r << " Line:" << __LINE__ <<std::endl;
+//                    return false;
+//                }
+                cv::Point centerLargestArea;
+                cv::Mat matLargestArea = edges(largestRect);
+                getCenterOfWhitePixels(matLargestArea,centerLargestArea);
+                cv::circle(display,
+                           cv::Point(centerLargestArea.x + c* sq,centerLargestArea.y + r* sq),
+                           5,cv::Scalar(0,0,255));
+                if(centerLargestArea.y + 20 <
+                        roi.y + roi.height/2 ) {
+                    std::cout << "fail case: c" << c << ",r" << r << " Line:" << __LINE__ <<std::endl;
+//                    return false;
+                }
+//                if(occPercent < 30) {
+//                    std::cout << "fail case: c" << c << ",r" << r << " Line:" << __LINE__ <<std::endl;
+//                    return false;
+//                }
             }
 
             // Also draw a white rectangle around the ROI to preserve previous visualization
-            rectangle(display,roi,cv::Scalar(255,255,255),2);
+//            rectangle(display,roi,cv::Scalar(255,255,255),1);
             char buffer[10];
             int value = nz.size();
             sprintf(buffer,"%d",value);
-            putText(display, std::string(buffer) ,cv::Point(c * sq + sq/2,r * sq+ sq/2), 1, 1.5, cv::Scalar(255, 255, 255), 3);
+//            putText(display, std::string(buffer) ,cv::Point(c * sq + sq/2,r * sq+ sq/2), 1, 1.5, cv::Scalar(0,0,255), 1);
             return true;
         }
     }
@@ -459,7 +604,7 @@ void ChessImageProcessing::createControlsWindow(const MoveDetectParams& defaults
     cv::createTrackbar("roi_percent", "Controls", nullptr, 100);
     cv::createTrackbar("diff_thresh", "Controls", nullptr, 255);
     cv::createTrackbar("canny_low", "Controls", nullptr, 500);
-    cv::createTrackbar("pieceMinPoints", "Controls", nullptr, 300);
+    cv::createTrackbar("pieceMinPoints", "Controls", nullptr, 500);
     cv::createTrackbar("pieceRoiPercent", "Controls", nullptr, 100);
     // add trackbar to control color/shape matching threshold
     cv::createTrackbar("colorThreshold", "Controls", nullptr, 500);

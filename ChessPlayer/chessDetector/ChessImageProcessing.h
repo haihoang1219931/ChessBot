@@ -19,12 +19,13 @@
 // Parameters container for detection (expandable)
 struct MoveDetectParams {
     int threshold = 500;         // general threshold (unused currently)
-    int roi_percent = 65;       // ROI percent of cell used for diff counting
+    int roi_percent = 80;       // ROI percent of cell used for diff counting
     int canny_low = 93;         // Canny low threshold
     int diff_thresh = 30;       // threshold for absdiff -> binary
-    int pieceMinPoints = 500;   // minimum edge points to consider a piece present
+    int pieceMinPoints = 300;   // minimum edge points to consider a piece present
     int pieceRoiPercent = 80;  // ROI percent for piece detection
     int colorThreshold = 93;  // Color threshold
+    int numLoopCheckPiece = 5;  // Color threshold
     std::string playerSide = "white";
 };
 class ChessImageProcessing
@@ -59,7 +60,7 @@ public:
     std::string coordToNotation(cv::Point pt, const std::string& playerSide);
     cv::Point notationToCoord(const std::string& notation, const std::string& playerSide);
     bool isChessPieceCell(const cv::Mat& edges, int c, int r, int sq, int min_points, int roi_percent, cv::Mat& display);
-    std::vector<std::vector<int>> getPieceMatrix(const cv::Mat& gray, int sq, int min_points, int roi_percent, int canny_low, std::string show_name);
+    std::vector<std::vector<int>> getPieceMatrix(const cv::Mat& gray, int sq, const MoveDetectParams& params, std::string show_name);
     void comparePieceMatrices(const std::vector<std::vector<int>>& mat1, const std::vector<std::vector<int>>& mat2,
                               std::vector<cv::Point>& starts, std::vector<cv::Point>& ends);
     // findPossibleMoves now takes a MoveDetectParams struct
