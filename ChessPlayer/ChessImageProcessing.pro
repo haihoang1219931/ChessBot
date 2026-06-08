@@ -5,7 +5,7 @@ CONFIG -= qt
 
 CONFIG += use_image_processing
 use_image_processing {
-#DEFINES += DEBUG_SHOW_IMAGE
+DEFINES += DEBUG_SHOW_IMAGE
 unix:!macx: INCLUDEPATH += /usr/local/include/opencv4
 unix:!macx: DEPENDPATH += /usr/local/include/opencv4
 unix:!macx: LIBS += -L/usr/local/lib/  \
@@ -43,7 +43,8 @@ INCLUDEPATH += \
     chessDetector
 SOURCES += chessDetector/ChessImageProcessing.cpp \
     main_simple_test.cpp \
-    main_color.cpp
+    main_color.cpp \
+    main_check_cell.cpp
 HEADERS += chessDetector/ChessImageProcessing.h
 }
 

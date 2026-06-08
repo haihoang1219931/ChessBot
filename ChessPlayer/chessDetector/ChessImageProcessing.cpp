@@ -340,7 +340,7 @@ std::vector<std::vector<int>> ChessImageProcessing::getPieceMatrix(const cv::Mat
 //    for(int loop = 0; loop < params.numLoopCheckPiece; loop++)
     {
 
-        int loop = 7;
+        int loop = 1;
         cv::Mat closed;
         if(loop == 0) {
             closed = edges.clone();
@@ -460,7 +460,7 @@ bool getCenterOfPoints(const cv::Mat& binary_img, cv::Point& center) {
     center.y = static_cast<int>(sum_y / numWhitePixels);
     return true;
 }
-bool getCenterOfWhitePixels(const cv::Mat& binary_img, cv::Point& center) {
+bool ChessImageProcessing::getCenterOfWhitePixels(const cv::Mat& binary_img, cv::Point& center) {
     // Treat the image as binary (non-zero pixels have weight 1.0)
     cv::Moments m = cv::moments(binary_img, true);
 
@@ -538,7 +538,8 @@ bool ChessImageProcessing::isChessPieceCell(const cv::Mat& edges, int c, int r, 
                 cv::Mat matLargestArea = edges(largestRect);
                 getCenterOfWhitePixels(matLargestArea,centerLargestArea);
                 cv::circle(display,
-                           cv::Point(centerLargestArea.x + c* sq,centerLargestArea.y + r* sq),
+                           cv::Point(largestRect.x + centerLargestArea.x + c* sq,
+                                     largestRect.y + centerLargestArea.y + r* sq),
                            5,cv::Scalar(0,0,255));
                 if(centerLargestArea.y + 20 <
                         roi.y + roi.height/2 ) {

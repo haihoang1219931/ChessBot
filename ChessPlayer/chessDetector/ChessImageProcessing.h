@@ -59,6 +59,7 @@ public:
     bool detectMovePhase3Classification();
     std::string coordToNotation(cv::Point pt, const std::string& playerSide);
     cv::Point notationToCoord(const std::string& notation, const std::string& playerSide);
+    bool getCenterOfWhitePixels(const cv::Mat& binary_img, cv::Point& center);
     bool isChessPieceCell(const cv::Mat& edges, int c, int r, int sq, int min_points, int roi_percent, cv::Mat& display);
     std::vector<std::vector<int>> getPieceMatrix(const cv::Mat& gray, int sq, const MoveDetectParams& params, std::string show_name);
     void comparePieceMatrices(const std::vector<std::vector<int>>& mat1, const std::vector<std::vector<int>>& mat2,
