@@ -340,7 +340,7 @@ std::vector<std::vector<int>> ChessImageProcessing::getPieceMatrix(const cv::Mat
 //    for(int loop = 0; loop < params.numLoopCheckPiece; loop++)
     {
 
-        int loop = 1;
+        int loop = 7;
         cv::Mat closed;
         if(loop == 0) {
             closed = edges.clone();
@@ -538,8 +538,7 @@ bool ChessImageProcessing::isChessPieceCell(const cv::Mat& edges, int c, int r, 
                 cv::Mat matLargestArea = edges(largestRect);
                 getCenterOfWhitePixels(matLargestArea,centerLargestArea);
                 cv::circle(display,
-                           cv::Point(largestRect.x + centerLargestArea.x + c* sq,
-                                     largestRect.y + centerLargestArea.y + r* sq),
+                           cv::Point(centerLargestArea.x + c* sq,centerLargestArea.y + r* sq),
                            5,cv::Scalar(0,0,255));
                 if(centerLargestArea.y + 20 <
                         roi.y + roi.height/2 ) {
