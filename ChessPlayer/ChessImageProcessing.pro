@@ -17,7 +17,10 @@ unix:!macx: LIBS += -L/usr/local/lib/  \
     -lopencv_highgui \
     -lopencv_imgcodecs \
     -lopencv_imgproc \
-    -lopencv_videoio
+    -lopencv_videoio \
+    -lopencv_dnn \
+    -lopencv_dnn_objdetect \
+    -lopencv_dnn_superres
 
 OPENCV_WINDOWS = $$PWD/../../ImageProcessing/compiledopencv
 win32: INCLUDEPATH += "$$OPENCV_WINDOWS/include"
@@ -44,7 +47,10 @@ INCLUDEPATH += \
 SOURCES += chessDetector/ChessImageProcessing.cpp \
     main_simple_test.cpp \
     main_color.cpp \
-    main_check_cell.cpp
+    main_check_cell.cpp \
+    main_mosse.cpp \
+    main_dnn.cpp \
+    main_dnn_origin.cpp
 HEADERS += chessDetector/ChessImageProcessing.h
 }
 
