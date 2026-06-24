@@ -800,7 +800,7 @@ void ApplicationController::calibToHome(int motorID)
 int jointSteps[MAX_MOTOR];
 void ApplicationController::goToReadyPosition()
 {
-    jointSteps[MOTOR_CAPTURE] = m_robot->homeStep(MOTOR_CAPTURE);
+    jointSteps[MOTOR_CAPTURE] = m_robot->maxStep(MOTOR_CAPTURE);
     jointSteps[MOTOR_ARM1] = m_robot->angleToStep(MOTOR_ARM1,0);
     jointSteps[MOTOR_ARM2] = m_robot->angleToStep(MOTOR_ARM2,90+m_robot->homeAngle(MOTOR_ARM2));
     jointSteps[MOTOR_ARM3] = m_robot->homeAngle(MOTOR_ARM3);
@@ -834,7 +834,7 @@ int ApplicationController::executeReadyPositionLoop()
 
 void ApplicationController::goToCalibPosition()
 {
-    jointSteps[MOTOR_CAPTURE] = m_robot->homeStep(MOTOR_CAPTURE);
+    jointSteps[MOTOR_CAPTURE] = m_robot->maxStep(MOTOR_CAPTURE);
     jointSteps[MOTOR_ARM1] = m_robot->calibStep(MOTOR_ARM1);
     jointSteps[MOTOR_ARM2] = m_robot->calibStep(MOTOR_ARM2);
     jointSteps[MOTOR_ARM3] = 0;
@@ -845,7 +845,7 @@ void ApplicationController::goToCalibPosition()
     setMachineState(MACHINE_EXECUTE_POSITION);    
 }
 void ApplicationController::gotoPosition(float x, float y, float upAngleInDegree) {
-    jointSteps[MOTOR_CAPTURE] = m_robot->homeStep(MOTOR_CAPTURE);
+    jointSteps[MOTOR_CAPTURE] = m_robot->maxStep(MOTOR_CAPTURE);
     jointSteps[MOTOR_ARM3] = m_robot->homeStep(MOTOR_ARM3);
     jointSteps[MOTOR_ARM4] = m_robot->homeStep(MOTOR_ARM4);
     calculateJoints(x, y, upAngleInDegree, jointSteps);
@@ -927,7 +927,7 @@ void ApplicationController::calculateSequenceMove(int startCol, int startRow, in
     int jointSteps[MAX_MOTOR];
     clearSequenceMove();
     
-    jointSteps[MOTOR_CAPTURE] = isCapture?(m_robot->maxStep(MOTOR_CAPTURE) - m_robot->maxStep(MOTOR_CAPTURE))
+    jointSteps[MOTOR_CAPTURE] = isCapture?(m_robot->maxStep(MOTOR_CAPTURE) - m_robot->minStep(MOTOR_CAPTURE))
                                             :0;
     // Inverse axis Oxy -> Oyx
     calculateJoints(targetPoint.y, -targetPoint.x, upAngleInDegree, jointSteps);
@@ -1043,8 +1043,8 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
                              m_robot->homeAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),m_robot->homeAngle(MOTOR_ARM5)};
         Point position[6] = {start,start,start,
                               stop,stop,stop};
-        int captureStep[6] = {m_robot->homeStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE),
-                               m_robot->maxStep(MOTOR_CAPTURE),m_robot->homeStep(MOTOR_CAPTURE),m_robot->homeStep(MOTOR_CAPTURE)};
+        int captureStep[6] = {m_robot->maxStep(MOTOR_CAPTURE),m_robot->minStep(MOTOR_CAPTURE),m_robot->minStep(MOTOR_CAPTURE),
+                                m_robot->minStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE)};
         int numStep = 6;
         for(int seqStep = 0; seqStep < numStep; seqStep++)
         {
@@ -1059,8 +1059,8 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
         float upAngles[6] = {m_robot->homeAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),
                               m_robot->maxAngle(MOTOR_ARM5),m_robot->homeAngle(MOTOR_ARM5)};
         Point position[6] = {start,start,start,stop,stop,stop};
-        int captureStep[6] = {m_robot->homeStep(MOTOR_CAPTURE),m_robot->homeStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE),
-            m_robot->maxStep(MOTOR_CAPTURE),m_robot->homeStep(MOTOR_CAPTURE),m_robot->homeStep(MOTOR_CAPTURE)};
+        int captureStep[6] = {m_robot->maxStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE),m_robot->minStep(MOTOR_CAPTURE),
+                                m_robot->minStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE)};
         int numStep = 6;
         for(int seqStep = 0; seqStep < numStep; seqStep++)
         {

@@ -91,16 +91,16 @@ int16_t ApplicationArduino::readA13() {
 void ApplicationArduino::initRobot()
 {
     m_chessBoard->setChessBoardPosX(38+42);
-    m_chessBoard->setChessBoardPosY(74+8);
-    m_chessBoard->setChessBoardSize(35*8);
-    m_chessBoard->setDropZoneSpace(35);
+    m_chessBoard->setChessBoardPosY(74+8+15);
+    m_chessBoard->setChessBoardSize(35.25f*8);
+    m_chessBoard->setDropZoneSpace(35.25f);
     m_chessBoard->setChessBoardSideSpace(0);
     m_minSpace = 2;
 
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
-        {true,                                 1,     0,       0,       0,        36,           0,        100,      16,   FREQUENCY_TIMER1,      0},
-        {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -18,         4,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
+        {true,                                 1,     0,       0,       0,        36,           20,        85,      16,   FREQUENCY_TIMER1,      0},
+        {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -24,         4,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
         {true, 16.0f*70.0f/20.0f*(200.0f/360.0f), 80.27,     140,       50,         8,          50,       210,       2,   FREQUENCY_TIMER1,    250},
         {false,  1.0f/1.0f,                       25.57,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
         {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       6,   FREQUENCY_TIMER1,      0},
@@ -278,10 +278,8 @@ bool ApplicationArduino::isLimitReached(int motorID, MOTOR_LIMIT_TYPE limitType)
     }
     break;
     case MOTOR::MOTOR_CAPTURE: {
-      m_limitGripperValue = readA13(); // Read the analog value from A13
-      limitReached = limitType == MOTOR_LIMIT_MIN || limitType == MOTOR_LIMIT_HOME ? 
-                    m_limitGripperValue > 630 :
-                    m_limitGripperValue < 300;
+      limitReached = limitType == MOTOR_LIMIT_MIN ? m_robot->minStep(MOTOR_CAPTURE) : 
+                    ( limitType == MOTOR_LIMIT_HOME ? (PINH & (1 << PH1)) == 0 : m_robot->maxStep(MOTOR_CAPTURE));
     }
     break;
     default: break;
@@ -331,7 +329,7 @@ void ApplicationArduino::initDirection(int motorID, int direction)
     break;
     case MOTOR::MOTOR_CAPTURE: 
     {
-      digitalWrite(dirPinCapture, direction > 0 ? LOW : HIGH);
+      digitalWrite(dirPinCapture, direction < 0 ? LOW : HIGH);
     }
     break;
     default: break;
