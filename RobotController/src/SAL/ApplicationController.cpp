@@ -825,7 +825,6 @@ int ApplicationController::executeReadyPositionLoop()
     }
     break;
     case COMMAND_STANDBY_PREDONE: {
-        specificPlatformGohome(MOTOR_CAPTURE,false);
         m_standByCommandState = COMMAND_STANDBY_DONE;
     }
     break;    
@@ -928,7 +927,8 @@ void ApplicationController::calculateSequenceMove(int startCol, int startRow, in
     int jointSteps[MAX_MOTOR];
     clearSequenceMove();
     
-    jointSteps[MOTOR_CAPTURE] = isCapture?415:0;
+    jointSteps[MOTOR_CAPTURE] = isCapture?(m_robot->maxStep(MOTOR_CAPTURE) - m_robot->maxStep(MOTOR_CAPTURE))
+                                            :0;
     // Inverse axis Oxy -> Oyx
     calculateJoints(targetPoint.y, -targetPoint.x, upAngleInDegree, jointSteps);
 

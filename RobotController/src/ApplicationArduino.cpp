@@ -26,9 +26,9 @@
 #define dirPinCapture 28 // MOTOR CAPTURE DIR
 
 #define limit1 19 // ARM1 LIMIT
-#define limit2 14 // ARM2 LIMIT
-#define limit5 18 // ARM5 LIMIT
-#define limitGripper A13 // CAPTURE LIMIT Analog
+#define limit2 18 // ARM2 LIMIT
+#define limit5 14 // ARM5 LIMIT
+#define limitGripper 16 // CAPTURE LIMIT Analog
 
 #define FREQUENCY_TIMER1 5000.0f
 
@@ -90,8 +90,8 @@ int16_t ApplicationArduino::readA13() {
 
 void ApplicationArduino::initRobot()
 {
-    m_chessBoard->setChessBoardPosX(77);
-    m_chessBoard->setChessBoardPosY(89);
+    m_chessBoard->setChessBoardPosX(38+42);
+    m_chessBoard->setChessBoardPosY(74+8);
     m_chessBoard->setChessBoardSize(35*8);
     m_chessBoard->setDropZoneSpace(35);
     m_chessBoard->setChessBoardSideSpace(0);
@@ -99,12 +99,12 @@ void ApplicationArduino::initRobot()
 
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
-        {true,                                 1,     0,       0,      300,         16,           0,       550,       16,   FREQUENCY_TIMER1,      0},
-        {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -22,         4,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
-        {true, 16.0f*70.0f/20.0f*(200.0f/360.0f), 80.27,     140,       52,         8,          50,       210,       2,   FREQUENCY_TIMER1,    250},
+        {true,                                 1,     0,       0,       0,        36,           0,        100,      16,   FREQUENCY_TIMER1,      0},
+        {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -18,         4,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
+        {true, 16.0f*70.0f/20.0f*(200.0f/360.0f), 80.27,     140,       50,         8,          50,       210,       2,   FREQUENCY_TIMER1,    250},
         {false,  1.0f/1.0f,                       25.57,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
         {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       6,   FREQUENCY_TIMER1,      0},
-        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -45,         6,         -45,         0,       6,   FREQUENCY_TIMER1,    100}
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -35,        36,         -35,         5,       6,   FREQUENCY_TIMER1,    100}
     };
 
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
@@ -142,7 +142,7 @@ void ApplicationArduino::specificPlatformGohome(int motorID, bool stopOtherStepp
     uint8_t stepPin = stepPinCapture;
     uint8_t dirPin = dirPinCapture;
     uint8_t limitPin = limitGripper;    
-    int delayTime = 1000;
+    int delayTime = 2000;
     int stateGoHome;
     int currentStep = 0;
     stateGoHome = STATE_CHECK_SENSOR;
@@ -150,43 +150,31 @@ void ApplicationArduino::specificPlatformGohome(int motorID, bool stopOtherStepp
     while(stateGoHome != STATE_HOME_DONE) {
       switch(stateGoHome){
         case STATE_CHECK_SENSOR:{
-          if( digitalRead(limitPin) == HIGH ) {
+          if( digitalRead(limitPin) == LOW ) {
             digitalWrite(dirPin, HIGH);
-            stateGoHome = STATE_FIND_HOME_POS_DIR_CAPTURE;
-            Serial.println("STATE_FIND_HOME_POS direction capture");
+            stateGoHome = STATE_GO_TO_MAX_POSITION;
+            Serial.println("Go to max position");
           } else {
             digitalWrite(dirPin, LOW);
-            stateGoHome = STATE_FIND_HOME_POS_DIR_HOME;
-            Serial.println("STATE_FIND_HOME_POS direction Home");
+            stateGoHome = STATE_GO_TO_HOME;
+            Serial.println("Go to home position");
           }
         }
         break;
-        case STATE_FIND_HOME_POS_DIR_CAPTURE: {
+        case STATE_GO_TO_HOME: {
           if(digitalRead(limitPin) == HIGH) {
             digitalWrite(stepPin, HIGH);
             delayMicroseconds(delayTime);
             digitalWrite(stepPin, LOW);
             delayMicroseconds(delayTime);
           } else {
-            currentStep = 0;
-            digitalWrite(dirPin, LOW);
-            stateGoHome = STATE_GO_TO_CAPTURE;
-          }
-        }
-        break;
-        case STATE_FIND_HOME_POS_DIR_HOME: {
-          if(digitalRead(limitPin) == HIGH) {
-            digitalWrite(stepPin, HIGH);
-            delayMicroseconds(delayTime);
-            digitalWrite(stepPin, LOW);
-            delayMicroseconds(delayTime);
-          } else {
+            currentStep = m_robot->homeStep(MOTOR_CAPTURE);
             digitalWrite(dirPin, HIGH);
-            stateGoHome = STATE_FIND_HOME_POS_DIR_CAPTURE;
+            stateGoHome = STATE_GO_TO_MAX_POSITION;
           }
         }
         break;
-        case STATE_GO_TO_CAPTURE: {
+        case STATE_GO_TO_MAX_POSITION: {
           if(currentStep < m_robot->maxStep(MOTOR_CAPTURE))
           {
             digitalWrite(stepPin, HIGH);
@@ -196,21 +184,7 @@ void ApplicationArduino::specificPlatformGohome(int motorID, bool stopOtherStepp
             currentStep ++;
           } 
           else {
-            digitalWrite(dirPin, HIGH);
-            stateGoHome = STATE_GO_HOME;
-          }
-        }
-        break;
-        case STATE_GO_HOME: {
-          if(currentStep > m_robot->homeStep(MOTOR_CAPTURE))
-          {
-            digitalWrite(stepPin, HIGH);
-            delayMicroseconds(delayTime);
-            digitalWrite(stepPin, LOW);
-            delayMicroseconds(delayTime);
-            currentStep --;
-          } 
-          else {
+            Serial.println("STATE_GO_TO_MAX_POSITION stop at step: " + String(currentStep));
             m_robot->m_motorParamList[motorID].currentStep = currentStep;
             stateGoHome = STATE_HOME_DONE;
           }
@@ -293,13 +267,13 @@ bool ApplicationArduino::isLimitReached(int motorID, MOTOR_LIMIT_TYPE limitType)
     break;
     case MOTOR::MOTOR_ARM2: {
       limitReached = limitType == MOTOR_LIMIT_MIN || limitType == MOTOR_LIMIT_HOME ? 
-                    (PINJ & (1 << 1)) == 0 :
+                    (PIND & (1 << 3)) == 0 :
                     false;
     }
     break;
     case MOTOR::MOTOR_ARM5: {
       limitReached = limitType == MOTOR_LIMIT_MIN || limitType == MOTOR_LIMIT_HOME ? 
-                    (PIND & (1 << 3)) == 0 :
+                    (PINJ & (1 << 1)) == 0 :
                     false;
     }
     break;
