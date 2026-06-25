@@ -90,8 +90,8 @@ int16_t ApplicationArduino::readA13() {
 
 void ApplicationArduino::initRobot()
 {
-    m_chessBoard->setChessBoardPosX(38+42);
-    m_chessBoard->setChessBoardPosY(74+8+15);
+    m_chessBoard->setChessBoardPosX(30+7+44); // R + wall + space X
+    m_chessBoard->setChessBoardPosY(30+7+45); // R + wall + space Y
     m_chessBoard->setChessBoardSize(35.25f*8);
     m_chessBoard->setDropZoneSpace(35.25f);
     m_chessBoard->setChessBoardSideSpace(0);
@@ -100,11 +100,11 @@ void ApplicationArduino::initRobot()
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
         {true,                                 1,     0,       0,       0,        36,           20,        85,      16,   FREQUENCY_TIMER1,      0},
-        {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -24,         4,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
-        {true, 16.0f*70.0f/20.0f*(200.0f/360.0f), 80.27,     140,       50,         8,          50,       210,       2,   FREQUENCY_TIMER1,    250},
-        {false,  1.0f/1.0f,                       25.57,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
+        {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -23,         4,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
+        {true, 16.0f*70.0f/20.0f*(200.0f/360.0f), 74.62,     140,       50,         8,          50,       210,       2,   FREQUENCY_TIMER1,    250},
+        {false,  1.0f/1.0f,                       26.03,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
         {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       6,   FREQUENCY_TIMER1,      0},
-        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -35,        36,         -35,         5,       6,   FREQUENCY_TIMER1,    100}
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -35,        36,         -35,         0,       6,   FREQUENCY_TIMER1,    100}
     };
 
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {

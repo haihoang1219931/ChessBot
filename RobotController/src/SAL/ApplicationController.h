@@ -47,6 +47,7 @@ public:
     void sendCalibrationProgress();
     void calculateSequenceMoveStraight(int startCol, int startRow,int stopCol, int stopRow);
     void calculateSequenceMove(int startCol, int startRow, int upAngleInDegree, bool isCapture);
+    void calculateSequenceMoveTest(int targetCol, int targetRow);
     void calculateSequenceMoveNormal(int startCol, int startRow,
                          int stopCol, int stopRow);
     void calculateSequenceAttack(int startCol, int startRow,

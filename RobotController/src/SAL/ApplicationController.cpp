@@ -50,6 +50,12 @@ void ApplicationController::loop() {
                 setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
             break;
         }
+        case MACHINE_EXECUTE_TEST: {
+            if(executeCommandSequenceLoop() == COMMAND_SEQUENCE_STATE_DONE) {
+                setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+            }
+            break;
+        }
         case MACHINE_EXECUTE_COMMAND: {
             if(executeCommandSequenceLoop() == COMMAND_SEQUENCE_STATE_DONE) {
                 goToReadyPosition();
@@ -86,6 +92,7 @@ int ApplicationController::executeCommandSequenceLoop()
     {
         m_commandSequenceState = COMMAND_SEQUENCE_STATE_EXECUTE;
         m_commandState = COMMAND_STATE_INIT;
+        this->printf("Execute command sequence, numCommand=%d\r\n",m_numCommand);
     }
         break;
     case COMMAND_SEQUENCE_STATE_EXECUTE:
@@ -93,6 +100,7 @@ int ApplicationController::executeCommandSequenceLoop()
         if(executeCommandLoop() == COMMAND_STATE_DONE) {
             if(m_curCommandId >= m_numCommand - 1) {
                 m_commandSequenceState = COMMAND_SEQUENCE_STATE_DONE;
+                this->printf("Execute command sequence done\r\n");
             } else {
                 m_commandState = COMMAND_STATE_INIT;
                 m_curCommandId++;
@@ -445,8 +453,12 @@ void ApplicationController::executeCommand(char* command) {
             calibToHome(command[1]-'0');
             this->printf("[l%d] Calib to home confirmed\r\n", command[1]-'0');
         }
-    }
-    else if(command[0] == 'c' && strlen(command)>=5) {
+    }else if(command[0] == 'T' && strlen(command)>=3) {
+        m_comCommandID ++;
+        executeSequence(MOVE_TEST, command[2]-'0',command[1]-'0',
+                0,0);
+        this->printf("[%s] Test seq confirmed\r\n", command);
+    }else if(command[0] == 'c' && strlen(command)>=5) {
         m_comCommandID ++;
         executeSequence(MOVE_NORMAL, command[2]-'0',command[1]-'0',
                 command[4]-'0',command[3]-'0');
@@ -867,24 +879,33 @@ void ApplicationController::executeSequence(
     // Castle: Move king -> Move rook -> Return to prepare
     // Promote: Move pawn -> Move promote piece -> Return to prepare
     switch (moveType) {
+    case MOVE_TEST:
+        calculateSequenceMoveTest(startCol, startRow);
+        setMachineState(MACHINE_EXECUTE_TEST);
+        break;
     case MOVE_NORMAL:
         calculateSequenceMoveNormal(startCol, startRow, stopCol, stopRow);
+        setMachineState(MACHINE_EXECUTE_COMMAND);
         break;
     case MOVE_ATTACK:
         calculateSequenceAttack(startCol, startRow, stopCol, stopRow, attackPiece);
+        setMachineState(MACHINE_EXECUTE_COMMAND);
         break;
     case MOVE_PASTPAWN:
         calculateSequencePastPawn(startCol, startRow, stopCol, stopRow);
+        setMachineState(MACHINE_EXECUTE_COMMAND);
         break;
     case MOVE_CASTLE:
         calculateSequenceCastle(startCol, startRow, stopCol, stopRow);
+        setMachineState(MACHINE_EXECUTE_COMMAND);
         break;
     case MOVE_PROMOTE:
         calculateSequencePromotePiece(startCol, startRow, stopCol, stopRow, attackPiece, promotePiece);
+        setMachineState(MACHINE_EXECUTE_COMMAND);
         break;
     }
 
-    setMachineState(MACHINE_EXECUTE_COMMAND);
+    
     m_commandSequenceState = COMMAND_SEQUENCE_STATE_INIT;
 }
 
@@ -936,6 +957,31 @@ void ApplicationController::calculateSequenceMove(int startCol, int startRow, in
     m_robot->moveToTarget(MAX_MOTOR);
     setMachineState(MACHINE_EXECUTE_POSITION);
 }
+#define DEBUG_COMMAND
+void ApplicationController::calculateSequenceMoveTest(int targetCol, int targetRow)
+{
+    // append move to target location
+    Point targetPoint = m_chessBoard->convertPoint(targetRow,targetCol);
+#ifdef DEBUG_COMMAND
+    printf("target[%d,%d] to Point(%d,%d)\r\n",
+           targetRow,targetCol,
+           (int)(targetPoint.x*10), (int)(targetPoint.y*10));
+#endif
+    clearSequenceMove();
+    float upAngles[1] = {m_robot->maxAngle(MOTOR_ARM5)};
+    Point position[1] = {targetPoint};
+    int captureStep[1] = {m_robot->minStep(MOTOR_CAPTURE)};
+    int numStep = 1;
+    for(int seqStep = 0; seqStep < numStep; seqStep++)
+    {
+        m_sequenceCommand[m_numCommand].x = position[seqStep].x;
+        m_sequenceCommand[m_numCommand].y = position[seqStep].y;
+        m_sequenceCommand[m_numCommand].updownAngle = upAngles[seqStep];
+        m_sequenceCommand[m_numCommand].captureStep = captureStep[seqStep];
+        m_sequenceCommand[m_numCommand].type = COMMAND_NORMAL;
+        m_numCommand++;
+    }
+}
 
 void ApplicationController::calculateSequenceMoveNormal(int startCol, int startRow,
                      int stopCol, int stopRow)
@@ -950,8 +996,6 @@ void ApplicationController::calculateSequenceMoveNormal(int startCol, int startR
     Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
     clearSequenceMove();
     appendSequenceMove(startPoint, stopPoint);
-    setMachineState(MACHINE_EXECUTE_COMMAND);
-    m_commandSequenceState = COMMAND_SEQUENCE_STATE_INIT;
 }
 
 void ApplicationController::calculateSequenceAttack(int startCol, int startRow,
