@@ -91,7 +91,7 @@ int16_t ApplicationArduino::readA13() {
 void ApplicationArduino::initRobot()
 {
     m_chessBoard->setChessBoardPosX(30+7+42); // R + wall + space X
-    m_chessBoard->setChessBoardPosY(30+7+42 + 8); // R + wall + space Y
+    m_chessBoard->setChessBoardPosY(30+7+42 + 10); // R + wall + space Y
     m_chessBoard->setChessBoardSize(35.25f*8);
     m_chessBoard->setDropZoneSpace(35.25f);
     m_chessBoard->setChessBoardSideSpace(0);
@@ -99,7 +99,7 @@ void ApplicationArduino::initRobot()
 
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
-        {true,                                 1,     0,       0,        0,        36,          20,        95,      16,   FREQUENCY_TIMER1,      0},
+        {true,                                 1,     0,       0,        0,        36,          20,        85,      16,   FREQUENCY_TIMER1,      0},
         {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -23,         8,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
         {true, 16.0f*70.0f/20.0f*(200.0f/360.0f), 74.62,     140,       50,         8,          50,       210,       2,   FREQUENCY_TIMER1,    250},
         {false,  1.0f/1.0f,                       26.03,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
