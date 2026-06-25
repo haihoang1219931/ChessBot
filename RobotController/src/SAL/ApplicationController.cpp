@@ -458,30 +458,30 @@ void ApplicationController::executeCommand(char* command) {
         executeSequence(MOVE_TEST, command[2]-'0',command[1]-'0',
                 0,0);
         this->printf("[%s] Test seq confirmed\r\n", command);
-    }else if(command[0] == 'c' && strlen(command)>=5) {
+    }else if(command[0] == 'c' && strlen(command)>=6) {
         m_comCommandID ++;
         executeSequence(MOVE_NORMAL, command[2]-'0',command[1]-'0',
-                command[4]-'0',command[3]-'0');
+                command[4]-'0',command[3]-'0',0,0,command[5] == '-');
         this->printf("[%s] Normal seq confirmed\r\n", command);
-    }else if(command[0] == 'C' && strlen(command)>=7 && command[1] == 'S' && command[2] == 'T') {
+    }else if(command[0] == 'C' && strlen(command)>=8 && command[1] == 'S' && command[2] == 'T') {
         m_comCommandID ++;
         executeSequence(MOVE_CASTLE, command[4]-'0',command[3]-'0',
-                command[6]-'0',command[5]-'0');
+                command[6]-'0',command[5]-'0',0,0,command[7] == '-');
         this->printf("[%s] Castle confirmed\r\n", command);
-    }else if(command[0] == 'a' && strlen(command)>=6) {
+    }else if(command[0] == 'a' && strlen(command)>=7) {
         m_comCommandID ++;
         executeSequence(MOVE_ATTACK, command[2]-'0',command[1]-'0',
-                command[4]-'0',command[3]-'0', command[5]);
+                command[4]-'0',command[3]-'0',0,0,command[6] == '-');
         this->printf("[%s] Attack confirmed\r\n", command);
-    }else if(command[0] == 'p' && strlen(command)>=6 && command[1] == 'p') {
+    }else if(command[0] == 'p' && strlen(command)>=7 && command[1] == 'p') {
         m_comCommandID ++;
         executeSequence(MOVE_PASTPAWN, command[3]-'0',command[2]-'0',
-                command[5]-'0',command[4]-'0');
+                command[5]-'0',command[4]-'0',0,0,command[6] == '-');
         this->printf("[%s] Past pawn confirmed\r\n", command);
     }else if(command[0] == 'p' && strlen(command)>=7) {
         m_comCommandID ++;
         executeSequence(MOVE_PROMOTE, command[3]-'0',command[2]-'0',
-                command[5]-'0',command[4]-'0',command[6], command[1]);
+                command[5]-'0',command[4]-'0',0,0,command[6] == '-');
         this->printf("[%s] Promote confirmed\r\n", command);
 
     }else if(command[0] == 't' && strlen(command)>=2)
@@ -869,7 +869,7 @@ void ApplicationController::executeSequence(
         MOVE_TYPE moveType,
         int startCol, int startRow,
         int stopCol, int stopRow,
-        char attackPiece, char promotePiece) {
+        char attackPiece, char promotePiece, bool straightMove) {
 #ifdef DEBUG_COMMAND
     this->printf("Go to Pos [%d,%d] to [%d,%d] \r\n",
                  startCol, startRow, stopCol, stopRow);
@@ -884,19 +884,19 @@ void ApplicationController::executeSequence(
         setMachineState(MACHINE_EXECUTE_TEST);
         break;
     case MOVE_NORMAL:
-        calculateSequenceMoveNormal(startCol, startRow, stopCol, stopRow);
+        calculateSequenceMoveNormal(startCol, startRow, stopCol, stopRow, straightMove);
         setMachineState(MACHINE_EXECUTE_COMMAND);
         break;
     case MOVE_ATTACK:
-        calculateSequenceAttack(startCol, startRow, stopCol, stopRow, attackPiece);
+        calculateSequenceAttack(startCol, startRow, stopCol, stopRow, attackPiece, straightMove);
         setMachineState(MACHINE_EXECUTE_COMMAND);
         break;
     case MOVE_PASTPAWN:
-        calculateSequencePastPawn(startCol, startRow, stopCol, stopRow);
+        calculateSequencePastPawn(startCol, startRow, stopCol, stopRow, straightMove);
         setMachineState(MACHINE_EXECUTE_COMMAND);
         break;
     case MOVE_CASTLE:
-        calculateSequenceCastle(startCol, startRow, stopCol, stopRow);
+        calculateSequenceCastle(startCol, startRow, stopCol, stopRow, straightMove);
         setMachineState(MACHINE_EXECUTE_COMMAND);
         break;
     case MOVE_PROMOTE:
@@ -984,7 +984,7 @@ void ApplicationController::calculateSequenceMoveTest(int targetCol, int targetR
 }
 
 void ApplicationController::calculateSequenceMoveNormal(int startCol, int startRow,
-                     int stopCol, int stopRow)
+                     int stopCol, int stopRow, bool straightMove)
 {
     // append move from start -> stop -> standy
     Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
@@ -995,11 +995,11 @@ void ApplicationController::calculateSequenceMoveNormal(int startCol, int startR
 #endif
     Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
     clearSequenceMove();
-    appendSequenceMove(startPoint, stopPoint);
+    appendSequenceMove(startPoint, stopPoint, straightMove);
 }
 
 void ApplicationController::calculateSequenceAttack(int startCol, int startRow,
-                     int stopCol, int stopRow, char attackPiece)
+                     int stopCol, int stopRow, char attackPiece, bool straightMove)
 {
     // get free drop point
     // append move from stop -> drop -> start -> stop -> standby
@@ -1009,12 +1009,12 @@ void ApplicationController::calculateSequenceAttack(int startCol, int startRow,
 
     clearSequenceMove();
     appendSequenceMove(stopPoint, dropPoint.location);
-    appendSequenceMove(startPoint, stopPoint);
+    appendSequenceMove(startPoint, stopPoint, straightMove);
     m_chessBoard->updateDropZone(attackPiece, dropPoint.rowID, dropPoint.colID, (ZONE_TYPE)dropPoint.zoneType);
 }
 
 void ApplicationController::calculateSequencePastPawn(int startCol, int startRow,
-                     int stopCol, int stopRow)
+                     int stopCol, int stopRow, bool straightMove)
 {
     // append move from attack pawn -> drop -> start -> stop -> standby
     DropPoint dropPoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
@@ -1023,12 +1023,12 @@ void ApplicationController::calculateSequencePastPawn(int startCol, int startRow
     Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
     clearSequenceMove();
     appendSequenceMove(pawnPoint, dropPoint.location);
-    appendSequenceMove(startPoint, stopPoint);
+    appendSequenceMove(startPoint, stopPoint, straightMove);
     m_chessBoard->updateDropZone('p', dropPoint.rowID, dropPoint.colID, (ZONE_TYPE)dropPoint.zoneType);
 }
 
 void ApplicationController::calculateSequencePromotePiece(int startCol, int startRow,
-                     int stopCol, int stopRow, char attackPiece, char promotePiece)
+                     int stopCol, int stopRow, char attackPiece, char promotePiece, bool straightMove)
 {
     // append move from attack piece -> drop -> promote -> stop -> start -> drop -> standby
     DropPoint promotePiecePoint = m_chessBoard->getFreeDropPoint(ZONE_PLAYER,promotePiece);
@@ -1049,7 +1049,7 @@ void ApplicationController::calculateSequencePromotePiece(int startCol, int star
 }
 
 void ApplicationController::calculateSequenceCastle(int kingCol, int kingRow,
-                                                    int rookCol, int rookRow)
+                                                    int rookCol, int rookRow, bool straightMove)
 {
 
     // append move king -> new point -> rook -> new point
@@ -1100,12 +1100,12 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
             m_numCommand++;
         }
     } else {
-        float upAngles[6] = {m_robot->homeAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),
+        float upAngles[4] = {m_robot->homeAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),
                               m_robot->maxAngle(MOTOR_ARM5),m_robot->homeAngle(MOTOR_ARM5)};
-        Point position[6] = {start,start,start,stop,stop,stop};
-        int captureStep[6] = {m_robot->maxStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE),m_robot->minStep(MOTOR_CAPTURE),
-                                m_robot->minStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE)};
-        int numStep = 6;
+        Point position[4] = {start,start,stop,stop};
+        int captureStep[4] = {m_robot->maxStep(MOTOR_CAPTURE),m_robot->minStep(MOTOR_CAPTURE),
+                                m_robot->maxStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE)};
+        int numStep = 4;
         for(int seqStep = 0; seqStep < numStep; seqStep++)
         {
             m_sequenceCommand[m_numCommand].x = position[seqStep].x;

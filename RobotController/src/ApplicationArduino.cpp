@@ -104,7 +104,7 @@ void ApplicationArduino::initRobot()
         {true, 16.0f*70.0f/20.0f*(200.0f/360.0f), 74.62,     140,       50,         8,          50,       210,       2,   FREQUENCY_TIMER1,    250},
         {false,  1.0f/1.0f,                       26.03,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
         {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       6,   FREQUENCY_TIMER1,      0},
-        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -35,        36,         -35,         0,       6,   FREQUENCY_TIMER1,    100}
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -35,        36,         -35,         5,       6,   FREQUENCY_TIMER1,    100}
     };
 
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {

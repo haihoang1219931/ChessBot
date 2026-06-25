@@ -43,21 +43,21 @@ public:
     void executeSequence(MOVE_TYPE moveType,
                          int startCol, int startRow,
                          int stopCol, int stopRow,
-                         char attackPiece = 0, char promotePiece = 0);
+                         char attackPiece = 0, char promotePiece = 0, bool straightMove = false);
     void sendCalibrationProgress();
     void calculateSequenceMoveStraight(int startCol, int startRow,int stopCol, int stopRow);
     void calculateSequenceMove(int startCol, int startRow, int upAngleInDegree, bool isCapture);
     void calculateSequenceMoveTest(int targetCol, int targetRow);
     void calculateSequenceMoveNormal(int startCol, int startRow,
-                         int stopCol, int stopRow);
+                         int stopCol, int stopRow, bool straightMove = false);
     void calculateSequenceAttack(int startCol, int startRow,
-                         int stopCol, int stopRow, char attackPiece);
+                         int stopCol, int stopRow, char attackPiece, bool straightMove = false);
     void calculateSequencePastPawn(int startCol, int startRow,
-                         int stopCol, int stopRow);
+                         int stopCol, int stopRow, bool straightMove = false);
     void calculateSequencePromotePiece(int startCol, int startRow,
-                         int stopCol, int stopRow, char attackPiece, char promotePiece);
+                         int stopCol, int stopRow, char attackPiece, char promotePiece, bool straightMove = false);
     void calculateSequenceCastle(int kingCol, int kingRow,
-                                 int rookCol, int rookRow);
+                                 int rookCol, int rookRow, bool straightMove = false);
     void calculatePolygonEdgeA2345(float upAngleInDegree, float* edge, float* angleA2A2345);
     void calculateJoints(float xPos, float yPos, float upAngleInDegree, int* jointSteps);
     Point calibPos();
