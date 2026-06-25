@@ -90,8 +90,8 @@ int16_t ApplicationArduino::readA13() {
 
 void ApplicationArduino::initRobot()
 {
-    m_chessBoard->setChessBoardPosX(30+7+44); // R + wall + space X
-    m_chessBoard->setChessBoardPosY(30+7+45); // R + wall + space Y
+    m_chessBoard->setChessBoardPosX(30+7+42); // R + wall + space X
+    m_chessBoard->setChessBoardPosY(30+7+42 + 8); // R + wall + space Y
     m_chessBoard->setChessBoardSize(35.25f*8);
     m_chessBoard->setDropZoneSpace(35.25f);
     m_chessBoard->setChessBoardSideSpace(0);
@@ -99,8 +99,8 @@ void ApplicationArduino::initRobot()
 
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
-        {true,                                 1,     0,       0,       0,        36,           20,        85,      16,   FREQUENCY_TIMER1,      0},
-        {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -23,         4,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
+        {true,                                 1,     0,       0,        0,        36,          20,        95,      16,   FREQUENCY_TIMER1,      0},
+        {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -23,         8,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
         {true, 16.0f*70.0f/20.0f*(200.0f/360.0f), 74.62,     140,       50,         8,          50,       210,       2,   FREQUENCY_TIMER1,    250},
         {false,  1.0f/1.0f,                       26.03,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
         {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       6,   FREQUENCY_TIMER1,      0},
@@ -142,7 +142,7 @@ void ApplicationArduino::specificPlatformGohome(int motorID, bool stopOtherStepp
     uint8_t stepPin = stepPinCapture;
     uint8_t dirPin = dirPinCapture;
     uint8_t limitPin = limitGripper;    
-    int delayTime = 2000;
+    int delayTime = 1500;
     int stateGoHome;
     int currentStep = 0;
     stateGoHome = STATE_CHECK_SENSOR;
@@ -159,18 +159,22 @@ void ApplicationArduino::specificPlatformGohome(int motorID, bool stopOtherStepp
             stateGoHome = STATE_GO_TO_HOME;
             Serial.println("Go to home position");
           }
+          delay(100);
         }
         break;
         case STATE_GO_TO_HOME: {
           if(digitalRead(limitPin) == HIGH) {
             digitalWrite(stepPin, HIGH);
-            delayMicroseconds(delayTime);
+            delayMicroseconds(10);
             digitalWrite(stepPin, LOW);
-            delayMicroseconds(delayTime);
+            delayMicroseconds(1500);
           } else {
             currentStep = m_robot->homeStep(MOTOR_CAPTURE);
             digitalWrite(dirPin, HIGH);
             stateGoHome = STATE_GO_TO_MAX_POSITION;
+            delay(100);
+            digitalWrite(dirPin, HIGH);
+            Serial.println("Found home position at step: " + String(currentStep));
           }
         }
         break;
@@ -178,9 +182,9 @@ void ApplicationArduino::specificPlatformGohome(int motorID, bool stopOtherStepp
           if(currentStep < m_robot->maxStep(MOTOR_CAPTURE))
           {
             digitalWrite(stepPin, HIGH);
-            delayMicroseconds(delayTime);
+            delayMicroseconds(10);
             digitalWrite(stepPin, LOW);
-            delayMicroseconds(delayTime);
+            delayMicroseconds(2000);
             currentStep ++;
           } 
           else {
@@ -195,7 +199,7 @@ void ApplicationArduino::specificPlatformGohome(int motorID, bool stopOtherStepp
         }
         break;
       }
-      delay(1);
+      // delay(1);
     }
     Serial.println("Homing Capture done");
     digitalWrite(enPin, HIGH);
@@ -205,6 +209,7 @@ void ApplicationArduino::specificPlatformGohome(int motorID, bool stopOtherStepp
       digitalWrite(enPin2, LOW);
       digitalWrite(enPin5, LOW);
     }
+    delay(100);
   }
 }
 
