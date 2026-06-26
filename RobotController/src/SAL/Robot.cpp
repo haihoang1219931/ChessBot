@@ -188,7 +188,7 @@ int Robot::executeGohome() {
     m_app->printf("Robot executeGohome M[%d]\r\n",m_requestMotorID);
 #endif
     int startID = m_requestMotorID == MAX_MOTOR ?
-                                            MOTOR_CAPTURE : m_requestMotorID;
+                                            MOTOR_ARM1 : m_requestMotorID;
     int stopID = m_requestMotorID == MAX_MOTOR ?
                                             MAX_MOTOR : m_requestMotorID+1;
     for(int motor = startID; motor< stopID; motor++)

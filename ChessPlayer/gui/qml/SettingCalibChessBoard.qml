@@ -17,6 +17,9 @@ FocusScope {
     // 1. Set up the camera
     Camera {
         id: camera
+        viewfinder {
+            resolution: "640x360"
+        }
     }
 
     // 2. Set up the VideoOutput

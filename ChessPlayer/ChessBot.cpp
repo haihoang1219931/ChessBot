@@ -7,6 +7,9 @@
 #include <QSerialPortInfo>
 #include <QTime>
 #include <QDebug>
+#include <QTextToSpeech>
+#include <QRegularExpression>
+#include <QRegularExpressionMatch>
 #include "ChessBot.h"
 #include "chessAlgo/ChessController.h"
 
@@ -25,10 +28,18 @@ ChessBot::ChessBot(QThread *parent) :
     m_mutex = new QMutex;
     m_pauseCond = new QWaitCondition;
     m_chessController = new ChessController();
+    m_detectParams = new MoveDetectParams();
+    m_detectParams->roi_percent = 100;
+    m_detectParams->diff_thresh = 255;
+    m_detectParams->canny_low = 500;
+    m_detectParams->pieceMinPoints = 500;
+    m_detectParams->pieceRoiPercent = 100;
+    m_detectParams->playerSide = m_side == 0?
+                "white":"black";
     // 1. Check if engines exist on your OS
     qDebug() << "Available TTS Engines:" << QTextToSpeech::availableEngines();
 
-    m_speech = new QTextToSpeech(this);
+    m_speech = new QTextToSpeech();
     // Explicitly enforce the system language to kickstart SAPI
     m_speech->setLocale(QLocale::system());
     // 2. Print current engine state (Should be Ready)
@@ -39,7 +50,7 @@ ChessBot::ChessBot(QThread *parent) :
     connect(m_speech, &QTextToSpeech::stateChanged, [](QTextToSpeech::State state) {
         qDebug() << "TTS State Changed to:" << state;
     });
-    m_speech->say("Welcome to Daddy chess robot");
+    m_speech->say("Hi. This is Daddy chess robot. Play fun");
     m_chessboardCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(8));
     m_dropzoneRightCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(2));
     m_dropzoneLeftCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(2));
@@ -61,6 +72,27 @@ bool readFrame(cv::Mat& outImg)
     bool readResult = false;
     if (!cap.isOpened()) {
         cap.open(0);
+        cap.set(cv::CAP_PROP_FRAME_WIDTH,640);
+        cap.set(cv::CAP_PROP_FRAME_HEIGHT,360);
+        // 1. TURN OFF AUTO EXPOSURE (Switch to Manual Mode)
+        // For Linux/V4L2 backends: 1 = Manual, 3 = Auto
+        // For Windows/DSHOW backends: 0.25 = Manual (sometimes 0)
+        bool turnedOff = cap.set(cv::CAP_PROP_AUTO_EXPOSURE, 1);
+
+        if (!turnedOff) {
+            // Fallback value try for specific backends like macOS/DirectShow
+            cap.set(cv::CAP_PROP_AUTO_EXPOSURE, 0.25);
+        }
+
+        // 2. SET THE MANUAL EXPOSURE VALUE
+        // Note: Value scaling varies wildly by hardware (e.g., -1 to -7, or 1 to 5000)
+        int targetExposure = -5;
+        cap.set(cv::CAP_PROP_EXPOSURE, targetExposure);
+
+        // Verify settings in console
+        std::cout << "Auto Exposure Mode: " << cap.get(cv::CAP_PROP_AUTO_EXPOSURE) << std::endl;
+        std::cout << "Manual Exposure Value: " << cap.get(cv::CAP_PROP_EXPOSURE) << std::endl;
+
     }
     if (cap.isOpened()) {
         readResult = cap.read(outImg);
@@ -300,6 +332,12 @@ bool ChessBot::playCheckDoubleMove()
     return false;
 }
 
+bool ChessBot::canMoveStraight(int startRow, int startCol, int stopRow, int stopCol)
+{
+    if(abs(startCol - stopCol) > 2 || abs(startRow - stopRow) > 2) return false;
+    return true;
+}
+
 bool ChessBot::playCheckEndGame()
 {
     QString gameState = m_chessController->buildResultText();
@@ -344,8 +382,10 @@ uint8_t ChessBot::playDetectMove()
     }
 
     if(!imageBefore.empty() && !imageAfter.empty()) {
+        cv::imwrite("imageBefore.jpg",imageBefore);
+        cv::imwrite("imageAfter.jpg",imageAfter);
         std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves(imageBefore, imageAfter,
-            m_side == 0?"white":"black");
+            *m_detectParams);
         for(int i = 0; i< chessMoves.size(); i++) {
             qDebug("Possible Move %s",chessMoves[i].c_str());
             QString from = QString::fromStdString(chessMoves[i]).left(2);  // Result: "e2"
@@ -499,11 +539,12 @@ uint8_t ChessBot::playCalculateNextMove()
 
     char robotCommand[32];
     if(m_chessController->botMove().isCapture()) {
-        sprintf(robotCommand,"a%d%d%d%d",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x());
+        sprintf(robotCommand,"a%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
+                canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x())?'-':'n');
     } else if(m_chessController->botMove().isCastling()) {
-        sprintf(robotCommand,"CST%d%d%d%d",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x());
+        sprintf(robotCommand,"CST%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),'-');
     } else if(m_chessController->botMove().isEnPassant()) {
-        sprintf(robotCommand,"pp%d%d%d%d",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x());
+        sprintf(robotCommand,"pp%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),'n');
     } else if(m_chessController->botMove().isPromotion()) {
         /**
          * @brief promoChar
@@ -519,9 +560,10 @@ uint8_t ChessBot::playCalculateNextMove()
         unsigned int promoPieceType = m_chessController->botMove().getPromotedPieceType();
         // Todo: convet promoPieceType to promoChar
         char promoChar = 'q';
-        sprintf(robotCommand,"p%c%d%d%d%d",promoChar,fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x());
+        sprintf(robotCommand,"p%c%d%d%d%d%c",promoChar,fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),'n');
     } else {
-        sprintf(robotCommand,"c%d%d%d%d",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x());
+        sprintf(robotCommand,"c%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
+                canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x())?'-':'n');
     }
     m_robotCommand = QString(robotCommand);
     qDebug("playCalculateNextMove %s to cmd[%s]\r\n",
@@ -1144,7 +1186,7 @@ uint8_t ChessBot::goHome()
         sleep(1);
         if (robotController->waitForReadyRead(500)) {
             QByteArray chunk = robotController->readAll();
-            qDebug("Received progress chunk: %s", chunk.constData());
+            qDebug("CMD[ha] Received progress chunk: %s", chunk.constData());
         }
         QString homeCmdID = "";
         QString homeCmdRequest = "";
@@ -1155,12 +1197,16 @@ uint8_t ChessBot::goHome()
             robotController->waitForBytesWritten(200);
             if (robotController->waitForReadyRead(500)) {
                 QByteArray chunk = robotController->readAll();
-                qDebug("Received progress chunk: %s", chunk.constData());
+                qDebug("CMD[cmd] Received progress chunk: %s", chunk.constData());
                 QString homeCmdIDStr = QString::fromLatin1(chunk);
                 if(homeCmdIDStr.contains("[cmd]")) {
-                    homeCmdID = homeCmdIDStr.section(']', 1);
-                    qDebug("homeCmdID: %s", homeCmdID.toStdString().c_str());
-                    break;
+                    QRegularExpression re("\\d+");
+                    QRegularExpressionMatch match = re.match(homeCmdIDStr);
+                    if (match.hasMatch()) {
+                        homeCmdID = match.captured(0);
+                        qDebug() << "Extracted numbers:" << homeCmdID; // Outputs: "0001"
+                        break;
+                    }
                 }
             }
             retry++;
@@ -1174,7 +1220,9 @@ uint8_t ChessBot::goHome()
                 robotController->waitForBytesWritten(200);
                 if (robotController->waitForReadyRead(200)) {
                     QByteArray chunk = robotController->readAll();
-                    qDebug("Received progress chunk: %s", chunk.constData());
+                    qDebug("CMD[%s] Received progress chunk: %s",
+                           homeCmdRequest.toStdString().c_str(),
+                           chunk.constData());
                     QString homeCmdStateStr = QString::fromLatin1(chunk);
                     if(homeCmdStateStr.contains("]DONE")) {
                         homeCmdState = homeCmdStateStr.section(']', 1);
@@ -1453,8 +1501,7 @@ void ChessBot::sendTestCommand(QString command)
 void ChessBot::initRobotCommunication() {
     qDebug("ChessBot::initRobotCommunication");
     m_state = STATE_INIT_COM;
-//    m_stateInit = INIT_DETECT_PORT;
-    m_stateInit = INIT_DONE;
+    m_stateInit = INIT_DETECT_PORT;
     m_calibRow = 0;
     m_calibCol = 0;
     togglePause(false);

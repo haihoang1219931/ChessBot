@@ -16,6 +16,7 @@
 #define CONFIGURE_CHESSBOARD_CALIB_FILE "calib_data.json"
 
 class ChessController;
+class MoveDetectParams;
 #ifdef IMAGE_PROCESS_MOVE
 class ChessImageProcessing;
 #endif
@@ -132,6 +133,7 @@ private:
     void testLoop();
     bool playCheckEndGame();
     bool playCheckDoubleMove();
+    bool canMoveStraight(int startRow, int startCol, int stopRow, int stopCol);
     uint8_t playDetectMove();
     uint8_t playRandomMove();
     uint8_t playCalculateNextMove();
@@ -174,6 +176,7 @@ private:
     int m_levelType;
     int m_levelScore;
     int m_side;
+    MoveDetectParams* m_detectParams;
     QString m_arduinoVersion;
     QVector<QPoint> m_chessboardConners; // 4 corners
     QVector<QVector<QPoint>> m_chessboardCalib;    // 8x8 chessboard
