@@ -1,5 +1,7 @@
 #include "ChessImageProcessing.h"
 
+const int WARP_SIZE = 640;
+
 typedef enum {
     DETECT_MOVE_PHASE1_BINARY,
     DETECT_MOVE_PHASE2_SUBSTRACTION,
@@ -18,6 +20,16 @@ ChessImageProcessing::ChessImageProcessing()
     m_transformMaxtrixValid = false;
 }
 
+static void printMatrix(const std::string & name,
+                        const std::vector < std::vector < int >> & mat) {
+    std::cout << "\n--- 8x8 Matrix: " << name << " ---" << std::endl;
+    for (int r = 0; r < 8; ++r) {
+        for (int c = 0; c < 8; ++c) {
+            std::cout << mat[r][c] << " ";
+        }
+        std::cout << std::endl;
+    }
+}
 void ChessImageProcessing::connectSource(char* source) {
 
 }
@@ -40,7 +52,7 @@ void ChessImageProcessing::setCorners(float topLeftX, float topLeftY,
     corners.push_back(cv::Point2f(topRightX, topRightY));
     corners.push_back(cv::Point2f(bottomRightX, bottomRightY));
     corners.push_back(cv::Point2f(bottomLeftX, bottomLeftY));
-    m_transformMatrix = getPerspectiveTransform(corners, std::vector<cv::Point2f>{{0,0},{640,0},{640,640},{0,640}});
+    m_transformMatrix = getPerspectiveTransform(corners, std::vector<cv::Point2f>{{0,0},{WARP_SIZE,0},{WARP_SIZE,WARP_SIZE},{0,640}});
     m_transformMaxtrixValid = true;
 }
 cv::Mat ChessImageProcessing::getTranformMatrix() {
@@ -110,25 +122,47 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& 
     if (img_start.empty() || img_end.empty() || !m_transformMaxtrixValid) return listMoves;
     std::vector<cv::Point> top3cells;
     cv::Mat gray1, gray2, warped1, warped2, edges1, edges2;
-
+    std::vector<cv::Point> startCellsBinary, startCellsColor;
+    std::vector<cv::Point> endsCellsBinary, endCellsColor;
+    std::vector<std::vector<int>> matColorMap1(8, std::vector<int>(8, 0));
+    std::vector<std::vector<int>> matColorMap2(8, std::vector<int>(8, 0));
     // warp image before calculation (also keep color warped images for color-matching)
-    cv::warpPerspective(img_start, warped1, m_transformMatrix, cv::Size(640, 640));
-    cv::warpPerspective(img_end, warped2, m_transformMatrix, cv::Size(640, 640));
+    cv::warpPerspective(img_start, warped1, m_transformMatrix, cv::Size(WARP_SIZE, WARP_SIZE));
+    cv::warpPerspective(img_end, warped2, m_transformMatrix, cv::Size(WARP_SIZE, WARP_SIZE));
     cv::cvtColor(warped1, gray1, cv::COLOR_BGR2GRAY);
     cv::cvtColor(warped2, gray2, cv::COLOR_BGR2GRAY);
+//    cv::imshow("color1",img_start);
+//    cv::imshow("color2",img_end);
+//    cv::imshow("warp1",warped1);
+//    cv::imshow("warp2",warped2);
 
+    // 1) detect start cell and candidate end cells
     cv::Canny(gray1, edges1, params.canny_low, params.canny_low * 3);
     cv::Canny(gray2, edges2, params.canny_low, params.canny_low * 3);
-
-    // 1) detect binary start cell and candidate end cells
-    std::vector<cv::Point> startCells;
-    std::vector<cv::Point> ends;
     detectMovePhase1Binary(edges1, edges2,
-                           startCells, ends,
+                           startCellsBinary, endsCellsBinary,
                            params);
+
+    detectMovePhase1ColorFilter(warped1, warped2,
+                           startCellsColor, endCellsColor,
+                           params,
+                           matColorMap1,
+                           matColorMap2);
+
     std::vector<cv::Point> listChangedCell;
     detectMovePhase2Substraction(gray1, gray2, params, listChangedCell);
-    listMoves = detectMovePhase3ColorMatching(warped1, warped2, startCells, listChangedCell, params);
+//    listMoves = detectMovePhase3ColorMatching(warped1, warped2, startCells, listChangedCell, params);
+    if(startCellsBinary.size() == 0) {
+        listMoves = detectMovePhase3ColorMatchingFromFilter(startCellsColor, listChangedCell, params,
+                                                        matColorMap1, matColorMap2);
+    } else if(startCellsBinary.size() == 1) {
+        listMoves = detectMovePhase3ColorMatchingFromFilter(startCellsBinary, listChangedCell, params,
+                                                        matColorMap1, matColorMap2);
+    } else {
+        if(startCellsColor.size() == 1)
+        listMoves = detectMovePhase3ColorMatchingFromFilter(startCellsColor, listChangedCell, params,
+                                                        matColorMap1, matColorMap2);
+    }
 
     return listMoves;
 }
@@ -172,6 +206,47 @@ bool ChessImageProcessing::detectMovePhase1Binary(const cv::Mat& edges1, const c
     }
 }
 
+bool ChessImageProcessing::detectMovePhase1ColorFilter(const cv::Mat& color1, const cv::Mat& color2,
+                                                  std::vector<cv::Point>& starts, std::vector<cv::Point>& ends,
+                                                  const MoveDetectParams& params,
+                                                  std::vector<std::vector<int>>& matColorMapBefore,
+                                                  std::vector<std::vector<int>>& matColorMapAfter)
+{
+    if (color1.empty() || color2.empty()) return false;
+    int sq = color1.cols / 8;
+    matColorMapBefore = getPieceMatrixColor(color1,params,"warp1");
+    matColorMapAfter = getPieceMatrixColor(color2,params,"warp2");
+
+    comparePieceMatrices(matColorMapBefore, matColorMapAfter, starts, ends);
+    for(cv::Point start: starts) {
+        std::cout << "Possible start: " << start << std::endl;
+#ifdef DEBUG_SHOW_IMAGE
+        // --- Draw on output image ---
+        cv::Mat out = color1.clone();
+        // Draw start position (red rectangle)
+        if (start.x >= 0 && start.y >= 0) {
+            cv::Rect box(start.x * sq, start.y * sq, sq, sq);
+            cv::rectangle(out, box, cv::Scalar::all(255),3);
+            putText(out, "FROM", box.tl() + cv::Point(5, 25), 1, 1.0, cv::Scalar::all(255), 2);
+        }
+        // Draw end positions (green rectangles)
+        for (const auto& pt : ends) {
+            cv::Rect box(pt.x * sq, pt.y * sq, sq, sq);
+            cv::rectangle(out, box, cv::Scalar::all(255),3);
+            putText(out, "TO", box.tl() + cv::Point(5, 25), 1, 1.0, cv::Scalar::all(255), 2);
+        }
+        imshow("Move Detection", out);
+#endif
+    }
+    // Return true only when we have a valid start and at least one end.
+    // NOTE: fixed '=' -> '==' bug so 'start' value is not overwritten.
+    if (starts.empty()) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
 bool ChessImageProcessing::detectMovePhase2Substraction(const cv::Mat& img_start, const cv::Mat& img_end,
                                                         const MoveDetectParams& params,
                                                         std::vector<cv::Point>& top3cells)
@@ -183,9 +258,10 @@ bool ChessImageProcessing::detectMovePhase2Substraction(const cv::Mat& img_start
 
     cv::Mat diff_bin;
     cv::absdiff(gray1, gray2, diff_bin);
+#ifdef DEBUG_SHOW_IMAGE
     cv::imshow("diff_bin_gray",diff_bin);
+#endif
     cv::threshold(diff_bin, diff_bin, params.diff_thresh, 255, cv::THRESH_BINARY);
-
     int sq = gray1.cols / 8;
     int sub = std::max(1, (sq * params.roi_percent) / 100);
     int off = (sq - sub) / 2;
@@ -323,6 +399,160 @@ std::vector<std::string> ChessImageProcessing::detectMovePhase3ColorMatching(con
     return listMoves;
 }
 
+std::vector<std::string> ChessImageProcessing::detectMovePhase3ColorMatchingFromFilter(const std::vector<cv::Point>& startCells,
+                                std::vector<cv::Point> listChangedCell,
+                                const MoveDetectParams& params,
+                                const std::vector<std::vector<int>> matColorMapBefore,
+                                const std::vector<std::vector<int>> matColorMapAfter)
+{
+    std::vector<std::string> listMoves;
+    for (int i=0; i< listChangedCell.size(); i++) {
+        std::cout << "detectMovePhase2Substraction: end " << listChangedCell[i] << std::endl;
+    }
+    cv::Point startCell(-1,-1);
+    bool foundValidStartCell = false;
+    for(cv::Point tmpStartCell: startCells) {
+        for(cv::Point tmpMoveCell: listChangedCell) {
+            if(tmpStartCell.x == tmpMoveCell.x && tmpStartCell.y == tmpMoveCell.y) {
+                startCell.x = tmpMoveCell.x;
+                startCell.y = tmpMoveCell.y;
+                foundValidStartCell = true;
+                break;
+            }
+        }
+        if(foundValidStartCell) break;
+    }
+    // 2) Exclude the start cell from changed-cell candidates (if present)
+    if (startCell.x >= 0 && startCell.y >= 0 && !listChangedCell.empty()) {
+        for (int i=0; i< listChangedCell.size(); i++) {
+            if (listChangedCell[i].x == startCell.x && listChangedCell[i].y == startCell.y) {
+                listChangedCell.erase(listChangedCell.begin() + i);
+                break;
+            }
+        }
+    }
+
+    for(cv::Point filterCell: listChangedCell) {
+        std::cout << "end cell [" << filterCell << "]" << std::endl;
+    }
+    // 3) If we have a start from phase1 and remaining candidates, try color matching
+    if (startCell.x >= 0 && startCell.y >= 0 && !listChangedCell.empty()) {
+        std::string from = coordToNotation(startCell, params.playerSide);
+        for(cv::Point filterCell: listChangedCell) {
+            std::cout << "filterCell y:" << filterCell.y << " x:" << filterCell.x << " v:" << matColorMapAfter[filterCell.y][filterCell.x] << std::endl;
+            if(matColorMapAfter[filterCell.y][filterCell.x] != 0 &&
+                    matColorMapBefore[filterCell.y][filterCell.x] == 0) {
+                std::string to = coordToNotation(filterCell, params.playerSide);
+                std::cout << "Player:" << params.playerSide
+                          << " Color match: " << from << " -> " << to << std::endl;
+                // build a move string and return as candidate
+                listMoves.push_back(from + to);
+            }
+        }
+    } else if (!listChangedCell.empty()) {
+        // No binary start found; if only changed cells remain, return their notations as possible moves
+        for (const auto& pt : listChangedCell) {
+            listMoves.push_back(coordToNotation(pt, params.playerSide));
+        }
+    }
+    return listMoves;
+}
+
+std::vector < std::vector < int >> ChessImageProcessing::cellColorFilterToMatrix(const cv::Mat& colorWarped, cv::Vec3b targetHSV,
+                                              int hTol, int sTol, int vTol,
+                                              int roiPercent, int minWhitePercent, int maxBlackPercent,
+                                              std::string name)
+{
+    std::vector < std::vector < int >> matrix(8, std::vector < int > (8, 0));
+
+    cv::Mat display = colorWarped.clone();
+    cv::Mat maskAll = cv::Mat::zeros(colorWarped.size(), CV_8UC1);
+
+    int h = targetHSV[0];
+    int s = targetHSV[1];
+    int v = targetHSV[2];
+
+    int lowH = h - hTol;
+    int highH = h + hTol;
+    int lowS = std::max(0, s - sTol);
+    int highS = std::min(255, s + sTol);
+    int lowV = std::max(0, v - vTol);
+    int highV = std::min(255, v + vTol);
+
+    cv::Mat mask;
+    if (lowH < 0) {
+        cv::Mat m1, m2;
+        inRange(colorWarped, cv::Scalar(0, lowS, lowV), cv::Scalar(highH, highS, highV), m1);
+        inRange(colorWarped, cv::Scalar(180 + lowH, lowS, lowV), cv::Scalar(180, highS, highV), m2);
+        bitwise_or(m1, m2, mask);
+    } else if (highH > 180) {
+        cv::Mat m1, m2;
+        inRange(colorWarped, cv::Scalar(lowH, lowS, lowV), cv::Scalar(180, highS, highV), m1);
+        inRange(colorWarped, cv::Scalar(0, lowS, lowV), cv::Scalar(highH - 180, highS, highV), m2);
+        bitwise_or(m1, m2, mask);
+    } else {
+        inRange(colorWarped, cv::Scalar(lowH, lowS, lowV), cv::Scalar(highH, highS, highV), mask);
+    }
+
+    cv::Mat kernel = getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3));
+    cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);
+    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
+
+    const int cellW = WARP_SIZE / 8;
+    const int cellH = WARP_SIZE / 8;
+    const int roiW = cv::max(2, (cellW * roiPercent) / 100);
+    const int roiH = cv::max(2, (cellH * roiPercent) / 100);
+
+    for (int r = 0; r < 8; ++r) {
+        for (int c = 0; c < 8; ++c) {
+            int cx = c * cellW + cellW / 2;
+            int cy = r * cellH + cellH / 2;
+            int x0 = cx - roiW / 2;
+            int y0 = cy - roiH / 2;
+            cv::Rect roiRect(x0, y0, roiW, roiH);
+            roiRect &= cv::Rect(0, 0, colorWarped.cols, colorWarped.rows);
+
+            cv::Mat roiMask = mask(roiRect);
+            double whitePixels = countNonZero(roiMask);
+            double area = roiRect.width * roiRect.height;
+            double blackPixels = area - whitePixels;
+
+            double whiteFrac = area > 0 ? (whitePixels / area) : 0.0;
+            double blackFrac = area > 0 ? (blackPixels / area) : 0.0;
+
+            double minWhiteThresh = minWhitePercent / 100.0;
+            double maxBlackThresh = maxBlackPercent / 100.0;
+
+            // Logic: Mostly the selected input color backdrop containing a small edge profile/shadow
+            //      bool isColorDetected = (whiteFrac >= minWhiteThresh) && (blackFrac > 0.01) && (blackFrac <= maxBlackThresh);
+            bool isColorDetected = whiteFrac >= minWhiteThresh;
+            if (isColorDetected) {
+                matrix[r][c] = 1;
+            }
+#ifdef DEBUG_SHOW_IMAGE
+            cv::Scalar boxColor = isColorDetected ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255);
+            rectangle(display, roiRect, boxColor, 2);
+            if (isColorDetected) {
+                putText(display, "MATCH", cv::Point(roiRect.x + 2, roiRect.y + 16), cv::FONT_HERSHEY_SIMPLEX, 0.4, boxColor, 1);
+            }
+            cv::Mat maskAllRoi = maskAll(roiRect);
+            bitwise_or(maskAllRoi, roiMask, maskAllRoi);
+#endif
+        }
+    }
+#ifdef DEBUG_SHOW_IMAGE
+    cv::Mat overlay = cv::Mat::zeros(colorWarped.size(), CV_8UC3);
+    overlay.setTo(cv::Scalar(0, 255, 255), maskAll);
+    addWeighted(overlay, 0.4, display, 0.6, 0, display);
+
+    std::stringstream ss;
+    ss << "Testing HSV(" << h << "," << s << "," << v << ")";
+    putText(display, ss.str(), cv::Point(10, 20), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
+    imshow("Warped"+name, display);
+#endif
+    return matrix;
+}
+
 bool ChessImageProcessing::detectMovePhase3Classification()
 {
     return true;
@@ -340,7 +570,7 @@ std::vector<std::vector<int>> ChessImageProcessing::getPieceMatrix(const cv::Mat
 //    for(int loop = 0; loop < params.numLoopCheckPiece; loop++)
     {
 
-        int loop = 7;
+        int loop = 1;
         cv::Mat closed;
         if(loop == 0) {
             closed = edges.clone();
@@ -436,6 +666,18 @@ std::vector<std::vector<int>> ChessImageProcessing::getPieceMatrix(const cv::Mat
     cv::imshow(show_name, edgesClone);
 #endif
     return mat;
+}
+
+std::vector<std::vector<int>> ChessImageProcessing::getPieceMatrixColor(const cv::Mat& color, const MoveDetectParams& params,
+                                                                        std::string show_name) {
+    std::vector<std::vector<int>> matColorPieces(8, std::vector<int>(8, 0));
+    cv::Mat hsvWarp;
+    cv::cvtColor(color, hsvWarp, cv::COLOR_BGR2HSV);
+    if(params.playerSide == "white")
+        matColorPieces = cellColorFilterToMatrix(hsvWarp,cv::Vec3b(75,8,102),90,87,12,63,5,28,show_name+"White");
+    else
+        matColorPieces = cellColorFilterToMatrix(hsvWarp,cv::Vec3b(22,160,138),55,87,12,61,10,28,show_name+"Black");
+    return matColorPieces;
 }
 
 bool getCenterOfPoints(const cv::Mat& binary_img, cv::Point& center) {
@@ -790,10 +1032,10 @@ std::vector<cv::Point> ChessImageProcessing::matchStartToCandidates(const cv::Ma
 //        if (dist <= colorThreshold) {
         bool cellIsSameColor = false;
         if(params.playerSide == "white") {
-            cellIsSameColor = !filterCellColor(warpedEndColor(croi),cv::Vec3b(20,124,157),10,156,106,59,50,25,
+            cellIsSameColor = filterCellColor(warpedEndColor(croi),cv::Vec3b(64,4,107),55,87,12,61,10,28,
                                                   std::to_string(cand.x)+","+std::to_string(cand.y));
         } else {
-            cellIsSameColor = filterCellColor(warpedEndColor(croi),cv::Vec3b(20,124,157),10,156,106,59,50,25,
+            cellIsSameColor = !filterCellColor(warpedEndColor(croi),cv::Vec3b(64,4,107),55,87,12,61,10,28,
                                                   std::to_string(cand.x)+","+std::to_string(cand.y));
         }
         if(cellIsSameColor) {

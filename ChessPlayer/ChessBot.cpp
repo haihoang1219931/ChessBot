@@ -1,3 +1,4 @@
+#include <QElapsedTimer>
 #include <QThread>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -25,14 +26,15 @@ ChessBot::ChessBot(QThread *parent) :
     QThread(parent),
     m_validCalibFileFound(false)
 {
+    m_side = 0;
     m_mutex = new QMutex;
     m_pauseCond = new QWaitCondition;
     m_chessController = new ChessController();
     m_detectParams = new MoveDetectParams();
-    m_detectParams->roi_percent = 100;
-    m_detectParams->diff_thresh = 255;
-    m_detectParams->canny_low = 500;
-    m_detectParams->pieceMinPoints = 500;
+    m_detectParams->roi_percent = 80;
+    m_detectParams->diff_thresh = 30;
+    m_detectParams->canny_low = 14;
+    m_detectParams->pieceMinPoints = 400;
     m_detectParams->pieceRoiPercent = 100;
     m_detectParams->playerSide = m_side == 0?
                 "white":"black";
@@ -67,37 +69,41 @@ ChessBot::~ChessBot()
     stopService();
 }
 #ifdef IMAGE_PROCESS_MOVE
+bool openFirstTime = false;
 bool readFrame(cv::Mat& outImg)
 {
+    QElapsedTimer timer;
+    timer.start();
     bool readResult = false;
     if (!cap.isOpened()) {
         cap.open(0);
-        cap.set(cv::CAP_PROP_FRAME_WIDTH,640);
-        cap.set(cv::CAP_PROP_FRAME_HEIGHT,360);
-        // 1. TURN OFF AUTO EXPOSURE (Switch to Manual Mode)
-        // For Linux/V4L2 backends: 1 = Manual, 3 = Auto
-        // For Windows/DSHOW backends: 0.25 = Manual (sometimes 0)
-        bool turnedOff = cap.set(cv::CAP_PROP_AUTO_EXPOSURE, 1);
-
-        if (!turnedOff) {
-            // Fallback value try for specific backends like macOS/DirectShow
-            cap.set(cv::CAP_PROP_AUTO_EXPOSURE, 0.25);
+//        if(!openFirstTime)
+        {
+            cap.set(cv::CAP_PROP_FRAME_WIDTH,1280);
+            cap.set(cv::CAP_PROP_FRAME_HEIGHT,960);
+            cap.set(cv::CAP_PROP_BUFFERSIZE, 1);
+            openFirstTime = true;
+            for(int i=0; i< 2;i++) {
+//                cap.read(outImg);
+                cap.grab();
+//                QThread::msleep(30);
+                printf(".");
+            }
         }
-
-        // 2. SET THE MANUAL EXPOSURE VALUE
-        // Note: Value scaling varies wildly by hardware (e.g., -1 to -7, or 1 to 5000)
-        int targetExposure = -5;
-        cap.set(cv::CAP_PROP_EXPOSURE, targetExposure);
-
-        // Verify settings in console
-        std::cout << "Auto Exposure Mode: " << cap.get(cv::CAP_PROP_AUTO_EXPOSURE) << std::endl;
-        std::cout << "Manual Exposure Value: " << cap.get(cv::CAP_PROP_EXPOSURE) << std::endl;
-
     }
     if (cap.isOpened()) {
+        timer.start();
         readResult = cap.read(outImg);
+        // 3. Get the elapsed time
+        qint64 milliSeconds = timer.elapsed();
+
+        qDebug() << "Single capture took" << milliSeconds << "milliseconds.";
         cap.release();
     }
+    // 3. Get the elapsed time
+    qint64 milliSeconds = timer.elapsed();
+
+    qDebug() << "The read frame took" << milliSeconds << "milliseconds.";
     return readResult;
 }
 #endif
@@ -125,8 +131,8 @@ void ChessBot::updateCorners(QVariantList corners)
     m_chessboardConners.clear();
     for (const QVariant &val : corners) {
         QVariantMap map = val.toMap();
-        int x = map["x"].toInt();
-        int y = map["y"].toInt();
+        int x = map["x"].toInt()*2;
+        int y = map["y"].toInt()*2;
 
         m_chessboardConners.append(QPoint(map["x"].toInt(),map["y"].toInt()));
     }
@@ -380,7 +386,6 @@ uint8_t ChessBot::playDetectMove()
     if(!readFrame(imageAfter)){
         return STATE_DONE_FAIL;
     }
-
     if(!imageBefore.empty() && !imageAfter.empty()) {
         cv::imwrite("imageBefore.jpg",imageBefore);
         cv::imwrite("imageAfter.jpg",imageAfter);
@@ -1357,7 +1362,8 @@ bool ChessBot::loadCalibrationData(QString fileName)
     QJsonArray calibArr = root.value("camera_calibration").toArray();
     for (const QJsonValue &val : calibArr) {
         QJsonObject obj = val.toObject();
-        m_chessboardConners.append(QPoint(obj.value("x").toInt(), obj.value("y").toInt()));
+        m_chessboardConners.append(QPoint(obj.value("x").toInt()*2,
+                                          obj.value("y").toInt()*2));
     }
 #ifdef IMAGE_PROCESS_MOVE
     if(m_chessboardConners.size() == 4)
@@ -1367,10 +1373,10 @@ bool ChessBot::loadCalibrationData(QString fileName)
                 m_chessboardConners[2].x(),m_chessboardConners[2].y(),
                 m_chessboardConners[3].x(),m_chessboardConners[3].y());
 
-//        cv::Mat src1 = cv::imread("28_1.jpg");
-//        cv::Mat src2 = cv::imread("28_2.jpg");
+//        cv::Mat src1 = cv::imread("color/0007.jpg");
+//        cv::Mat src2 = cv::imread("color/0008.jpg");
 //        if(!src1.empty() && !src2.empty()) {
-//            std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves(src1, src2, "white");
+//            std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves(src1, src2, *m_detectParams);
 //            for(int i = 0; i< chessMoves.size(); i++) {
 //                qDebug("Possible Move %s",chessMoves[i].c_str());
 //            }
@@ -1555,8 +1561,8 @@ QVariantList ChessBot::chessboardCorners() const {
     qDebug("Number of m_chessboardConners %d",m_chessboardConners.size());
     for (const QPoint &corner : m_chessboardConners) {
         QVariantMap pointMap;
-        pointMap["x"] = corner.x();
-        pointMap["y"] = corner.y();
+        pointMap["x"] = corner.x()/2;
+        pointMap["y"] = corner.y()/2;
         rootList.append(pointMap);
     }
     return rootList;

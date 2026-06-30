@@ -18,7 +18,7 @@ FocusScope {
     Camera {
         id: camera
         viewfinder {
-            resolution: "640x360"
+            resolution: "1280x960"
         }
     }
 

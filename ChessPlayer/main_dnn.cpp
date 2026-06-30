@@ -1,241 +1,132 @@
-#include <opencv2/opencv.hpp>
-#include <opencv2/dnn.hpp>
-#include <iostream>
-#include <fstream>
+//#include <opencv2/opencv.hpp>
+//#include <iostream>
+//#include <chrono>
+//#include <iomanip>
+//#include <sstream>
+//#include <algorithm>
 
-using namespace cv;
-using namespace cv::dnn;
-using namespace std;
+//// Trackbar callback placeholder
+//void on_trackbar(int, void*) {}
 
-static Mat g_img;
-static vector<Point2f> g_corners;
-static Mat g_warp;
-static bool g_warpReady = false;
-static Net g_net;
-static vector<string> g_labels;
-static Size g_inputSize(256,256);
+//// Function to generate a timestamped filename
+//std::string getTimestampFilename() {
+//    auto now = std::chrono::system_clock::now();
+//    auto in_time_t = std::chrono::system_clock::to_time_t(now);
 
-void drawCornersAndShow() {
-    Mat disp = g_img.clone();
-    for (size_t i = 0; i < g_corners.size(); ++i) {
-        circle(disp, g_corners[i], 6, Scalar(0, 255, 0), -1);
-        putText(disp, to_string((int)i+1), g_corners[i] + Point2f(6.f, -6.f), FONT_HERSHEY_SIMPLEX, 0.6, Scalar(0,255,0), 2);
-    }
-    imshow("Input", disp);
-}
+//    std::stringstream ss;
+//    // Format: cap_YYYYMMDD_HHMMSS.jpg
+//    ss << "cap_" << std::put_time(std::localtime(&in_time_t), "%Y%m%d_%H%M%S") << ".jpg";
+//    return ss.str();
+//}
 
-void computeWarp() {
-    if (g_corners.size() != 4) return;
-    vector<Point2f> dst{
-        Point2f(0,0), Point2f(640-1,0), Point2f(640-1,640-1), Point2f(0,640-1)
-    };
-    Mat M = getPerspectiveTransform(g_corners, dst);
-    warpPerspective(g_img, g_warp, M, Size(640,640));
-    g_warpReady = true;
-    imshow("Warped", g_warp);
-}
+//int main() {
+//    // Open camera using platform-optimized backends
+//#if defined(__linux__)
+//    cv::VideoCapture cap(1, cv::CAP_V4L2);
+//#elif defined(_WIN32)
+//    cv::VideoCapture cap(0, cv::CAP_DSHOW);
+//#else
+//    cv::VideoCapture cap(0);
+//#endif
 
-void onMouse(int event, int x, int y, int flags, void* userdata) {
-    if (event == EVENT_LBUTTONDOWN) {
-        if (g_corners.size() < 4) {
-            g_corners.emplace_back((float)x, (float)y);
-            drawCornersAndShow();
-            if (g_corners.size() == 4) computeWarp();
-        }
-    } else if (event == EVENT_RBUTTONDOWN) {
-        // reset
-        g_corners.clear();
-        g_warpReady = false;
-        destroyWindow("Warped");
-        imshow("Input", g_img);
-    }
-}
+//    if (!cap.isOpened()) {
+//        std::cerr << "Error: Could not open camera." << std::endl;
+//        return -1;
+//    }
 
-bool loadLabels(const string &path, vector<string> &labels) {
-    if (path.empty()) return false;
-    ifstream ifs(path);
-    if (!ifs.is_open()) return false;
-    string line;
-    while (getline(ifs, line)) {
-        if (!line.empty()) {
-            labels.push_back(line);
-            std::cout << "label: " << line << std::endl;
-        }
-    }
-    return !labels.empty();
-}
+//    std::string winName = "Camera Controls";
+//    cv::namedWindow(winName, cv::WINDOW_AUTOSIZE);
 
-static Mat sigmoidMat(const Mat &m) {
-    Mat out;
-    m.convertTo(out, CV_32F);
-    // apply sigmoid elementwise
-    out.forEach<float>([](float &v, const int * pos) {
-        v = 1.0f / (1.0f + std::exp(-v));
-    });
-    return out;
-}
+//    // --- INITIAL VALUE SETTINGS ---
+//    // OpenCV normalized properties typically expect values mapped from 0 to 100 or 0 to 255.
+//    int auto_exposure = 1;
+//    int exposure_val  = 50;
+//    int auto_wb       = 1;
+//    int wb_temp       = 5000;
+//    int brightness    = 50;  // Default halfway midtone
+//    int contrast      = 50;  // Default halfway contrast
+//    int hue           = 50;  // Default halfway hue tint
 
-void runRecognitionAndShow() {
-    if (!g_warpReady) return;
-    Mat vis; cvtColor(g_warp, vis, COLOR_BGR2RGB); // keep color
-    int cellW = g_warp.cols / 1;
-    int cellH = g_warp.rows / 1;
+//    // --- CREATE ALL TRACKBARS ---
+//    cv::createTrackbar("Auto Exposure (0=Off, 1=On)", winName, &auto_exposure, 1, on_trackbar);
+//    cv::createTrackbar("Exposure Value", winName, &exposure_val, 100, on_trackbar);
+//    cv::createTrackbar("Auto White Balance", winName, &auto_wb, 1, on_trackbar);
+//    cv::createTrackbar("WB Temp (Kelvin/Steps)", winName, &wb_temp, 10000, on_trackbar);
 
-    // helper to access raw float pointer for 4D Mat [N,C,H,W]
-    auto get4 = [&](const Mat &m, int n, int c, int h, int w)->float {
-        // assume continuous
-        const float* data = (const float*)m.ptr<float>(0);
-        int C = m.size[1];
-        int H = m.size[2];
-        int W = m.size[3];
-        size_t idx = ((size_t)n * C + c);
-        idx = (idx * H + h);
-        idx = (idx * W + w);
-        return data[idx];
-    };
-    int r = 0;
-    int c = 0;
-//    for (int r = 0; r < 8; ++r)
-    {
-//        for (int c = 0; c < 8; ++c)
-        {
-            Rect cell(c*cellW, r*cellH, cellW, cellH);
-            Mat roi = g_warp(cell);
-            Mat input;
-            resize(roi, input, g_inputSize);
-            Mat blob = blobFromImage(input, 1.0/255.0, g_inputSize, Scalar(), true, false);
-            g_net.setInput(blob);
-            Mat out = g_net.forward();
+//    // New hardware trackbars
+//    cv::createTrackbar("Brightness", winName, &brightness, 255, on_trackbar);
+//    cv::createTrackbar("Contrast", winName, &contrast, 255, on_trackbar);
+//    cv::createTrackbar("Hue", winName, &hue, 128, on_trackbar);
 
-            int classId = -1;
-            float confidence = 0.0f;
+//    cv::Mat frame;
+//    std::cout << "==========================================" << std::endl;
+//    std::cout << " Controls:" << std::endl;
+//    std::cout << "  Press 'S' or 's' to Save a timestamped JPG" << std::endl;
+//    std::cout << "  Press 'ESC' to Exit" << std::endl;
+//    std::cout << "==========================================" << std::endl;
 
-            // DEBUG: print out dims
-            // cout << "out.dims=" << out.dims << " total=" << out.total() << "\n";
+//    while (true) {
+//        cap >> frame;
+//        if (frame.empty()) {
+//            std::cerr << "Blank frame grabbed." << std::endl;
+//            break;
+//        }
 
-            if ((int)out.total() == (int)g_labels.size()) {
-                // flat vector of class scores
-                Mat vec = out.reshape(1, 1);
-                double minv, maxv; Point minLoc, maxLoc;
-                minMaxLoc(vec, &minv, &maxv, &minLoc, &maxLoc);
-                classId = maxLoc.x;
-                confidence = (float)maxv;
-            } else if (out.dims == 4) {
-                int N = out.size[0];
-                int Cn = out.size[1];
-                int Hn = out.size[2];
-                int Wn = out.size[3];
-                if (Cn == (int)g_labels.size() && Hn == 1 && Wn == 1) {
-                    // shape [1, C, 1, 1] -> class scores
-                    double best = -1e9; int bestc = -1;
-                    for (int ch = 0; ch < Cn; ++ch) {
-                        float v = get4(out, 0, ch, 0, 0);
-                        if (v > best) { best = v; bestc = ch; }
-                    }
-                    classId = bestc; confidence = (float)best;
-                } else if (Cn == 1) {
-                    // single-channel segmentation: take mean probability after sigmoid
-                    Mat map(Hn, Wn, CV_32F);
-                    for (int yy = 0; yy < Hn; ++yy) for (int xx = 0; xx < Wn; ++xx) map.at<float>(yy,xx) = get4(out,0,0,yy,xx);
-                    Mat prob = sigmoidMat(map);
-                    Scalar avg = mean(prob);
-                    // if average probability high -> mark occupied; choose label 'unknown' (index 0 = empty)
-                    // find best label: if occupied -> pick first non-empty label index 1
-                    if (avg[0] > 0.2f) {
-                        // approximate: pick label with highest prior (not available) => mark as unknown; use label 1 if exists
-                        if ((int)g_labels.size() > 1) classId = 1; else classId = 0;
-                    } else {
-                        classId = 0; // empty
-                    }
-                    confidence = (float)avg[0];
-                } else if (Cn > 1) {
-                    // multiclass per-pixel segmentation [1,C,H,W] -> compute mode across pixels
-                    vector<int> counts(Cn, 0);
-                    for (int yy = 0; yy < Hn; ++yy) {
-                        for (int xx = 0; xx < Wn; ++xx) {
-                            int bestc = 0; float bestv = get4(out,0,0,yy,xx);
-                            for (int ch = 1; ch < Cn; ++ch) {
-                                float v = get4(out,0,ch,yy,xx);
-                                if (v > bestv) { bestv = v; bestc = ch; }
-                            }
-                            counts[bestc]++;
-                        }
-                    }
-                    int bestc = 0; int bestcnt = counts[0];
-                    for (int ch = 1; ch < Cn; ++ch) if (counts[ch] > bestcnt) { bestcnt = counts[ch]; bestc = ch; }
-                    classId = bestc;
-                    confidence = (float)bestcnt / (float)(Hn * Wn);
-                }
-            } else if (out.total() == 1) {
-                // single scalar probability
-                float v = out.at<float>(0);
-                classId = (v > 0.5f && g_labels.size()>1) ? 1 : 0;
-                confidence = v;
-            } else {
-                // fallback: try argmax on flattened vector
-                Mat vec = out.reshape(1, 1);
-                double minv, maxv; Point minLoc, maxLoc;
-                minMaxLoc(vec, &minv, &maxv, &minLoc, &maxLoc);
-                classId = maxLoc.x % (int)g_labels.size();
-                confidence = (float)maxv;
-            }
+//        // --- 1. EXPOSURE CONTROLS ---
+//        if (auto_exposure == 0) {
+//#if defined(__linux__)
+//            cap.set(cv::CAP_PROP_AUTO_EXPOSURE, 1);
+//            cap.set(cv::CAP_PROP_EXPOSURE, exposure_val * 10);
+//#else
+//            cap.set(cv::CAP_PROP_AUTO_EXPOSURE, 0);
+//            cap.set(cv::CAP_PROP_EXPOSURE, -1 * (exposure_val / 8));
+//#endif
+//        } else {
+//#if defined(__linux__)
+//            cap.set(cv::CAP_PROP_AUTO_EXPOSURE, 3);
+//#else
+//            cap.set(cv::CAP_PROP_AUTO_EXPOSURE, 1);
+//#endif
+//        }
 
-            string label = "?";
-            if (classId >= 0 && classId < (int)g_labels.size()) label = g_labels[classId];
-            // draw
-            rectangle(vis, cell, Scalar(0,255,0), 1);
-            string text = label;
-//            text += " " + to_string((int)(confidence*100)) + "%";
-            int baseline=0;
-            Size tsize = getTextSize(text, FONT_HERSHEY_SIMPLEX, 0.4, 1, &baseline);
-            int tx = cell.x + (cell.width - tsize.width)/2;
-            int ty = cell.y + (cell.height + tsize.height)/2;
-            putText(vis, text, Point(tx, ty), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,255), 1);
-        }
-    }
-    cvtColor(vis, vis, COLOR_BGR2RGB);
-    imshow("Warped DNN", vis);
-}
+//        // --- 2. WHITE BALANCE CONTROLS ---
+//        if (auto_wb == 0) {
+//            cap.set(cv::CAP_PROP_AUTO_WB, 0);
+//            cap.set(cv::CAP_PROP_WB_TEMPERATURE, std::max(2000, wb_temp));
+//        } else {
+//            cap.set(cv::CAP_PROP_AUTO_WB, 1);
+//        }
 
-int main(int argc, char** argv) {
-    if (argc < 3) {
-        cout << "Usage: " << argv[0] << " <image> <model.onnx> [labels.txt] [input_w] [input_h]" << endl;
-        return 0;
-    }
-    string imgPath = argv[1];
-    string modelPath = argv[2];
-    string labelsPath = (argc >= 4) ? argv[3] : string();
-    if (argc >= 5) g_inputSize.width = atoi(argv[4]);
-    if (argc >= 6) g_inputSize.height = atoi(argv[5]);
+//        // --- 3. BRIGHTNESS, CONTRAST, & HUE CONTROLS ---
+//        // Scale slider values (0-100) to typical driver ranges (maps nicely via fractions)
+//        cap.set(cv::CAP_PROP_BRIGHTNESS, brightness / 100.0);
+//        cap.set(cv::CAP_PROP_CONTRAST, contrast / 100.0);
+//        cap.set(cv::CAP_PROP_HUE, hue / 100.0);
 
-    g_img = imread(imgPath);
-    if (g_img.empty()) { cerr << "Failed to load image" << endl; return -1; }
+//        // Show live feed frame
+//        cv::imshow(winName, frame);
 
-    // load network
-    try {
-        g_net = readNet(modelPath);
-    } catch (const std::exception &ex) {
-        cerr << "Failed to load model: " << ex.what() << endl; return -1;
-    }
-    g_net.setPreferableBackend(DNN_BACKEND_DEFAULT);
-    g_net.setPreferableTarget(DNN_TARGET_CPU);
+//        // Check for keyboard triggers
+//        int key = cv::waitKey(30);
 
-    if (!labelsPath.empty()) loadLabels(labelsPath, g_labels);
+//        if (key == 27) { // ESC key to exit
+//            break;
+//        }
+//        else if (key == 's' || key == 'S') { // S key to save frame
+//            std::string filename = getTimestampFilename();
 
-    namedWindow("Input", WINDOW_NORMAL);
-    imshow("Input", g_img);
-    setMouseCallback("Input", onMouse, nullptr);
+//            // Save the frame with 95% JPEG quality
+//            bool saved = cv::imwrite(filename, frame, {cv::IMWRITE_JPEG_QUALITY, 95});
 
-    cout << "Click 4 corners (clockwise) to warp board. Right-click to reset corners." << endl;
+//            if (saved) {
+//                std::cout << "[SUCCESS] Saved frame as: " << filename << std::endl;
+//            } else {
+//                std::cerr << "[ERROR] Failed to save image file." << std::endl;
+//            }
+//        }
+//    }
 
-    while (true) {
-        int k = waitKey(10);
-        if (k == 27) break;
-        if (g_warpReady) {
-            runRecognitionAndShow();
-            // small delay to avoid busy loop
-            waitKey(0);
-        }
-    }
-    return 0;
-}
+//    cap.release();
+//    cv::destroyAllWindows();
+//    return 0;
+//}

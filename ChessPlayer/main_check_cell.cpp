@@ -21,7 +21,7 @@
 //#define WARP_SIZE 320
 
 //// --- GLOBAL: interactive Canny threshold ---
-//static int g_canny_threshold = 93;
+//static int g_canny_threshold = 14;
 
 //// --- GLOBAL: zoom state for Raw edges window ---
 //static bool g_zoomEnabled = false;

@@ -20,9 +20,9 @@
 struct MoveDetectParams {
     int threshold = 500;         // general threshold (unused currently)
     int roi_percent = 80;       // ROI percent of cell used for diff counting
-    int canny_low = 93;         // Canny low threshold
+    int canny_low = 14;         // Canny low threshold
     int diff_thresh = 30;       // threshold for absdiff -> binary
-    int pieceMinPoints = 300;   // minimum edge points to consider a piece present
+    int pieceMinPoints = 200;   // minimum edge points to consider a piece present
     int pieceRoiPercent = 80;  // ROI percent for piece detection
     int colorThreshold = 93;  // Color threshold
     int numLoopCheckPiece = 5;  // Color threshold
@@ -49,6 +49,11 @@ public:
     bool detectMovePhase1Binary(const cv::Mat& edges1, const cv::Mat& edges2,
                                 std::vector<cv::Point>& starts, std::vector<cv::Point>& ends,
                                 const MoveDetectParams& params);
+    bool detectMovePhase1ColorFilter(const cv::Mat& color1, const cv::Mat& color2,
+                                std::vector<cv::Point>& starts, std::vector<cv::Point>& ends,
+                                const MoveDetectParams& params,
+                                std::vector<std::vector<int>>& matColorMapBefore,
+                                std::vector<std::vector<int>>& matColorMapAfter);
     // now accepts a params struct rather than many separate arguments
     bool detectMovePhase2Substraction(const cv::Mat& img_start, const cv::Mat& img_end,
                                       const MoveDetectParams& params,
@@ -56,12 +61,22 @@ public:
     std::vector<std::string> detectMovePhase3ColorMatching(const cv::Mat& warped1, const cv::Mat& warped2,
                                     const std::vector<cv::Point>& startCells, std::vector<cv::Point> listChangedCell,
                                     const MoveDetectParams& params);
+    std::vector<std::string> detectMovePhase3ColorMatchingFromFilter(const std::vector<cv::Point>& startCells,
+                                    std::vector<cv::Point> listChangedCell,
+                                    const MoveDetectParams& params,
+                                    const std::vector<std::vector<int>> matColorMapBefore,
+                                    const std::vector<std::vector<int>> matColorMapAfter);
+    std::vector < std::vector < int >> cellColorFilterToMatrix(const cv::Mat& colorWarped, cv::Vec3b targetHSV,
+                                                  int hTol, int sTol, int vTol,
+                                                  int roiPercent, int minWhitePercent, int maxBlackPercent,
+                                                  std::string name);
     bool detectMovePhase3Classification();
     std::string coordToNotation(cv::Point pt, const std::string& playerSide);
     cv::Point notationToCoord(const std::string& notation, const std::string& playerSide);
     bool getCenterOfWhitePixels(const cv::Mat& binary_img, cv::Point& center);
     bool isChessPieceCell(const cv::Mat& edges, int c, int r, int sq, int min_points, int roi_percent, cv::Mat& display);
     std::vector<std::vector<int>> getPieceMatrix(const cv::Mat& gray, int sq, const MoveDetectParams& params, std::string show_name);
+    std::vector<std::vector<int>> getPieceMatrixColor(const cv::Mat& color, const MoveDetectParams& params, std::string show_name);
     void comparePieceMatrices(const std::vector<std::vector<int>>& mat1, const std::vector<std::vector<int>>& mat2,
                               std::vector<cv::Point>& starts, std::vector<cv::Point>& ends);
     // findPossibleMoves now takes a MoveDetectParams struct

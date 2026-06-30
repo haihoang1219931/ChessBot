@@ -20,12 +20,12 @@
 
 //static Vec3b sampledHSV = Vec3b(0, 0, 0);
 //static bool hasSample = false;
-//static int hTolSample = 10;
-//static int sTolSample = 60;
-//static int vTolSample = 60;
+//static int hTolSample = 55;
+//static int sTolSample = 87;
+//static int vTolSample = 12;
 //static int roiPercentSample = 60;
 
-//static int minWhitePercentSample = 70;
+//static int minWhitePercentSample = 10;
 //static int maxBlackPercentSample = 25;
 
 //// Calibration slots
@@ -52,7 +52,20 @@
 //static int minWhitePercentCalibrated[5] = {70,86,20};
 //static int maxBlackPercentCalibrated[5] = {25,25,25};
 
-//const int WARP_SIZE = 800;
+//const int WARP_SIZE = 640;
+
+
+//// Helper to print matrix properties cleanly to the console log
+//static void printMatrix(const string & name,
+//                        const vector < vector < int >> & mat) {
+//    cout << "\n--- 8x8 Matrix: " << name << " ---" << endl;
+//    for (int r = 0; r < 8; ++r) {
+//        for (int c = 0; c < 8; ++c) {
+//            cout << mat[r][c] << " ";
+//        }
+//        cout << endl;
+//    }
+//}
 
 //static void drawCornersAndShow() {
 //    Mat disp = img.clone();
@@ -170,7 +183,7 @@
 //        imshow("Warped", display);
 //        imshow("Mask", maskAll);
 //    }
-
+//    printMatrix("matrix",matrix);
 //    return matrix;
 //}
 
@@ -215,18 +228,6 @@
 //                  hTolSample,sTolSample,vTolSample,
 //                  roiPercentSample,minWhitePercentSample,maxBlackPercentSample,
 //                  true);
-//}
-
-//// Helper to print matrix properties cleanly to the console log
-//static void printMatrix(const string & name,
-//                        const vector < vector < int >> & mat) {
-//    cout << "\n--- 8x8 Matrix: " << name << " ---" << endl;
-//    for (int r = 0; r < 8; ++r) {
-//        for (int c = 0; c < 8; ++c) {
-//            cout << mat[r][c] << " ";
-//        }
-//        cout << endl;
-//    }
 //}
 
 //int main(int argc, char ** argv) {
