@@ -14,18 +14,12 @@
 #include "ChessBot.h"
 #include "chessAlgo/ChessController.h"
 
-#ifdef IMAGE_PROCESS_MOVE
-    #include "ChessImageProcessing.h"
-    static cv::VideoCapture cap;
-    static cv::Mat imageBefore,imageAfter;
-    static bool readFrame(cv::Mat& outImg);
-#endif
-
-
 ChessBot::ChessBot(QThread *parent) :
     QThread(parent),
     m_validCalibFileFound(false)
 {
+    m_width = 1920;
+    m_height = 1080;
     m_side = 0;
     m_mutex = new QMutex;
     m_pauseCond = new QWaitCondition;
@@ -70,28 +64,57 @@ ChessBot::~ChessBot()
 }
 #ifdef IMAGE_PROCESS_MOVE
 bool openFirstTime = false;
-bool readFrame(cv::Mat& outImg)
+bool ChessBot::readFrame(cv::Mat& outImg)
 {
     QElapsedTimer timer;
     timer.start();
     bool readResult = false;
     if (!cap.isOpened()) {
+        QElapsedTimer timer;
+        timer.start();
         cap.open(0);
+        qint64 milliSeconds = timer.elapsed();
+
+        qDebug() << "Open took" << milliSeconds << "milliseconds.";
 //        if(!openFirstTime)
         {
-            cap.set(cv::CAP_PROP_FRAME_WIDTH,1280);
-            cap.set(cv::CAP_PROP_FRAME_HEIGHT,960);
-            cap.set(cv::CAP_PROP_BUFFERSIZE, 1);
+            QElapsedTimer timer;
+            timer.start();
+            cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
+
+            // Set your target resolution
+            cap.set(cv::CAP_PROP_FRAME_WIDTH, m_width);
+            cap.set(cv::CAP_PROP_FRAME_HEIGHT, m_height);
+
+            // Set your target frame rate
+            cap.set(cv::CAP_PROP_FPS, 30);
+
+            // Verify what the hardware actually set (some cameras fallback if unsupported)
+            double actual_width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
+            double actual_height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
+            double actual_fps = cap.get(cv::CAP_PROP_FPS);
+
+            std::cout << "Capture initialized: " << actual_width << "x" << actual_height
+                      << " @ " << actual_fps << " FPS" << std::endl;
+
+            qint64 milliSeconds = timer.elapsed();
+
+            qDebug() << "Set property took" << milliSeconds << "milliseconds.";
             openFirstTime = true;
-            for(int i=0; i< 2;i++) {
+            timer.start();
+            for(int i=0; i< 0;i++) {
 //                cap.read(outImg);
                 cap.grab();
 //                QThread::msleep(30);
                 printf(".");
             }
+            milliSeconds = timer.elapsed();
+
+            qDebug() << "grap 2 images took" << milliSeconds << "milliseconds.";
         }
     }
     if (cap.isOpened()) {
+        QElapsedTimer timer;
         timer.start();
         readResult = cap.read(outImg);
         // 3. Get the elapsed time
@@ -131,8 +154,8 @@ void ChessBot::updateCorners(QVariantList corners)
     m_chessboardConners.clear();
     for (const QVariant &val : corners) {
         QVariantMap map = val.toMap();
-        int x = map["x"].toInt()*2;
-        int y = map["y"].toInt()*2;
+        int x = map["x"].toInt()*m_width/640;
+        int y = map["y"].toInt()*m_height/360;
 
         m_chessboardConners.append(QPoint(map["x"].toInt(),map["y"].toInt()));
     }
@@ -211,10 +234,22 @@ void ChessBot::run()
     qDebug("Dowork finished");
 }
 
+void ChessBot::playInputMove(int startIndex, int stopIndex) {
+    if(m_chessController->moveByUiSquares(startIndex,stopIndex)) {
+        m_state = STATE_PLAY;
+        m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
+        togglePause(false);
+        startService();
+    } else {
+        qDebug("Invalid input move");
+    }
+
+}
 void ChessBot::playLoop()
 {
     switch (m_statePlay) {
     case PLAY_SETUP: {
+        qDebug("PLAY_SETUP");
 #ifdef IMAGE_PROCESS_MOVE
         readFrame(imageBefore);
         qDebug("First image [%d,%d]",
@@ -340,8 +375,27 @@ bool ChessBot::playCheckDoubleMove()
 
 bool ChessBot::canMoveStraight(int startRow, int startCol, int stopRow, int stopCol)
 {
+    bool foundBlockingPiece = false;
+    // reject move outside 3x3 block
     if(abs(startCol - stopCol) > 2 || abs(startRow - stopRow) > 2) return false;
-    return true;
+    // check pieces inside 3x3 block
+    QStringList board = m_chessController->board();
+    int minRow = std::min(startRow,stopRow);
+    int maxRow = std::max(startRow,stopRow);
+    int minCol = std::min(startCol,stopCol);
+    int maxCol = std::max(startCol,stopCol);
+    for(int row = minRow; row<= maxRow; row++) {
+        for(int col = minCol; col <= maxCol; col++) {
+            printf("row[%d] col[%d] %s\r\n",row,col,board[row*8+col].toStdString().c_str());
+            if((row == minRow && col == minCol) ||
+                (row == maxRow && col == maxRow))
+                continue;
+            if(board[row*8+col] != "") {
+                foundBlockingPiece = true;
+            }
+        }
+    }
+    return !foundBlockingPiece;
 }
 
 bool ChessBot::playCheckEndGame()
@@ -1362,9 +1416,10 @@ bool ChessBot::loadCalibrationData(QString fileName)
     QJsonArray calibArr = root.value("camera_calibration").toArray();
     for (const QJsonValue &val : calibArr) {
         QJsonObject obj = val.toObject();
-        m_chessboardConners.append(QPoint(obj.value("x").toInt()*2,
-                                          obj.value("y").toInt()*2));
+        m_chessboardConners.append(QPoint(obj.value("x").toInt()*m_width/640,
+                                          obj.value("y").toInt()*m_height/360));
     }
+    qDebug("m_chessboardConners.size() %d",m_chessboardConners.size());
 #ifdef IMAGE_PROCESS_MOVE
     if(m_chessboardConners.size() == 4)
     {
@@ -1516,7 +1571,8 @@ void ChessBot::initRobotCommunication() {
 void ChessBot::processNextMove()
 {
     m_state = STATE_PLAY;
-    m_statePlay = PLAY_INIT;
+//    m_statePlay = PLAY_INIT;
+    m_statePlay = PLAY_INFORM_ERROR;
     togglePause(false);
     startService();
 }
@@ -1561,8 +1617,8 @@ QVariantList ChessBot::chessboardCorners() const {
     qDebug("Number of m_chessboardConners %d",m_chessboardConners.size());
     for (const QPoint &corner : m_chessboardConners) {
         QVariantMap pointMap;
-        pointMap["x"] = corner.x()/2;
-        pointMap["y"] = corner.y()/2;
+        pointMap["x"] = corner.x()*640/m_width;
+        pointMap["y"] = corner.y()*360/m_height;
         rootList.append(pointMap);
     }
     return rootList;
@@ -1580,6 +1636,8 @@ QObject* ChessBot::chessControllerObject() const
 void ChessBot::resetGame(){
     qDebug("Reset game side[%d]",m_side);
     m_chessController->newGame();
+    bool canMove = canMoveStraight(1,0,3,0);
+    printf("canMove = %s\r\n",canMove?"true":"false");
 }
 
 bool ChessBot::detectArduinoPort(int baudRate)

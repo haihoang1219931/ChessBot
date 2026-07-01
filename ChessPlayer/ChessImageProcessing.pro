@@ -51,7 +51,8 @@ SOURCES += chessDetector/ChessImageProcessing.cpp \
     main_mosse.cpp \
     main_dnn.cpp \
     main_dnn_origin.cpp \
-    main_gray_filter.cpp
+    main_gray_filter.cpp \
+    main_v4l2.cpp
 HEADERS += chessDetector/ChessImageProcessing.h
 }
 

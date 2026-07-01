@@ -52,7 +52,7 @@ void ChessImageProcessing::setCorners(float topLeftX, float topLeftY,
     corners.push_back(cv::Point2f(topRightX, topRightY));
     corners.push_back(cv::Point2f(bottomRightX, bottomRightY));
     corners.push_back(cv::Point2f(bottomLeftX, bottomLeftY));
-    m_transformMatrix = getPerspectiveTransform(corners, std::vector<cv::Point2f>{{0,0},{WARP_SIZE,0},{WARP_SIZE,WARP_SIZE},{0,640}});
+    m_transformMatrix = getPerspectiveTransform(corners, std::vector<cv::Point2f>{{0,0},{WARP_SIZE,0},{WARP_SIZE,WARP_SIZE},{0,WARP_SIZE}});
     m_transformMaxtrixValid = true;
 }
 cv::Mat ChessImageProcessing::getTranformMatrix() {

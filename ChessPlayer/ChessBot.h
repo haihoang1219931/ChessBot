@@ -18,7 +18,7 @@
 class ChessController;
 class MoveDetectParams;
 #ifdef IMAGE_PROCESS_MOVE
-class ChessImageProcessing;
+    #include "ChessImageProcessing.h"
 #endif
 
 typedef enum{
@@ -117,6 +117,7 @@ public Q_SLOTS:
     void disconnectCamera();
     void speakText(const QString &text);
     void speakMove(const QString &piece, const QString &move);
+    void playInputMove(int startIndex, int stopIndex);
 
 Q_SIGNALS:
     void detectFailed();
@@ -164,6 +165,9 @@ private:
     QTextToSpeech *m_speech;
 #ifdef IMAGE_PROCESS_MOVE
     ChessImageProcessing* m_moveDetector;
+    cv::VideoCapture cap;
+    cv::Mat imageBefore,imageAfter;
+    bool readFrame(cv::Mat& outImg);
 #endif
     QSerialPort *robotController;
     QString m_commandTest;
@@ -176,6 +180,8 @@ private:
     int m_levelType;
     int m_levelScore;
     int m_side;
+    int m_width;
+    int m_height;
     MoveDetectParams* m_detectParams;
     QString m_arduinoVersion;
     QVector<QPoint> m_chessboardConners; // 4 corners

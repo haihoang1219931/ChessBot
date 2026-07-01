@@ -8,8 +8,8 @@ FocusScope {
     signal exitPressed()
     // Trapezoid points: [Top-Left, Top-Right, Bottom-Right, Bottom-Left]
     property var points: [
-        {"x": 0, "y": 0}, {"x": 640, "y": 0},
-        {"x": 640, "y": 480}, {"x": 0, "y": 480},
+        {"x": 0, "y": 0}, {"x": 360, "y": 0},
+        {"x": 640, "y": 360}, {"x": 0, "y": 360},
     ]
     property int activeIndex: 0
     property bool isEditing: false
@@ -18,14 +18,16 @@ FocusScope {
     Camera {
         id: camera
         viewfinder {
-            resolution: "1280x960"
+            resolution: "1920x1080"
         }
     }
 
     // 2. Set up the VideoOutput
     VideoOutput {
         id: videoOutput
-        anchors.fill: parent
+        anchors.centerIn: parent
+        width: 640
+        height: 360
         source: camera
     }
 
@@ -40,7 +42,7 @@ FocusScope {
         id: canvas
         anchors.centerIn: parent
         width: 640
-        height: 480
+        height: 360
         focus: true
         onPaint: {
             var ctx = getContext("2d");

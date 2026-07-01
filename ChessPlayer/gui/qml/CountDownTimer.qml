@@ -10,9 +10,21 @@ Rectangle {
     signal goback()
     signal startGame()
     signal gobackLevelSelection()
-    Keys.onEscapePressed: root.goback()
-    Keys.onReturnPressed: root.startGame()
+    Keys.onEscapePressed: {
+        if(!chessboard.activeUserInput)
+            root.goback()
+        else
+            chessboard.cancelUserSelection();
+    }
+    Keys.onReturnPressed: {
+        root.startGame()
+        chessboard.updateUserSelection();
+    }
     Keys.onSpacePressed: backend.processNextMove()
+    Keys.onLeftPressed: chessboard.updateUserInput(-1)
+    Keys.onRightPressed: chessboard.updateUserInput(1)
+    Keys.onUpPressed: chessboard.updateUserInput(-8)
+    Keys.onDownPressed: chessboard.updateUserInput(8)
     property int levelType: 1
     property int levelScore: 200
     property int side: 0
@@ -20,6 +32,7 @@ Rectangle {
     property string player1Time: "02:51"
     property string player2Name: "Player"
     property string player2Time: "03:28"
+
     function openGameResult(result) {
         // 1. Set the source to your QML file
         if(myLoader.item === null)
@@ -157,6 +170,9 @@ Rectangle {
         onGameEnded: {
             console.log("Game end: "+endState);
             openGameResult(endState);
+        }
+        onDetectFailed: {
+            chessboard.enableUserInput(true);
         }
     }
 }
