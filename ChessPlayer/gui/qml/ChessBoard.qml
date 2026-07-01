@@ -24,10 +24,12 @@ Item {
         if(userInputIndexStop != -1) {
             userInputIndexStop = -1;
         } else if(userInputIndexStart != -1) {
+            userInputIndex = userInputIndexStart;
             userInputIndexStart = -1;
-        }
-        if(userInputIndexStop == -1 && userInputIndexStart == -1)
+        } else if(userInputIndexStop == -1 &&
+                  userInputIndexStart == -1) {
             activeUserInput = false;
+        }
     }
 
     function updateUserSelection() {

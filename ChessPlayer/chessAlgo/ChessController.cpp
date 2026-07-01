@@ -166,13 +166,6 @@ void ChessController::clickSquare(int uiIndex)
         return;
     }
 
-    if (!moveByUiSquares(m_selectedUiSquare, uiIndex))
-    {
-        clearSelection();
-        Q_EMIT boardChanged();
-        return;
-    }
-
     Q_EMIT boardChanged();
 }
 
@@ -227,7 +220,6 @@ bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex)
         return true;
     }
 
-    playEngineMove();
     return true;
 }
 

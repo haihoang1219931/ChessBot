@@ -24,6 +24,7 @@ ChessBot::ChessBot(QThread *parent) :
     m_mutex = new QMutex;
     m_pauseCond = new QWaitCondition;
     m_chessController = new ChessController();
+#ifdef IMAGE_PROCESS_MOVE
     m_detectParams = new MoveDetectParams();
     m_detectParams->roi_percent = 80;
     m_detectParams->diff_thresh = 30;
@@ -32,6 +33,7 @@ ChessBot::ChessBot(QThread *parent) :
     m_detectParams->pieceRoiPercent = 100;
     m_detectParams->playerSide = m_side == 0?
                 "white":"black";
+#endif
     // 1. Check if engines exist on your OS
     qDebug() << "Available TTS Engines:" << QTextToSpeech::availableEngines();
 
@@ -235,6 +237,7 @@ void ChessBot::run()
 }
 
 void ChessBot::playInputMove(int startIndex, int stopIndex) {
+    qDebug("======== playInputMove %d->%d",startIndex,stopIndex);
     if(m_chessController->moveByUiSquares(startIndex,stopIndex)) {
         m_state = STATE_PLAY;
         m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
@@ -259,6 +262,7 @@ void ChessBot::playLoop()
     }
         break;
     case PLAY_INIT: {
+        qDebug("PLAY_INIT");
         if(playCheckEndGame() == true)
             m_statePlay = PLAY_CHECK_CURRENT_MOVE;
         else
@@ -266,6 +270,7 @@ void ChessBot::playLoop()
     }
         break;
     case PLAY_CHECK_CURRENT_MOVE:{
+        qDebug("PLAY_CHECK_CURRENT_MOVE");
         if(!playCheckDoubleMove())
             m_statePlay = PLAY_DETECT_MOVE;
         else
@@ -273,6 +278,7 @@ void ChessBot::playLoop()
     }
         break;
     case PLAY_DETECT_MOVE: {
+        qDebug("PLAY_DETECT_MOVE");
         if(playDetectMove() == STATE_DONE_SUCCESS){
             m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
         } else {
@@ -281,18 +287,21 @@ void ChessBot::playLoop()
     }
         break;
     case PLAY_CALCULATE_NEXT_MOVE: {
+        qDebug("PLAY_CALCULATE_NEXT_MOVE");
         if(playCalculateNextMove() == STATE_DONE_SUCCESS){
             m_statePlay = PLAY_EXECUTE_NEXT_MOVE;
         }
     }
         break;
     case PLAY_EXECUTE_NEXT_MOVE: {
+        qDebug("PLAY_EXECUTE_NEXT_MOVE");
         if(playExecuteNextMove()== STATE_DONE_SUCCESS){
             m_statePlay = PLAY_INFORM_RESULT;
         }
     }
         break;
     case PLAY_INFORM_RESULT: {
+        qDebug("PLAY_INFORM_RESULT");
         if(playInformResult()== STATE_DONE_SUCCESS){
             m_statePlay = PLAY_PROCESS_DONE;
         }
@@ -307,6 +316,7 @@ void ChessBot::playLoop()
         break;
 
     case PLAY_PROCESS_DONE: {
+        qDebug("PLAY_PROCESS_DONE");
         playCheckEndGame();
         togglePause(true);
     }
@@ -386,7 +396,7 @@ bool ChessBot::canMoveStraight(int startRow, int startCol, int stopRow, int stop
     int maxCol = std::max(startCol,stopCol);
     for(int row = minRow; row<= maxRow; row++) {
         for(int col = minCol; col <= maxCol; col++) {
-            printf("row[%d] col[%d] %s\r\n",row,col,board[row*8+col].toStdString().c_str());
+//            printf("row[%d] col[%d] %s\r\n",row,col,board[row*8+col].toStdString().c_str());
             if((row == minRow && col == minCol) ||
                 (row == maxRow && col == maxRow))
                 continue;
@@ -433,10 +443,7 @@ uint8_t ChessBot::playDetectMove()
 {
     qDebug("playDetectMove");
     bool foundValidMove = false;
-#ifndef IMAGE_PROCESS_MOVE
-    if(playRandomMove() == STATE_DONE_SUCCESS)
-    foundValidMove = true;
-#else
+#ifdef IMAGE_PROCESS_MOVE
     if(!readFrame(imageAfter)){
         return STATE_DONE_FAIL;
     }
