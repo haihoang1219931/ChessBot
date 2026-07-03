@@ -632,7 +632,8 @@ uint8_t ChessBot::playCalculateNextMove()
                 'p',0,
                 canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x())?'-':'n');
     } else if(m_chessController->botMove().isCastling()) {
-        sprintf(robotCommand,"CST%d%d%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
+        sprintf(robotCommand,"CST%d%d%d%d%d%d%c",fromCoord.y(),fromCoord.x(),
+                toCoord.y(),toCoord.x() > fromCoord.x()?7:0,
                 0,0,'-');
     } else if(m_chessController->botMove().isEnPassant()) {
         sprintf(robotCommand,"pp%d%d%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
