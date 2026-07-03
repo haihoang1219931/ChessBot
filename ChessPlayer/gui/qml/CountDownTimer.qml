@@ -277,7 +277,7 @@ Rectangle {
             enablePromotionSelection(true);
         }
         onPlayTurnChanged:{
-            root.gameTurn = nextTurn;
+            root.gameTurn = root.side == 0 ? nextTurn:1-nextTurn;
         }
     }
 }

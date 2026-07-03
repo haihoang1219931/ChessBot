@@ -137,6 +137,7 @@ ApplicationWindow {
                                "player2Time": 600,
                            });
                 backend.setSide(side==="White"?0:1);
+                backend.resetGame()
             }
         }
     }

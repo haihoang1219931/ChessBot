@@ -129,12 +129,6 @@ void ChessController::newGame()
     refreshCheckState();
     setStatus("NEW_GAME");
     Q_EMIT sideToMoveChanged();
-
-    if (m_playerColor == 1) // player is Black — engine plays White's first move
-    {
-        playEngineMove();
-        Q_EMIT boardChanged();
-    }
 }
 
 void ChessController::clickSquare(int uiIndex)

@@ -310,6 +310,7 @@ void ChessBot::playLoop()
         break;
     case PLAY_CALCULATE_NEXT_MOVE: {
         qDebug("PLAY_CALCULATE_NEXT_MOVE");
+        sleep(5);
         if(playCalculateNextMove() == STATE_DONE_SUCCESS){
             m_statePlay = PLAY_EXECUTE_NEXT_MOVE;
         }
@@ -1672,8 +1673,12 @@ QObject* ChessBot::chessControllerObject() const
 void ChessBot::resetGame(){
     qDebug("Reset game side[%d]",m_side);
     m_chessController->newGame();
-    bool canMove = canMoveStraight(1,0,3,0);
-    printf("canMove = %s\r\n",canMove?"true":"false");
+    if(m_side == 1) {
+        m_state = STATE_PLAY;
+        m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
+        togglePause(false);
+        startService();
+    }
 }
 
 bool ChessBot::detectArduinoPort(int baudRate)
