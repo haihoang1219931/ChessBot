@@ -236,18 +236,39 @@ void ChessBot::run()
     qDebug("Dowork finished");
 }
 
-void ChessBot::playInputMove(int startIndex, int stopIndex) {
+void ChessBot::playInputMove(int startIndex, int stopIndex, int promotePiece) {
     qDebug("======== playInputMove %d->%d",startIndex,stopIndex);
-    if(m_chessController->moveByUiSquares(startIndex,stopIndex)) {
+    if(promotePiece < 0) {
+        if(m_chessController->moveByUiSquares(startIndex,stopIndex)) {
+            m_state = STATE_PLAY;
+            m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
+            togglePause(false);
+            startService();
+        } else {
+            if(m_chessController->status() == "CHOOSE_PROMOTION_PIECE") {
+                Q_EMIT showPromotionPieces();
+            } else {
+                qDebug("Invalid input move");
+            }
+        }
+    } else {
+        QStringList listPromotions = {"q","r","n","b"};
+        m_chessController->choosePromotion(m_side == 0 ?listPromotions[promotePiece]:
+                                                        listPromotions[promotePiece].toUpper());
         m_state = STATE_PLAY;
         m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
         togglePause(false);
         startService();
-    } else {
-        qDebug("Invalid input move");
     }
 
+
 }
+
+void ChessBot::playInputCancelPromotion()
+{
+    m_chessController->cancelPromotion();
+}
+
 void ChessBot::playLoop()
 {
     switch (m_statePlay) {
@@ -1582,6 +1603,11 @@ void ChessBot::processNextMove()
     m_statePlay = PLAY_INFORM_ERROR;
     togglePause(false);
     startService();
+}
+
+void ChessBot::undoMove()
+{
+    m_chessController->undoMove();
 }
 
 void ChessBot::setLevel(int level)

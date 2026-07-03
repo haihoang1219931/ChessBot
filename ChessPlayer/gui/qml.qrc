@@ -17,5 +17,6 @@
         <file>qml/SettingCalibrationPoints.qml</file>
         <file>qml/SettingsMenu.qml</file>
         <file>qml/DownloadProgress.qml</file>
+        <file>qml/PromotionPieces.qml</file>
     </qresource>
 </RCC>

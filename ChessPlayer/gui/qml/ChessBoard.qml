@@ -129,9 +129,8 @@ Item {
                     anchors.centerIn: parent
                     text: pieceText(controller && controller.board ? controller.board[boardIndex] : "")
                     color: pieceColor(controller && controller.board ? controller.board[boardIndex] : "")
-                    font.pixelSize: parent.width
+                    font.pixelSize: chessGrid.tileSize
                     font.bold: true
-                    font.family: "Courier"
                 }
 
                 MouseArea {

@@ -53,6 +53,7 @@ QString ChessController::status() const
 
 void ChessController::setStatus(QString status)
 {
+    qDebug("ChessController::setStatus %s",status.toStdString().c_str());
     if(m_status != status) {
         m_status = status;
         Q_EMIT statusChanged();
@@ -101,6 +102,12 @@ void ChessController::setPlayerColor(int color)
     Q_EMIT playerColorChanged();
 }
 
+void ChessController::undoMove()
+{
+
+}
+
+const std::string whitePawnPromotion = "8/2P1k3/8/3K4/8/8/8/8 w - - 0 1";
 const std::string whiteMateFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
 const std::string blackMateFen = "7K/6q1/6k1/8/8/8/8/8 w - - 0 1";
 const std::string staleMateFen = "7k/5Q2/7K/8/8/8/8/8 b - - 0 1";
@@ -108,7 +115,7 @@ const std::string ongoingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ
 
 void ChessController::newGame()
 {
-    m_board = std::make_shared<Board>();
+    m_board = std::make_shared<Board>(whitePawnPromotion);
     globalTT.clearTT();
     m_moveHistory.clear();
     Q_EMIT moveHistoryChanged();
@@ -223,51 +230,10 @@ bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex)
     return true;
 }
 
-bool ChessController::moveByCoordinates(const QString& startSquare, const QString& stopSquare)
+bool ChessController::moveByUiIndex(int startUiIndex,
+                                        int stopUiIndex,
+                                        QChar promotionSuffix)
 {
-    int startUiIndex = -1;
-    if (!tryParseCoordinate(startSquare, startUiIndex))
-    {
-        setStatus("INVALID_COORDINATE");
-        return false;
-    }
-
-    const QString stopTrimmed = stopSquare.trimmed().toLower();
-    if (stopTrimmed.size() != 2 && stopTrimmed.size() != 3)
-    {
-        setStatus("INVALID_COORDINATE");
-        return false;
-    }
-
-    int stopUiIndex = -1;
-    if (!tryParseCoordinate(stopTrimmed.left(2), stopUiIndex))
-    {
-        setStatus("INVALID_COORDINATE");
-        return false;
-    }
-
-    QChar promotionSuffix;
-    if (stopTrimmed.size() == 3)
-    {
-        promotionSuffix = stopTrimmed.at(2);
-        if (promotionSuffix != 'q' && promotionSuffix != 'r' && promotionSuffix != 'b' && promotionSuffix != 'n')
-        {
-            setStatus("INVALID_PROMOTION_PIECE");
-            return false;
-        }
-    }
-
-    if (startUiIndex < 0 || startUiIndex >= 64 || stopUiIndex < 0 || stopUiIndex >= 64)
-    {
-        return false;
-    }
-
-    if (m_promotionPending)
-    {
-        setStatus("PROTOMTION_PENDING");
-        return false;
-    }
-
     const int originSquare = uiIndexToSquare(startUiIndex);
     const int destinationSquare = uiIndexToSquare(stopUiIndex);
 
@@ -307,6 +273,43 @@ bool ChessController::moveByCoordinates(const QString& startSquare, const QStrin
         return true;
     }
     return true;
+}
+bool ChessController::moveByCoordinates(const QString& startSquare,
+                                        const QString& stopSquare,
+                                        QChar promotionSuffix)
+{
+    int startUiIndex = -1;
+    if (!tryParseCoordinate(startSquare, startUiIndex))
+    {
+        setStatus("INVALID_COORDINATE");
+        return false;
+    }
+
+    const QString stopTrimmed = stopSquare.trimmed().toLower();
+    if (stopTrimmed.size() != 2 && stopTrimmed.size() != 3)
+    {
+        setStatus("INVALID_COORDINATE");
+        return false;
+    }
+
+    int stopUiIndex = -1;
+    if (!tryParseCoordinate(stopTrimmed.left(2), stopUiIndex))
+    {
+        setStatus("INVALID_COORDINATE");
+        return false;
+    }
+
+    if (startUiIndex < 0 || startUiIndex >= 64 || stopUiIndex < 0 || stopUiIndex >= 64)
+    {
+        return false;
+    }
+
+    if (m_promotionPending)
+    {
+        setStatus("PROTOMTION_PENDING");
+        return false;
+    }
+    return moveByUiIndex(startUiIndex,stopUiIndex,promotionSuffix);
 }
 
 QStringList ChessController::findBestMoveCoordinates() const
@@ -388,9 +391,13 @@ void ChessController::choosePromotion(const QString& pieceLetter)
         Q_EMIT boardChanged();
         return;
     }
-
-    playEngineMove();
     Q_EMIT boardChanged();
+}
+
+void ChessController::cancelPromotion()
+{
+    m_promotionPending = false;
+    m_pendingPromotionMoves.clear();
 }
 
 void ChessController::refreshBoardModel()

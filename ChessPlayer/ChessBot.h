@@ -110,6 +110,7 @@ public Q_SLOTS:
     void sendTestCommand(QString command);
     void initRobotCommunication();
     void processNextMove();
+    void undoMove();
     void setLevel(int level);
     void setSide(int side);
     void resetGame();
@@ -117,7 +118,8 @@ public Q_SLOTS:
     void disconnectCamera();
     void speakText(const QString &text);
     void speakMove(const QString &piece, const QString &move);
-    void playInputMove(int startIndex, int stopIndex);
+    void playInputMove(int startIndex, int stopIndex, int promotePiece = -1);
+    void playInputCancelPromotion();
 
 Q_SIGNALS:
     void detectFailed();
@@ -127,6 +129,7 @@ Q_SIGNALS:
     void levelScoreChanged(int score);
     void calibrationUploadProgress(int direction, int progress);
     void calibrationUploadComplete(int direction, bool success);
+    void showPromotionPieces();
 
 private:
     void playLoop();

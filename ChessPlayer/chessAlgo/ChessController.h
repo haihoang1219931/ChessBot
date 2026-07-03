@@ -43,12 +43,18 @@ public:
     Q_INVOKABLE void newGame();
     Q_INVOKABLE void clickSquare(int uiIndex);
     Q_INVOKABLE bool moveByUiSquares(int startUiIndex, int stopUiIndex);
-    Q_INVOKABLE bool moveByCoordinates(const QString& startSquare, const QString& stopSquare);
+    Q_INVOKABLE bool moveByUiIndex(int startUiIndex,
+                                            int stopUiIndex,
+                                            QChar promotionSuffix);
+    Q_INVOKABLE bool moveByCoordinates(const QString& startSquare, const QString& stopSquare,
+                                       QChar promotionSuffix = QChar());
     Q_INVOKABLE QStringList findBestMoveCoordinates() const;
     Q_INVOKABLE bool isValidDestination(int uiIndex) const;
     Q_INVOKABLE void choosePromotion(const QString& pieceLetter);
+    Q_INVOKABLE void cancelPromotion();
     Q_INVOKABLE void setEngineLevel(int level);
     Q_INVOKABLE void setPlayerColor(int color);
+    Q_INVOKABLE void undoMove();
 
 Q_SIGNALS:
     void boardChanged();

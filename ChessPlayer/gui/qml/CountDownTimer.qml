@@ -10,11 +10,17 @@ Rectangle {
     signal goback()
     signal startGame()
     signal gobackLevelSelection()
+    Keys.onPressed: {
+        if (event.key === Qt.Key_Home) {
+            console.log("Home key was pressed!");
+            root.goback();
+        }
+    }
     Keys.onEscapePressed: {
-        if(!chessboard.activeUserInput)
-            root.goback()
-        else
+        if(chessboard.activeUserInput)
             chessboard.cancelUserSelection();
+        else
+            backend.undoMove();
     }
     Keys.onReturnPressed: {
         root.startGame()
@@ -35,14 +41,23 @@ Rectangle {
 
     function openGameResult(result) {
         // 1. Set the source to your QML file
-        if(myLoader.item === null)
-        myLoader.setSource("GameResult.qml");
-        myLoader.item.gameResult = result
+        if(loaderDialogEndgame.item === null)
+        loaderDialogEndgame.setSource("GameResult.qml");
+        loaderDialogEndgame.item.gameResult = result
     }
-    function closeLoaderItem() {
-        myLoader.source = "";   // This automatically destroys the loaded item
-        root.forceActiveFocus(); // Restore focus to the main UI
+
+    function enablePromotionSelection(enable) {
+        if(enable){
+            // 1. Set the source to your QML file
+            if(loaderDialogPromotion.item === null)
+            loaderDialogPromotion.setSource("PromotionPieces.qml");
+            loaderDialogPromotion.item.side = backend.side === 0 ?"white":"black";
+        } else {
+            loaderDialogPromotion.source = ""; // Close it
+            root.forceActiveFocus();
+        }
     }
+
     Column {
         anchors.fill: parent
         // --- TOP OVERLAY SECTION ---
@@ -133,7 +148,7 @@ Rectangle {
         }
     }
     Loader {
-        id: myLoader
+        id: loaderDialogEndgame
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         focus: true // Necessary for children to receive focus
@@ -144,12 +159,23 @@ Rectangle {
         }
     }
 
+    Loader {
+        id: loaderDialogPromotion
+        anchors.centerIn: parent
+        focus: true // Necessary for children to receive focus
+
+        onLoaded: {
+            // 2. Force focus to the loaded item immediately after it's ready
+            item.forceActiveFocus();
+        }
+    }
+
     Connections {
-        target: myLoader.item // Connects to the loaded object
+        target: loaderDialogEndgame.item // Connects to the loaded object
         ignoreUnknownSignals: true // Prevents errors before source is loaded
 
         onGameNextStep: {
-            myLoader.source = ""; // Close it
+            loaderDialogEndgame.source = ""; // Close it
             if(nextStep === 1) {
                 console.log("gobackLevelSelection");
                 gobackLevelSelection();
@@ -160,6 +186,23 @@ Rectangle {
             }
         }
     }
+
+    Connections {
+        target: loaderDialogPromotion.item // Connects to the loaded object
+        ignoreUnknownSignals: true // Prevents errors before source is loaded
+
+        onCancelSelectPromote: {
+            enablePromotionSelection(false);
+            backend.playInputCancelPromotion();
+        }
+        onPromoteSelected: {
+            enablePromotionSelection(false);
+            backend.playInputMove(chessboard.userInputIndexStart,
+                                  chessboard.userInputIndexStop,
+                                  promotePiece);
+        }
+    }
+
     Component.onCompleted: {
         root.levelType = backend.levelType
         root.levelScore = backend.levelScore
@@ -173,6 +216,9 @@ Rectangle {
         }
         onDetectFailed: {
             chessboard.enableUserInput(true);
+        }
+        onShowPromotionPieces: {
+            enablePromotionSelection(true);
         }
     }
 }
