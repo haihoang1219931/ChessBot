@@ -123,6 +123,7 @@ public Q_SLOTS:
 
 Q_SIGNALS:
     void detectFailed();
+    void playTurnChanged(int nextTurn);
     void gameEnded(int endState);
     void sideChanged(int side);
     void levelTypeChanged(int type);

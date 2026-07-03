@@ -129,7 +129,13 @@ ApplicationWindow {
             }
             onSideConfirmed: {
                 stack.pop();
-                stack.push(timer);
+                stack.push(timer, {
+                               "side":side==="White"?0:1,
+                               "gameTurn":side==="White"?0:1,
+                               "playTime": 600,
+                               "player1Time": 600,
+                               "player2Time": 600,
+                           });
                 backend.setSide(side==="White"?0:1);
             }
         }

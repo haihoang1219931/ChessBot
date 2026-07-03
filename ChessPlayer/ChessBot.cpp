@@ -242,6 +242,7 @@ void ChessBot::playInputMove(int startIndex, int stopIndex, int promotePiece) {
         if(m_chessController->moveByUiSquares(startIndex,stopIndex)) {
             m_state = STATE_PLAY;
             m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
+            Q_EMIT playTurnChanged(1-m_side);
             togglePause(false);
             startService();
         } else {
@@ -338,6 +339,7 @@ void ChessBot::playLoop()
 
     case PLAY_PROCESS_DONE: {
         qDebug("PLAY_PROCESS_DONE");
+        Q_EMIT playTurnChanged(m_side);
         playCheckEndGame();
         togglePause(true);
     }
@@ -1601,6 +1603,7 @@ void ChessBot::processNextMove()
     m_state = STATE_PLAY;
 //    m_statePlay = PLAY_INIT;
     m_statePlay = PLAY_INFORM_ERROR;
+    Q_EMIT playTurnChanged(1-m_side);
     togglePause(false);
     startService();
 }

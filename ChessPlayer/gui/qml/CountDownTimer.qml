@@ -34,10 +34,29 @@ Rectangle {
     property int levelType: 1
     property int levelScore: 200
     property int side: 0
+    property int gameTurn: 0
     property string player1Name: "Bot"
-    property string player1Time: "02:51"
     property string player2Name: "Player"
-    property string player2Time: "03:28"
+    property int playTime: 600
+    property int player1Time: 600
+    property int player2Time: 600
+    function resetGame(){
+        player1Time = playTime;
+        player2Time = playTime;
+        gameTurn = side;
+        timer.start();
+        console.log("Reset game gameTurn="+gameTurn);
+    }
+
+    function formatSeconds(totalSeconds) {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+
+        const paddedMinutes = String(minutes).padStart(2, '0');
+        const paddedSeconds = String(seconds).padStart(2, '0');
+
+        return paddedMinutes+":"+paddedSeconds;
+    }
 
     function openGameResult(result) {
         // 1. Set the source to your QML file
@@ -97,25 +116,37 @@ Rectangle {
 
             // Blue Background (Right)
             Rectangle {
+                id: rectRight
                 anchors.fill: parent
                 color: "#001e3e"
-
+                property real textSizeFactor: root.gameTurn != root.side ?52:72
+                Behavior on textSizeFactor {
+                    NumberAnimation { duration: 300; easing.type: Easing.InOutQuad }
+                }
                 Column {
                     anchors.bottom: parent.bottom
                     anchors.right: parent.right
                     anchors.bottomMargin: 10
                     anchors.rightMargin: 10
                     spacing: -5
-                    Text { text: player2Name; color: "white"; font.pixelSize: 52 }
-                    Text { text: player2Time; color: "white"; font.pixelSize: 52; font.bold: true }
+                    Text { text: player2Name; color: "white"; font.pixelSize: rectRight.textSizeFactor}
+                    Text { text: formatSeconds(player2Time); color: "white"; font.pixelSize: rectRight.textSizeFactor; font.bold: true }
                 }
             }
 
             // Red/Orange Shape with Slash (Left)
             Shape {
+                id: dynamicShape
                 anchors.fill: parent
                 smooth: true
-
+                property real widthFactor: root.gameTurn == root.side ? 0.42 : 0.82
+                property real textSizeFactor: root.gameTurn != root.side ?72:52
+                Behavior on widthFactor {
+                    NumberAnimation { duration: 300; easing.type: Easing.InOutQuad }
+                }
+                Behavior on textSizeFactor {
+                    NumberAnimation { duration: 300; easing.type: Easing.InOutQuad }
+                }
                 ShapePath {
                     strokeWidth: 0
                     fillGradient: LinearGradient {
@@ -125,8 +156,8 @@ Rectangle {
                     }
 
                     startX: 0; startY: 0
-                    PathLine { x: root.width * 0.62; y: 0 }
-                    PathLine { x: root.width * 0.42; y: root.height }
+                    PathLine { x: root.width * dynamicShape.widthFactor; y: 0 }
+                    PathLine { x: root.width * (dynamicShape.widthFactor-0.2); y: root.height }
                     PathLine { x: 0; y: root.height }
                     PathLine { x: 0; y: 0 }
                 }
@@ -134,8 +165,8 @@ Rectangle {
                 Column {
                     x: 5
                     spacing: -5
-                    Text { text: player1Name; color: "white"; font.pixelSize: 52 }
-                    Text { text: player1Time; color: "white"; font.pixelSize: 52; font.bold: true }
+                    Text { text: player1Name; color: "white"; font.pixelSize: dynamicShape.textSizeFactor }
+                    Text { text: formatSeconds(player1Time); color: "white"; font.pixelSize: dynamicShape.textSizeFactor; font.bold: true }
                 }
             }
             ChessBoard {
@@ -147,6 +178,7 @@ Rectangle {
             }
         }
     }
+
     Loader {
         id: loaderDialogEndgame
         anchors.horizontalCenter: parent.horizontalCenter
@@ -170,6 +202,29 @@ Rectangle {
         }
     }
 
+    Timer {
+        id: timer
+        interval: 1000
+        running: true
+        repeat: true
+
+        onTriggered: {
+            if(gameTurn == side) {
+                player2Time --
+                if(player2Time == 0) {
+                    openGameResult(2)
+                    timer.stop();
+                }
+            } else {
+                player1Time --
+                if(player1Time == 0) {
+                    openGameResult(1)
+                    timer.stop();
+                }
+            }
+        }
+    }
+
     Connections {
         target: loaderDialogEndgame.item // Connects to the loaded object
         ignoreUnknownSignals: true // Prevents errors before source is loaded
@@ -182,6 +237,7 @@ Rectangle {
             } else {
                 console.log("resetGame");
                 backend.resetGame();
+                root.resetGame();
                 root.forceActiveFocus();
             }
         }
@@ -219,6 +275,9 @@ Rectangle {
         }
         onShowPromotionPieces: {
             enablePromotionSelection(true);
+        }
+        onPlayTurnChanged:{
+            root.gameTurn = nextTurn;
         }
     }
 }
