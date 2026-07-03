@@ -107,6 +107,8 @@ void ChessController::undoMove()
 
 }
 
+const std::string whiteCatsling1 = "1nbqk2r/pppp1ppp/8/2p1bn2/5N2/1B1Q4/P1rPPPPP/R3K2R w KQkq -";
+const std::string whiteCatsling2 = "r3k2r/8/8/8/3B4/8/8/R3K2R w KQkq - 0 1";
 const std::string whitePawnPromotion = "8/2P1k3/8/3K4/8/8/8/8 w - - 0 1";
 const std::string whiteMateFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
 const std::string blackMateFen = "7K/6q1/6k1/8/8/8/8/8 w - - 0 1";
@@ -115,7 +117,7 @@ const std::string ongoingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ
 
 void ChessController::newGame()
 {
-    m_board = std::make_shared<Board>(whitePawnPromotion);
+    m_board = std::make_shared<Board>();
     globalTT.clearTT();
     m_moveHistory.clear();
     Q_EMIT moveHistoryChanged();
