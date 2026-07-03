@@ -310,7 +310,6 @@ void ChessBot::playLoop()
         break;
     case PLAY_CALCULATE_NEXT_MOVE: {
         qDebug("PLAY_CALCULATE_NEXT_MOVE");
-        sleep(5);
         if(playCalculateNextMove() == STATE_DONE_SUCCESS){
             m_statePlay = PLAY_EXECUTE_NEXT_MOVE;
         }
@@ -629,12 +628,15 @@ uint8_t ChessBot::playCalculateNextMove()
 
     char robotCommand[32];
     if(m_chessController->botMove().isCapture()) {
-        sprintf(robotCommand,"a%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
+        sprintf(robotCommand,"a%d%d%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
+                'p',0,
                 canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x())?'-':'n');
     } else if(m_chessController->botMove().isCastling()) {
-        sprintf(robotCommand,"CST%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),'-');
+        sprintf(robotCommand,"CST%d%d%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
+                0,0,'-');
     } else if(m_chessController->botMove().isEnPassant()) {
-        sprintf(robotCommand,"pp%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),'n');
+        sprintf(robotCommand,"pp%d%d%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
+                'p',0,'n');
     } else if(m_chessController->botMove().isPromotion()) {
         /**
          * @brief promoChar
@@ -650,7 +652,8 @@ uint8_t ChessBot::playCalculateNextMove()
         unsigned int promoPieceType = m_chessController->botMove().getPromotedPieceType();
         // Todo: convet promoPieceType to promoChar
         char promoChar = 'q';
-        sprintf(robotCommand,"p%c%d%d%d%d%c",promoChar,fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),'n');
+        sprintf(robotCommand,"pm%d%d%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
+                0,promoChar,'n');
     } else {
         sprintf(robotCommand,"c%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
                 canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x())?'-':'n');
@@ -1602,8 +1605,8 @@ void ChessBot::initRobotCommunication() {
 void ChessBot::processNextMove()
 {
     m_state = STATE_PLAY;
-//    m_statePlay = PLAY_INIT;
-    m_statePlay = PLAY_INFORM_ERROR;
+    m_statePlay = PLAY_INIT;
+//    m_statePlay = PLAY_INFORM_ERROR;
     Q_EMIT playTurnChanged(1-m_side);
     togglePause(false);
     startService();
