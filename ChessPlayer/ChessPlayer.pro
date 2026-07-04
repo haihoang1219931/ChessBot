@@ -1,7 +1,7 @@
 TEMPLATE = app
 CONFIG += c++11 no_keywords console
 
-QT += qml quick qml serialport texttospeech
+QT += qml quick qml serialport texttospeech multimedia
 CONFIG += c++11
 
 CONFIG += use_chess_algo
@@ -74,13 +74,15 @@ HEADERS += \
 }
 SOURCES += \
     ChessBot.cpp \
-    main.cpp
+    main.cpp \
+    voice/PiperStreamer.cpp
 
 RESOURCES += \
     gui/qml.qrc
 QML_DESIGNER_IMPORT_PATH =
 
 HEADERS += \
-    ChessBot.h \
+    ChessBot.h \ \
+    voice/PiperStreamer.h
 
 

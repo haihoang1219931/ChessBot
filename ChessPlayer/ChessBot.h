@@ -11,7 +11,11 @@
 #include <QVariantList>
 #include <QPoint>
 #include <QVector>
+#if defined(_WIN32)
 #include <QTextToSpeech>
+#else
+#include "voice/PiperStreamer.h"
+#endif
 
 #define CONFIGURE_CHESSBOARD_CALIB_FILE "calib_data.json"
 
@@ -166,7 +170,11 @@ private:
     QMutex *m_mutex;
     QWaitCondition* m_pauseCond;
     ChessController* m_chessController;
+#if defined(_WIN32)
     QTextToSpeech *m_speech;
+#else
+    PiperStreamer *m_speech;
+#endif
 #ifdef IMAGE_PROCESS_MOVE
     ChessImageProcessing* m_moveDetector;
     cv::VideoCapture cap;

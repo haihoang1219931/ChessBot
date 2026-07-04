@@ -8,7 +8,6 @@
 #include <QSerialPortInfo>
 #include <QTime>
 #include <QDebug>
-#include <QTextToSpeech>
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
 #include "ChessBot.h"
@@ -34,6 +33,7 @@ ChessBot::ChessBot(QThread *parent) :
     m_detectParams->playerSide = m_side == 0?
                 "white":"black";
 #endif
+#if defined(_WIN32)
     // 1. Check if engines exist on your OS
     qDebug() << "Available TTS Engines:" << QTextToSpeech::availableEngines();
 
@@ -48,7 +48,10 @@ ChessBot::ChessBot(QThread *parent) :
     connect(m_speech, &QTextToSpeech::stateChanged, [](QTextToSpeech::State state) {
         qDebug() << "TTS State Changed to:" << state;
     });
-    m_speech->say("Hi. This is Daddy chess robot. Play fun");
+#else
+    m_speech = new PiperStreamer();
+#endif
+    speakText("I'm chess robot. Nice to play");
     m_chessboardCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(8));
     m_dropzoneRightCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(2));
     m_dropzoneLeftCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(2));
@@ -537,7 +540,7 @@ uint8_t ChessBot::playCalculateNextMove()
     QString from = lastMove.left(2);  // Result: "e2"
     QString to = lastMove.right(2);   // Result: "e4"
     QPoint fromCoord, toCoord;
-//    speakMove(m_chessController->pieceType(to), to);
+    speakMove(m_chessController->pieceType(to), to);
     fromCoord = notationToCoord(from.toStdString(),
                                                 m_side != 0?"white":"black");
     toCoord = notationToCoord(to.toStdString(),
@@ -1816,7 +1819,11 @@ bool ChessBot::getArduinoVersion()
 
 void ChessBot::speakText(const QString &text)
 {
+#if defined(_WIN32)
     m_speech->say(text.trimmed());
+#else
+    m_speech->speak(text);
+#endif
 }
 
 void ChessBot::speakMove(const QString &piece, const QString &move)
@@ -1830,5 +1837,5 @@ void ChessBot::speakMove(const QString &piece, const QString &move)
         formattedMove.append(" ");
     }
 
-    m_speech->say(formattedMove.trimmed());
+    speakText(formattedMove);
 }
