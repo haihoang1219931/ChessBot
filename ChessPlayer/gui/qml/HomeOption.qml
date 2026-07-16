@@ -8,9 +8,10 @@ Rectangle {
     height: 120
     color: "#88f8f9fa"
     property int selection: 0
-    signal homeNextStep(var nextStep);
+    signal homeNextStep(var nextStep)
+    signal goback()
     Keys.onLeftPressed: {
-        selection = (selection-1) >= 0?(selection-1)%2:2;
+        selection = (selection-1) >= 0?(selection-1)%2:1;
     }
     Keys.onRightPressed: {
         selection = (selection+1)%2;
@@ -18,6 +19,9 @@ Rectangle {
     Keys.onReturnPressed: {
         console.log("Home option select "+selection);
         homeNextStep(selection);
+    }
+    Keys.onEscapePressed: {
+        goback()
     }
 
     ColumnLayout {
@@ -42,7 +46,7 @@ Rectangle {
                 color: selection == 0? "green": "#1a5f7a"
 
                 Text {
-                    text: "Select\nside"
+                    text: "Select\nlevel"
                     color: "white"
                     anchors.centerIn: parent
                     font.pixelSize: 20

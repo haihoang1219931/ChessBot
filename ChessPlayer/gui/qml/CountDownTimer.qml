@@ -13,7 +13,7 @@ Rectangle {
     Keys.onPressed: {
         if (event.key === Qt.Key_Home) {
             console.log("Home key was pressed!");
-            root.goback();
+            openHomeOption();
         }
     }
     Keys.onEscapePressed: {
@@ -81,7 +81,6 @@ Rectangle {
         // 1. Set the source to your QML file
         if(loaderDialogEndgame.item === null)
         loaderDialogEndgame.setSource("HomeOption.qml");
-        loaderDialogEndgame.item.gameResult = result
     }
 
     Column {
@@ -252,13 +251,17 @@ Rectangle {
         onHomeNextStep: {
             loaderDialogEndgame.source = ""; // Close it
             if(nextStep === 0) {
-                console.log("gobackLevelSelection");
+                console.log("level selection");
                 gobackLevelSelection();
-            } else {
+            } else if(nextStep === 1){
                 console.log("homing robot");
                 backend.homingRobot();
                 root.forceActiveFocus();
             }
+        }
+
+        onGoback: {
+            loaderDialogEndgame.source = ""; // Close it
         }
     }
 
