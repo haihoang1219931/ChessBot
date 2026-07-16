@@ -471,17 +471,17 @@ void ApplicationController::executeCommand(char* command) {
     }else if(command[0] == 'a' && strlen(command)>=7) {
         m_comCommandID ++;
         executeSequence(MOVE_ATTACK, command[2]-'0',command[1]-'0',
-                command[4]-'0',command[3]-'0',0,0,command[6] == '-');
+                command[4]-'0',command[3]-'0',command[5],0,command[6] == '-');
         this->printf("[%s] Attack confirmed\r\n", command);
     }else if(command[0] == 'p' && strlen(command)>=7 && command[1] == 'p') {
         m_comCommandID ++;
         executeSequence(MOVE_PASTPAWN, command[3]-'0',command[2]-'0',
-                command[5]-'0',command[4]-'0',0,0,command[6] == '-');
+                command[5]-'0',command[4]-'0',command[5],0,command[6] == '-');
         this->printf("[%s] Past pawn confirmed\r\n", command);
-    }else if(command[0] == 'p' && strlen(command)>=7) {
+    }else if(command[0] == 'p' && strlen(command)>=8 && command[1] == 'm') {
         m_comCommandID ++;
         executeSequence(MOVE_PROMOTE, command[3]-'0',command[2]-'0',
-                command[5]-'0',command[4]-'0',0,0,command[6] == '-');
+                command[5]-'0',command[4]-'0',command[6],command[7],false);
         this->printf("[%s] Promote confirmed\r\n", command);
 
     }else if(command[0] == 't' && strlen(command)>=2)
