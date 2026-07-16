@@ -118,6 +118,7 @@ public Q_SLOTS:
     void stopService();
     void togglePause(bool paused);
     void sendTestCommand(QString command);
+    void homingRobot();
     void initRobotCommunication();
     void processNextMove();
     void undoMove();

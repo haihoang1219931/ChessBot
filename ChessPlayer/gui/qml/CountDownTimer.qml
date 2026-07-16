@@ -77,6 +77,13 @@ Rectangle {
         }
     }
 
+    function openHomeOption() {
+        // 1. Set the source to your QML file
+        if(loaderDialogEndgame.item === null)
+        loaderDialogEndgame.setSource("HomeOption.qml");
+        loaderDialogEndgame.item.gameResult = result
+    }
+
     Column {
         anchors.fill: parent
         // --- TOP OVERLAY SECTION ---
@@ -238,6 +245,18 @@ Rectangle {
                 console.log("resetGame");
                 backend.resetGame();
                 root.resetGame();
+                root.forceActiveFocus();
+            }
+        }
+
+        onHomeNextStep: {
+            loaderDialogEndgame.source = ""; // Close it
+            if(nextStep === 0) {
+                console.log("gobackLevelSelection");
+                gobackLevelSelection();
+            } else {
+                console.log("homing robot");
+                backend.homingRobot();
                 root.forceActiveFocus();
             }
         }

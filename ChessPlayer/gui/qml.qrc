@@ -18,5 +18,6 @@
         <file>qml/SettingsMenu.qml</file>
         <file>qml/DownloadProgress.qml</file>
         <file>qml/PromotionPieces.qml</file>
+        <file>qml/HomeOption.qml</file>
     </qresource>
 </RCC>

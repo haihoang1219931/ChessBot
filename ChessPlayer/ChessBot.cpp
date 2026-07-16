@@ -637,9 +637,9 @@ uint8_t ChessBot::playCalculateNextMove()
                 'p',
                 canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),PIECE_MOVE_CAPTURE)?'-':'n');
     } else if(m_chessController->botMove().isCastling()) {
-        sprintf(robotCommand,"CST%d%d%d%d%c%c%c",fromCoord.y(),fromCoord.x(),
+        sprintf(robotCommand,"CST%d%d%d%d%c",fromCoord.y(),fromCoord.x(),
                 toCoord.y(),toCoord.x() > fromCoord.x()?7:0,
-                '0','0','-');
+                '-');
     } else if(m_chessController->botMove().isEnPassant()) {
         sprintf(robotCommand,"pp%d%d%d%d%c%c%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
                 'p','0',
@@ -1603,6 +1603,11 @@ void ChessBot::sendTestCommand(QString command)
     m_stateTest = TEST_ROBOT;
     m_commandTest = command;
     togglePause(false);
+}
+
+void ChessBot::homingRobot()
+{
+    sendTestCommand("ha");
 }
 
 void ChessBot::initRobotCommunication() {
