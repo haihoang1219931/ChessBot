@@ -7,14 +7,15 @@ import QtQml 2.0
 ApplicationWindow {
     id: wroot
     visible: true
-    width: 800
-    height: 480
+    visibility: Window.FullScreen
     title: qsTr("ChessPlayer")
     color: "#050505"
 
     StackView {
         id: stack
-        anchors.fill: parent
+        width: 800
+        height: 480
+        anchors.centerIn: parent
         // 1. MUST HAVE FOCUS TRUE
         focus: true
 
