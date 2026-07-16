@@ -85,6 +85,12 @@ typedef enum{
     TEST_CHECK_RESULT,
     TEST_DONE
 } STATE_TEST_PHASE;
+
+typedef enum{
+    PIECE_MOVE_NORMAL,
+    PIECE_MOVE_CAPTURE,
+    PIECE_MOVE_ENPASSANT
+} PIECE_MOVE_TYPE;
 class ChessBot : public QThread {
     Q_OBJECT
     Q_PROPERTY(int levelType READ levelType NOTIFY levelTypeChanged)
@@ -142,7 +148,7 @@ private:
     void testLoop();
     bool playCheckEndGame();
     bool playCheckDoubleMove();
-    bool canMoveStraight(int startRow, int startCol, int stopRow, int stopCol);
+    bool canMoveStraight(int startRow, int startCol, int stopRow, int stopCol, PIECE_MOVE_TYPE moveType = PIECE_MOVE_NORMAL);
     uint8_t playDetectMove();
     uint8_t playRandomMove();
     uint8_t playCalculateNextMove();

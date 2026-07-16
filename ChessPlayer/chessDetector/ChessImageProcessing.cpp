@@ -159,8 +159,17 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& 
         listMoves = detectMovePhase3ColorMatchingFromFilter(startCellsBinary, listChangedCell, params,
                                                         matColorMap1, matColorMap2);
     } else {
-        if(startCellsColor.size() == 1)
-        listMoves = detectMovePhase3ColorMatchingFromFilter(startCellsColor, listChangedCell, params,
+        std::vector<cv::Point> possibleStartCells;
+        if(startCellsColor.size() > 0) {
+            for (const auto& point : startCellsBinary) {
+                // Check if the current point exists in the color list
+                if (std::find(startCellsColor.begin(), startCellsColor.end(), point) != startCellsColor.end()) {
+                    possibleStartCells.push_back(point);
+                }
+            }
+        }
+        if(possibleStartCells.size() == 1)
+            listMoves = detectMovePhase3ColorMatchingFromFilter(possibleStartCells, listChangedCell, params,
                                                         matColorMap1, matColorMap2);
     }
 
@@ -171,6 +180,7 @@ bool ChessImageProcessing::detectMovePhase1Binary(const cv::Mat& edges1, const c
                                                   std::vector<cv::Point>& starts, std::vector<cv::Point>& ends,
                                                   const MoveDetectParams& params)
 {
+    std::cout << "detectMovePhase1Binary" << std::endl;
     if (edges1.empty() || edges2.empty()) return false;
     int sq = edges1.cols / 8;
     std::vector<std::vector<int>> mat1 = getPieceMatrix(edges1, sq, params,"warp1");
@@ -212,6 +222,7 @@ bool ChessImageProcessing::detectMovePhase1ColorFilter(const cv::Mat& color1, co
                                                   std::vector<std::vector<int>>& matColorMapBefore,
                                                   std::vector<std::vector<int>>& matColorMapAfter)
 {
+    std::cout << "detectMovePhase1ColorFilter" << std::endl;
     if (color1.empty() || color2.empty()) return false;
     int sq = color1.cols / 8;
     matColorMapBefore = getPieceMatrixColor(color1,params,"warp1");
@@ -407,7 +418,10 @@ std::vector<std::string> ChessImageProcessing::detectMovePhase3ColorMatchingFrom
 {
     std::vector<std::string> listMoves;
     for (int i=0; i< listChangedCell.size(); i++) {
-        std::cout << "detectMovePhase2Substraction: end " << listChangedCell[i] << std::endl;
+        std::cout << "detectMovePhase2Substraction: listChangedCell " << listChangedCell[i] << std::endl;
+    }
+    for (int i=0; i< startCells.size(); i++) {
+        std::cout << "detectMovePhase2Substraction: startCells " << startCells[i] << std::endl;
     }
     cv::Point startCell(-1,-1);
     bool foundValidStartCell = false;
@@ -784,7 +798,7 @@ bool ChessImageProcessing::isChessPieceCell(const cv::Mat& edges, int c, int r, 
                            5,cv::Scalar(0,0,255));
                 if(centerLargestArea.y + 20 <
                         roi.y + roi.height/2 ) {
-                    std::cout << "fail case: c" << c << ",r" << r << " Line:" << __LINE__ <<std::endl;
+//                    std::cout << "fail case: c" << c << ",r" << r << " Line:" << __LINE__ <<std::endl;
 //                    return false;
                 }
 //                if(occPercent < 30) {

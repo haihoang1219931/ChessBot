@@ -455,34 +455,51 @@ void ApplicationController::executeCommand(char* command) {
         }
     }else if(command[0] == 'T' && strlen(command)>=3) {
         m_comCommandID ++;
-        executeSequence(MOVE_TEST, command[2]-'0',command[1]-'0',
-                0,0);
-        this->printf("[%s] Test seq confirmed\r\n", command);
+        if (executeSequence(MOVE_TEST, command[2]-'0',command[1]-'0',
+                0,0) )
+            this->printf("[%s] Test seq confirmed\r\n", command);
+        else
+            this->printf("[%s] Test seq failed\r\n", command);
     }else if(command[0] == 'c' && strlen(command)>=6) {
         m_comCommandID ++;
-        executeSequence(MOVE_NORMAL, command[2]-'0',command[1]-'0',
-                command[4]-'0',command[3]-'0',0,0,command[5] == '-');
-        this->printf("[%s] Normal seq confirmed\r\n", command);
+        if (executeSequence(MOVE_NORMAL, command[2]-'0',command[1]-'0',
+                command[4]-'0',command[3]-'0',0,0,command[5] == '-')) {
+            this->printf("[%s] Normal seq confirmed\r\n", command);
+        } else {
+            this->printf("[%s] Normal seq failed\r\n", command);
+        }
     }else if(command[0] == 'C' && strlen(command)>=8 && command[1] == 'S' && command[2] == 'T') {
         m_comCommandID ++;
-        executeSequence(MOVE_CASTLE, command[4]-'0',command[3]-'0',
-                command[6]-'0',command[5]-'0',0,0,command[7] == '-');
-        this->printf("[%s] Castle confirmed\r\n", command);
+        if (executeSequence(MOVE_CASTLE, command[4]-'0',command[3]-'0',
+                command[6]-'0',command[5]-'0',0,0,command[7] == '-')) {
+            this->printf("[%s] Castle confirmed\r\n", command);
+        } else {
+            this->printf("[%s] Castle failed\r\n", command);
+        }
     }else if(command[0] == 'a' && strlen(command)>=7) {
         m_comCommandID ++;
-        executeSequence(MOVE_ATTACK, command[2]-'0',command[1]-'0',
-                command[4]-'0',command[3]-'0',command[5],0,command[6] == '-');
-        this->printf("[%s] Attack confirmed\r\n", command);
+        if (executeSequence(MOVE_ATTACK, command[2]-'0',command[1]-'0',
+                command[4]-'0',command[3]-'0',command[5],0,command[6] == '-')) {
+            this->printf("[%s] Attack confirmed\r\n", command);
+        } else {
+            this->printf("[%s] Attack failed\r\n", command);
+        }
     }else if(command[0] == 'p' && strlen(command)>=7 && command[1] == 'p') {
         m_comCommandID ++;
-        executeSequence(MOVE_PASTPAWN, command[3]-'0',command[2]-'0',
-                command[5]-'0',command[4]-'0',command[5],0,command[6] == '-');
-        this->printf("[%s] Past pawn confirmed\r\n", command);
+        if (executeSequence(MOVE_PASTPAWN, command[3]-'0',command[2]-'0',
+                command[5]-'0',command[4]-'0',command[5],0,command[6] == '-')) {
+            this->printf("[%s] Past pawn confirmed\r\n", command);
+        } else {
+            this->printf("[%s] Past pawn failed\r\n", command);
+        }
     }else if(command[0] == 'p' && strlen(command)>=8 && command[1] == 'm') {
         m_comCommandID ++;
-        executeSequence(MOVE_PROMOTE, command[3]-'0',command[2]-'0',
-                command[5]-'0',command[4]-'0',command[6],command[7],false);
-        this->printf("[%s] Promote confirmed\r\n", command);
+        if (executeSequence(MOVE_PROMOTE, command[3]-'0',command[2]-'0',
+                command[5]-'0',command[4]-'0',command[6],command[7],false)) {
+            this->printf("[%s] Promote confirmed\r\n", command);
+        } else {
+            this->printf("[%s] Promote failed\r\n", command);
+        }
 
     }else if(command[0] == 't' && strlen(command)>=2)
     {
@@ -865,51 +882,65 @@ void ApplicationController::gotoPosition(float x, float y, float upAngleInDegree
     m_robot->moveToTarget(MAX_MOTOR);
     setMachineState(MACHINE_EXECUTE_POSITION);
 }
-void ApplicationController::executeSequence(
+bool ApplicationController::executeSequence(
         MOVE_TYPE moveType,
         int startCol, int startRow,
         int stopCol, int stopRow,
         char attackPiece, char promotePiece, bool straightMove) {
-#ifdef DEBUG_COMMAND
+    bool executeInitResult = false;
+// #ifdef DEBUG_COMMAND
     this->printf("Go to Pos [%d,%d] to [%d,%d] \r\n",
                  startCol, startRow, stopCol, stopRow);
-#endif
+// #endif
     // Attack: Move piece out -> Move attack piece -> Return to prepare
     // No attack: Move attack piece -> Return to prepare
     // Castle: Move king -> Move rook -> Return to prepare
     // Promote: Move pawn -> Move promote piece -> Return to prepare
     switch (moveType) {
     case MOVE_TEST:
-        calculateSequenceMoveTest(startCol, startRow);
-        setMachineState(MACHINE_EXECUTE_TEST);
+        executeInitResult = calculateSequenceMoveTest(startCol, startRow);
+        if (executeInitResult) {
+            setMachineState(MACHINE_EXECUTE_TEST);
+        }
         break;
     case MOVE_NORMAL:
-        calculateSequenceMoveNormal(startCol, startRow, stopCol, stopRow, straightMove);
-        setMachineState(MACHINE_EXECUTE_COMMAND);
+        executeInitResult = calculateSequenceMoveNormal(startCol, startRow, stopCol, stopRow, straightMove);
+        if (executeInitResult) {
+            setMachineState(MACHINE_EXECUTE_COMMAND);
+        }
         break;
     case MOVE_ATTACK:
-        calculateSequenceAttack(startCol, startRow, stopCol, stopRow, attackPiece, straightMove);
-        setMachineState(MACHINE_EXECUTE_COMMAND);
+        executeInitResult = calculateSequenceAttack(startCol, startRow, stopCol, stopRow, attackPiece, straightMove);
+        if (executeInitResult) {
+            setMachineState(MACHINE_EXECUTE_COMMAND);
+        }
         break;
     case MOVE_PASTPAWN:
-        calculateSequencePastPawn(startCol, startRow, stopCol, stopRow, straightMove);
-        setMachineState(MACHINE_EXECUTE_COMMAND);
+        executeInitResult = calculateSequencePastPawn(startCol, startRow, stopCol, stopRow, straightMove);
+        if (executeInitResult) {
+            setMachineState(MACHINE_EXECUTE_COMMAND);
+        }
         break;
     case MOVE_CASTLE:
-        calculateSequenceCastle(startCol, startRow, stopCol, stopRow, straightMove);
-        setMachineState(MACHINE_EXECUTE_COMMAND);
+        executeInitResult = calculateSequenceCastle(startCol, startRow, stopCol, stopRow, straightMove);
+        if (executeInitResult) {
+            setMachineState(MACHINE_EXECUTE_COMMAND);
+        }
         break;
     case MOVE_PROMOTE:
-        calculateSequencePromotePiece(startCol, startRow, stopCol, stopRow, attackPiece, promotePiece);
-        setMachineState(MACHINE_EXECUTE_COMMAND);
+        executeInitResult = calculateSequencePromotePiece(startCol, startRow, stopCol, stopRow, attackPiece, promotePiece);
+        if (executeInitResult) {
+            setMachineState(MACHINE_EXECUTE_COMMAND);
+        }
         break;
     }
 
     
     m_commandSequenceState = COMMAND_SEQUENCE_STATE_INIT;
+    return executeInitResult;
 }
 
-void ApplicationController::calculateSequenceMoveStraight(int startCol, int startRow,int stopCol, int stopRow)
+bool ApplicationController::calculateSequenceMoveStraight(int startCol, int startRow,int stopCol, int stopRow)
 {
     Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
     Point endPoint = m_chessBoard->convertPoint(stopRow,stopCol);
@@ -939,7 +970,7 @@ void ApplicationController::calculateSequenceMoveStraight(int startCol, int star
     m_commandSequenceState = COMMAND_SEQUENCE_STATE_INIT;
 }
 
-void ApplicationController::calculateSequenceMove(int startCol, int startRow, int upAngleInDegree, bool isCapture)
+bool ApplicationController::calculateSequenceMove(int startCol, int startRow, int upAngleInDegree, bool isCapture)
 {
 #ifdef DEBUG_COMMAND
     printf("ApplicationController::calculateSequenceMove\r\n");
@@ -958,8 +989,12 @@ void ApplicationController::calculateSequenceMove(int startCol, int startRow, in
     setMachineState(MACHINE_EXECUTE_POSITION);
 }
 #define DEBUG_COMMAND
-void ApplicationController::calculateSequenceMoveTest(int targetCol, int targetRow)
+bool ApplicationController::calculateSequenceMoveTest(int targetCol, int targetRow)
 {
+    // Check for valid coordinates
+    if (targetCol < 0 || targetCol > 7 || targetRow < 0 || targetRow > 7) {
+        return false;
+    }
     // append move to target location
     Point targetPoint = m_chessBoard->convertPoint(targetRow,targetCol);
 #ifdef DEBUG_COMMAND
@@ -981,11 +1016,18 @@ void ApplicationController::calculateSequenceMoveTest(int targetCol, int targetR
         m_sequenceCommand[m_numCommand].type = COMMAND_NORMAL;
         m_numCommand++;
     }
+    return true;
 }
 
-void ApplicationController::calculateSequenceMoveNormal(int startCol, int startRow,
+bool ApplicationController::calculateSequenceMoveNormal(int startCol, int startRow,
                      int stopCol, int stopRow, bool straightMove)
 {
+    // Check for valid coordinates
+    if (startCol < 0 || startCol > 7 || startRow < 0 || startRow > 7 ||
+        stopCol < 0 || stopCol > 7 || stopRow < 0 || stopRow > 7) {
+        return false;
+    }
+    
     // append move from start -> stop -> standy
     Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
 #ifdef DEBUG_COMMAND
@@ -996,11 +1038,18 @@ void ApplicationController::calculateSequenceMoveNormal(int startCol, int startR
     Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
     clearSequenceMove();
     appendSequenceMove(startPoint, stopPoint, straightMove);
+    return true;
 }
 
-void ApplicationController::calculateSequenceAttack(int startCol, int startRow,
+bool ApplicationController::calculateSequenceAttack(int startCol, int startRow,
                      int stopCol, int stopRow, char attackPiece, bool straightMove)
 {
+    // Check for valid coordinates
+    if (startCol < 0 || startCol > 7 || startRow < 0 || startRow > 7 ||
+        stopCol < 0 || stopCol > 7 || stopRow < 0 || stopRow > 7) {
+        return false;
+    }
+    
     // get free drop point
     // append move from stop -> drop -> start -> stop -> standby
     DropPoint dropPoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
@@ -1011,11 +1060,18 @@ void ApplicationController::calculateSequenceAttack(int startCol, int startRow,
     appendSequenceMove(stopPoint, dropPoint.location);
     appendSequenceMove(startPoint, stopPoint, straightMove);
     m_chessBoard->updateDropZone(attackPiece, dropPoint.rowID, dropPoint.colID, (ZONE_TYPE)dropPoint.zoneType);
+    return true;
 }
 
-void ApplicationController::calculateSequencePastPawn(int startCol, int startRow,
+bool ApplicationController::calculateSequencePastPawn(int startCol, int startRow,
                      int stopCol, int stopRow, bool straightMove)
 {
+    // Check for valid coordinates
+    if (startCol < 0 || startCol > 7 || startRow < 0 || startRow > 7 ||
+        stopCol < 0 || stopCol > 7 || stopRow < 0 || stopRow > 7) {
+        return false;
+    }
+
     // append move from attack pawn -> drop -> start -> stop -> standby
     DropPoint dropPoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
     Point pawnPoint = m_chessBoard->convertPoint(startRow,stopCol);
@@ -1025,11 +1081,20 @@ void ApplicationController::calculateSequencePastPawn(int startCol, int startRow
     appendSequenceMove(pawnPoint, dropPoint.location);
     appendSequenceMove(startPoint, stopPoint, straightMove);
     m_chessBoard->updateDropZone('p', dropPoint.rowID, dropPoint.colID, (ZONE_TYPE)dropPoint.zoneType);
+    return true;
 }
 
-void ApplicationController::calculateSequencePromotePiece(int startCol, int startRow,
+bool ApplicationController::calculateSequencePromotePiece(int startCol, int startRow,
                      int stopCol, int stopRow, char attackPiece, char promotePiece, bool straightMove)
 {
+    if( startCol < 0 || startCol > 7 || stopCol < 0 || stopCol > 7 ||
+        startRow < 0 || startRow > 7 || stopRow < 0 || stopRow > 7) {
+        return false;
+    }
+    // Check for valid promotion
+    if (promotePiece != 'q' && promotePiece != 'r' && promotePiece != 'b' && promotePiece != 'n') {
+        return false;
+    }
     // append move from attack piece -> drop -> promote -> stop -> start -> drop -> standby
     DropPoint promotePiecePoint = m_chessBoard->getFreeDropPoint(ZONE_PLAYER,promotePiece);
     DropPoint dropPiecePoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
@@ -1046,12 +1111,16 @@ void ApplicationController::calculateSequencePromotePiece(int startCol, int star
     appendSequenceMove(promotePiecePoint.location, stopPoint);
     appendSequenceMove(startPoint, dropPieceBotPoint.location);
     m_chessBoard->updateDropZone('p', promotePiecePoint.rowID, promotePiecePoint.colID, (ZONE_TYPE)promotePiecePoint.zoneType);
+    return true;
 }
 
-void ApplicationController::calculateSequenceCastle(int kingCol, int kingRow,
+bool ApplicationController::calculateSequenceCastle(int kingCol, int kingRow,
                                                     int rookCol, int rookRow, bool straightMove)
 {
-
+    if( kingCol < 0 || kingCol > 7 || rookCol < 0 || rookCol > 7 ||
+        kingRow != 0 || kingRow != 7 || kingRow != rookRow) {
+        return false;
+    }
     // append move king -> new point -> rook -> new point
     Point kingPoint = m_chessBoard->convertPoint(kingRow,kingCol);
     Point rookPoint = m_chessBoard->convertPoint(rookRow,rookCol);
@@ -1067,6 +1136,7 @@ void ApplicationController::calculateSequenceCastle(int kingCol, int kingRow,
     clearSequenceMove();
     appendSequenceMove(kingPoint, kingNewPoint, true);
     appendSequenceMove(rookPoint, rookNewPoint);
+    return true;
 }
 
 float ApplicationController::distance(float x1, float y1, float x2, float y2)

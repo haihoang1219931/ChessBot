@@ -40,23 +40,23 @@ public:
     int executeReadyPositionLoop();
     void goToCalibPosition();
     void gotoPosition(float x, float y, float upAngleInDegree);
-    void executeSequence(MOVE_TYPE moveType,
+    bool executeSequence(MOVE_TYPE moveType,
                          int startCol, int startRow,
                          int stopCol, int stopRow,
                          char attackPiece = 0, char promotePiece = 0, bool straightMove = false);
     void sendCalibrationProgress();
-    void calculateSequenceMoveStraight(int startCol, int startRow,int stopCol, int stopRow);
-    void calculateSequenceMove(int startCol, int startRow, int upAngleInDegree, bool isCapture);
-    void calculateSequenceMoveTest(int targetCol, int targetRow);
-    void calculateSequenceMoveNormal(int startCol, int startRow,
+    bool calculateSequenceMoveStraight(int startCol, int startRow,int stopCol, int stopRow);
+    bool calculateSequenceMove(int startCol, int startRow, int upAngleInDegree, bool isCapture);
+    bool calculateSequenceMoveTest(int targetCol, int targetRow);
+    bool calculateSequenceMoveNormal(int startCol, int startRow,
                          int stopCol, int stopRow, bool straightMove = false);
-    void calculateSequenceAttack(int startCol, int startRow,
+    bool calculateSequenceAttack(int startCol, int startRow,
                          int stopCol, int stopRow, char attackPiece, bool straightMove = false);
-    void calculateSequencePastPawn(int startCol, int startRow,
+    bool calculateSequencePastPawn(int startCol, int startRow,
                          int stopCol, int stopRow, bool straightMove = false);
-    void calculateSequencePromotePiece(int startCol, int startRow,
+    bool calculateSequencePromotePiece(int startCol, int startRow,
                          int stopCol, int stopRow, char attackPiece, char promotePiece, bool straightMove = false);
-    void calculateSequenceCastle(int kingCol, int kingRow,
+    bool calculateSequenceCastle(int kingCol, int kingRow,
                                  int rookCol, int rookRow, bool straightMove = false);
     void calculatePolygonEdgeA2345(float upAngleInDegree, float* edge, float* angleA2A2345);
     void calculateJoints(float xPos, float yPos, float upAngleInDegree, int* jointSteps);
