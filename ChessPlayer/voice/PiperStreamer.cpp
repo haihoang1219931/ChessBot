@@ -38,7 +38,7 @@ PiperStreamer::PiperStreamer(QObject *parent)
 
     // 5. Setup Piper Standalone System Process Engine
     // NOTE: If you are running on Windows, change "./piper" to "piper.exe"
-    QString program = "./voice/app/piper";
+    QString program = "piper";
     QStringList arguments;
     arguments << "--model" << "./voice/model/en_US-hfc_female-medium.onnx"
               << "--output-raw"; // Instant zero-lag stream emissions

@@ -525,7 +525,7 @@ std::vector < std::vector < int >> ChessImageProcessing::cellColorFilterToMatrix
 
             // Logic: Mostly the selected input color backdrop containing a small edge profile/shadow
             //      bool isColorDetected = (whiteFrac >= minWhiteThresh) && (blackFrac > 0.01) && (blackFrac <= maxBlackThresh);
-            bool isColorDetected = whiteFrac >= minWhiteThresh;
+            bool isColorDetected = whitePixels >= minWhitePercent;
             if (isColorDetected) {
                 matrix[r][c] = 1;
             }
@@ -674,9 +674,9 @@ std::vector<std::vector<int>> ChessImageProcessing::getPieceMatrixColor(const cv
     cv::Mat hsvWarp;
     cv::cvtColor(color, hsvWarp, cv::COLOR_BGR2HSV);
     if(params.playerSide == "white")
-        matColorPieces = cellColorFilterToMatrix(hsvWarp,cv::Vec3b(75,8,102),90,87,12,63,5,28,show_name+"White");
+        matColorPieces = cellColorFilterToMatrix(hsvWarp,cv::Vec3b(75,8,90),90,87,12,78,2,28,show_name+"White");
     else
-        matColorPieces = cellColorFilterToMatrix(hsvWarp,cv::Vec3b(22,160,138),55,87,12,61,10,28,show_name+"Black");
+        matColorPieces = cellColorFilterToMatrix(hsvWarp,cv::Vec3b(22,160,138),55,87,12,78,10,28,show_name+"Black");
     return matColorPieces;
 }
 

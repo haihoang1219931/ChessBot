@@ -2,6 +2,7 @@
 #include <iostream>
 
 int main() {
+    std::cout << "OpenCV Version: " << CV_VERSION << std::endl;
     // Open the default USB webcam (/dev/video0) using the V4L2 backend
     cv::VideoCapture cap(0, cv::CAP_V4L);
 

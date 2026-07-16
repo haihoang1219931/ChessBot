@@ -1704,6 +1704,7 @@ bool ChessBot::detectArduinoPort(int baudRate)
     
     // Try each port
     for (const QSerialPortInfo &portInfo : ports) {
+        if(!portInfo.portName().toLower().contains("usb")) continue;
         qDebug("Trying port: %s (%s)",
                portInfo.portName().toStdString().c_str(),
                portInfo.description().toStdString().c_str());
@@ -1719,7 +1720,7 @@ bool ChessBot::detectArduinoPort(int baudRate)
         if (robotController->open(QIODevice::ReadWrite)) {
             qDebug("Opened port: %s", portInfo.portName().toStdString().c_str());
             
-            for(int i=0; i< 10; i++) {
+            for(int i=0; i< 2; i++) {
                 // Send version request
                 robotController->write("v");
                 robotController->waitForBytesWritten(500);
