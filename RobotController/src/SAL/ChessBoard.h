@@ -23,6 +23,7 @@ public:
     void setCalibDropZonePoint(int row, int col, ZONE_TYPE zone, Point point);
     void resetCalibrationToFormula();
     Point convertDropPoint(int row, int col, ZONE_TYPE zone);
+    void resetDropZoneMap();
 
 private:
     float m_chessBoardPosX;

@@ -159,6 +159,16 @@ void ChessBoard::updateDropZone(uint8_t piece, int row, int col, ZONE_TYPE zone)
     }
 }
 
+void ChessBoard::resetDropZoneMap()
+{
+    for(int rowId = 0; rowId < 8; rowId++) {
+        for(int colId = 0; colId < 2; colId++) {
+            m_dropZoneMapPlayer[rowId][colId] = 0;
+            m_dropZoneMapBot[rowId][colId] = 0;
+        }
+    }
+}
+
 void ChessBoard::moveGuestPieceOut(uint8_t piece) {
     for(int rowId = 0; rowId < 8; rowId ++){
         for(int colId = 0; colId < 8; colId ++){

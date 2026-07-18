@@ -37,7 +37,9 @@ public:
     void goToHome(int motorID);
     void calibToHome(int motorID);
     void goToReadyPosition();
+    void goToHomeToCalibPosition();
     int executeReadyPositionLoop();
+    int executeHomeToCalibPositionLoop();
     void goToCalibPosition();
     void gotoPosition(float x, float y, float upAngleInDegree);
     bool executeSequence(MOVE_TYPE moveType,
@@ -94,6 +96,7 @@ public:
     Command m_nextPoint;
     char m_commandRead[64];
     uint8_t m_standByCommandState;
+    uint8_t m_homeCalibCommandState;
     uint8_t m_numCommand;
     uint8_t m_curCommandId;
     uint8_t m_commandState;

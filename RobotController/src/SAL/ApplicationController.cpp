@@ -58,12 +58,18 @@ void ApplicationController::loop() {
         }
         case MACHINE_EXECUTE_COMMAND: {
             if(executeCommandSequenceLoop() == COMMAND_SEQUENCE_STATE_DONE) {
-                goToReadyPosition();
+                goToHomeToCalibPosition();
             }
             break;
         }
         case MACHINE_EXECUTE_POSITION_STANDBY: {
             if(executeReadyPositionLoop() == COMMAND_STANDBY_DONE) {
+                setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+            }
+            break;
+        }
+        case MACHINE_EXECUTE_POSITION_HOME_TO_CALIB: {
+            if(executeHomeToCalibPositionLoop() == COMMAND_HOME_TO_CALIB_DONE) {
                 setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
             }
             break;
@@ -345,6 +351,14 @@ void ApplicationController::executeCommand(char* command) {
             m_comCommandID ++;
             goToReadyPosition();
             this->printf("[r] Ready position confirmed\r\n");
+        } else if(command[1] == 'h') {
+            m_comCommandID ++;
+            goToHomeToCalibPosition();
+            this->printf("[rh] Home calibration confirmed\r\n");
+        } else if(command[1] == 's') {
+            m_comCommandID ++;
+            m_chessBoard->resetDropZoneMap();
+            this->printf("[rs] Reset drop zone confirmed\r\n");
         }
     }
     else if(command[0] == 'm' && strlen(command)>=2) {
@@ -840,7 +854,19 @@ void ApplicationController::goToReadyPosition()
     m_standByCommandState = COMMAND_STANDBY_INIT;
     setMachineState(MACHINE_EXECUTE_POSITION_STANDBY);
 }
-
+void ApplicationController::goToHomeToCalibPosition()
+{
+    jointSteps[MOTOR_CAPTURE] = m_robot->maxStep(MOTOR_CAPTURE);
+    jointSteps[MOTOR_ARM1] = m_robot->angleToStep(MOTOR_ARM1,m_robot->homeAngle(MOTOR_ARM1));
+    jointSteps[MOTOR_ARM2] = m_robot->angleToStep(MOTOR_ARM2,m_robot->homeAngle(MOTOR_ARM2));
+    jointSteps[MOTOR_ARM3] = m_robot->homeAngle(MOTOR_ARM3);
+    jointSteps[MOTOR_ARM4] = m_robot->homeAngle(MOTOR_ARM4);
+    jointSteps[MOTOR_ARM5] = m_robot->angleToStep(MOTOR_ARM5,m_robot->homeAngle(MOTOR_ARM5));
+    m_robot->setMoveTarget(jointSteps);
+    m_robot->moveToTarget(MAX_MOTOR);
+    m_homeCalibCommandState = COMMAND_HOME_TO_CALIB_INIT;
+    setMachineState(MACHINE_EXECUTE_POSITION_HOME_TO_CALIB);
+}
 int ApplicationController::executeReadyPositionLoop()
 {
     switch(m_standByCommandState) {
@@ -859,6 +885,30 @@ int ApplicationController::executeReadyPositionLoop()
     break;    
     }
     return m_standByCommandState;
+}
+
+int ApplicationController::executeHomeToCalibPositionLoop()
+{
+    switch(m_homeCalibCommandState) {
+    case COMMAND_HOME_TO_CALIB_INIT:
+        m_homeCalibCommandState = COMMAND_HOME_TO_CALIB_PHASE1;
+        break;
+    case COMMAND_HOME_TO_CALIB_PHASE1: {
+        if(m_robot->loop() == ROBOT_EXECUTE_DONE) {
+            specificPlatformGohome(MOTOR_CAPTURE);
+            m_robot->requestGoHome(MAX_MOTOR);
+            m_homeCalibCommandState = COMMAND_HOME_TO_CALIB_PHASE2;
+        }
+    }
+    break;
+    case COMMAND_HOME_TO_CALIB_PHASE2: {
+        if(m_robot->loop() == ROBOT_EXECUTE_DONE) {
+            m_homeCalibCommandState = COMMAND_HOME_TO_CALIB_DONE;
+        }
+    }
+    break;    
+    }
+    return m_homeCalibCommandState;
 }
 
 void ApplicationController::goToCalibPosition()
@@ -888,10 +938,10 @@ bool ApplicationController::executeSequence(
         int stopCol, int stopRow,
         char attackPiece, char promotePiece, bool straightMove) {
     bool executeInitResult = false;
-// #ifdef DEBUG_COMMAND
+#ifdef DEBUG_COMMAND
     this->printf("Go to Pos [%d,%d] to [%d,%d] \r\n",
                  startCol, startRow, stopCol, stopRow);
-// #endif
+#endif
     // Attack: Move piece out -> Move attack piece -> Return to prepare
     // No attack: Move attack piece -> Return to prepare
     // Castle: Move king -> Move rook -> Return to prepare
@@ -1118,7 +1168,7 @@ bool ApplicationController::calculateSequenceCastle(int kingCol, int kingRow,
                                                     int rookCol, int rookRow, bool straightMove)
 {
     if( kingCol < 0 || kingCol > 7 || rookCol < 0 || rookCol > 7 ||
-        kingRow != 0 || kingRow != 7 || kingRow != rookRow) {
+        (kingRow != 0 && kingRow != 7) || kingRow != rookRow) {
         return false;
     }
     // append move king -> new point -> rook -> new point

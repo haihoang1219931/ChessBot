@@ -49,6 +49,7 @@ typedef enum {
 } STATE_CHESBOT;
 
 typedef enum{
+    PLAY_CALCULATE_NEXT_MOVE_RESET,
     PLAY_SETUP,
     PLAY_INIT,
     PLAY_CHECK_CURRENT_MOVE,
@@ -171,6 +172,10 @@ private:
     uint8_t goHome();
     bool isCalibDataLoaded();
     QPoint notationToCoord(const std::string& notation, const std::string& playerSide);
+#ifdef IMAGE_PROCESS_MOVE
+    void processAndSaveFailures(const cv::Mat& imageBefore, const cv::Mat& imageAfter);
+    int getNextFileCounter(const std::string& folderPath);
+#endif
 
 private:
     bool m_stopped = false;

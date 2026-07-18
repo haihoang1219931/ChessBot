@@ -278,6 +278,7 @@ void ChessBot::playLoop()
     switch (m_statePlay) {
     case PLAY_SETUP: {
         qDebug("PLAY_SETUP");
+        sendTestCommand("rs");
 #ifdef IMAGE_PROCESS_MOVE
         readFrame(imageBefore);
         qDebug("First image [%d,%d]",
@@ -308,7 +309,15 @@ void ChessBot::playLoop()
             m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
         } else {
             m_statePlay = PLAY_INFORM_ERROR;
+#ifdef IMAGE_PROCESS_MOVE
+            processAndSaveFailures(imageBefore,imageAfter);
+#endif
         }
+    }
+        break;
+    case PLAY_CALCULATE_NEXT_MOVE_RESET: {
+        sendTestCommand("rs");
+        m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
     }
         break;
     case PLAY_CALCULATE_NEXT_MOVE: {
@@ -1695,7 +1704,7 @@ void ChessBot::resetGame(){
     m_chessController->newGame();
     if(m_side == 1) {
         m_state = STATE_PLAY;
-        m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
+        m_statePlay = PLAY_CALCULATE_NEXT_MOVE_RESET;
         togglePause(false);
         startService();
     }
@@ -1858,3 +1867,50 @@ void ChessBot::speakMove(const QString &piece, const QString &move)
 
     speakText(formattedMove);
 }
+
+#ifdef IMAGE_PROCESS_MOVE
+int ChessBot::getNextFileCounter(const std::string& folderPath) {
+    int maxIndex = 0;
+    
+    if (!std::filesystem::exists(folderPath)) {
+        return 1; 
+    }
+
+    // Direct loop utilizing full std::filesystem scopes
+    for (const auto& entry : std::filesystem::directory_iterator(folderPath)) {
+        if (entry.is_regular_file()) {
+            std::string filename = entry.path().stem().string(); 
+            
+            if (filename.size() > 1 && filename[0] == 'f') {
+                try {
+                    int num = std::stoi(filename.substr(1));
+                    if (num > maxIndex) {
+                        maxIndex = num;
+                    }
+                } catch (...) {
+                    // Ignore non-conforming filenames
+                }
+            }
+        }
+    }
+    
+    return maxIndex + 1;
+}
+
+void ChessBot::processAndSaveFailures(const cv::Mat& imageBefore, const cv::Mat& imageAfter) {
+    std::string dirName = "failcases";
+    std::filesystem::create_directories(dirName); // Direct inline call
+
+    static int fileCounter = getNextFileCounter(dirName);
+
+    std::stringstream ssBefore, ssAfter;
+    
+    ssBefore << dirName << "/f" << std::setw(4) << std::setfill('0') << fileCounter++ << ".jpg";
+    ssAfter  << dirName << "/f" << std::setw(4) << std::setfill('0') << fileCounter++ << ".jpg";
+
+    cv::imwrite(ssBefore.str(), imageBefore);
+    cv::imwrite(ssAfter.str(), imageAfter);
+
+    std::cout << "Saved: " << ssBefore.str() << " and " << ssAfter.str() << std::endl;
+}
+#endif
