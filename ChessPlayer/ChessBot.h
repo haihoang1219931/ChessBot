@@ -172,6 +172,7 @@ private:
     uint8_t goHome();
     bool isCalibDataLoaded();
     QPoint notationToCoord(const std::string& notation, const std::string& playerSide);
+    void logWithTimestampQt(QString data);
 #ifdef IMAGE_PROCESS_MOVE
     void processAndSaveFailures(const cv::Mat& imageBefore, const cv::Mat& imageAfter);
     int getNextFileCounter(const std::string& folderPath);

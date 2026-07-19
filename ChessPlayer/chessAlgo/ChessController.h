@@ -39,6 +39,7 @@ public:
     Move botMove() const;
     void playEngineMove();
     QString pieceType(QString square);
+    QString extractFEN();
 
     Q_INVOKABLE void newGame();
     Q_INVOKABLE void clickSquare(int uiIndex);

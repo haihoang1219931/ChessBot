@@ -511,6 +511,11 @@ QString ChessController::pieceType(QString square)
     return pieceName;
 }
 
+QString ChessController::extractFEN()
+{
+    return QString::fromStdString(m_board->extractFen());
+}
+
 bool ChessController::tryFindLegalMove(int originSquare, int destinationSquare, Move& outMove, QChar promotionSuffix)
 {
     MoveGen moveGen(m_board);

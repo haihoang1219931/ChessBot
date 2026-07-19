@@ -555,8 +555,11 @@ QPoint ChessBot::notationToCoord(const std::string& notation, const std::string&
 }
 uint8_t ChessBot::playCalculateNextMove()
 {
+    qDebug("playCalculateNextMove FEN: %s",m_chessController->extractFEN().toStdString().c_str());
+    logWithTimestampQt(m_chessController->extractFEN());
     m_chessController->playEngineMove();
     QString lastMove = m_chessController->moveHistory().last();
+    printf("lastMove %s\r\n", lastMove.toStdString().c_str());
     QString from = lastMove.left(2);  // Result: "e2"
     QString to = lastMove.right(2);   // Result: "e4"
     QPoint fromCoord, toCoord;
@@ -1710,7 +1713,10 @@ QObject* ChessBot::chessControllerObject() const
 
 void ChessBot::resetGame(){
     qDebug("Reset game side[%d]",m_side);
+    logWithTimestampQt("======= NEW GAME =======");
     m_chessController->newGame();
+    qDebug("Init FEN: %s",m_chessController->extractFEN().toStdString().c_str());
+    logWithTimestampQt(m_chessController->extractFEN());
     if(m_side == 1) {
         m_state = STATE_PLAY;
         m_statePlay = PLAY_CALCULATE_NEXT_MOVE_RESET;
@@ -1876,7 +1882,25 @@ void ChessBot::speakMove(const QString &piece, const QString &move)
 
     speakText(formattedMove);
 }
+void ChessBot::logWithTimestampQt(QString data) {
+    // 1. Get current date and format as yyyy-MM-dd
+    QString dateString = QDate::currentDate().toString("yyyy-MM-dd");
+    QString filename = "play_history_"+dateString + ".txt";
 
+    QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+
+    QFile file(filename);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        QTextStream out(&file);
+
+        // Write the log line
+        out << "[" << timestamp << "] " << data << "\n";
+
+        file.close();
+    } else {
+        qWarning() << "Error: Could not open file" << filename << "for writing:" << file.errorString();
+    }
+}
 #ifdef IMAGE_PROCESS_MOVE
 // Custom padding helper to replace std::setw/std::setfill
 std::string ChessBot::formatFilename(const std::string& folder, int number) {
@@ -1955,19 +1979,23 @@ int ChessBot::getNextFileCounter(const std::string& folderPath) {
 }
 
 void ChessBot::processAndSaveFailures(const cv::Mat& imageBefore, const cv::Mat& imageAfter) {
+    if(imageBefore.cols > 0 && imageBefore.rows > 0 && imageAfter.cols > 0 && imageAfter.rows > 0) {
+        qDebug("Processing and saving failure images.");
+    } else {
+        qDebug("Invalid images provided for saving.");
+        return;
+    }
     std::string dirName = "failcases";
     makeDirectory(dirName); // Uses our C++11 fallback folder creator
 
     static int fileCounter = getNextFileCounter(dirName);
 
-    std::stringstream ssBefore, ssAfter;
-    
     std::string pathBefore = formatFilename(dirName, fileCounter++);
     std::string pathAfter  = formatFilename(dirName, fileCounter++);
+    
+    cv::imwrite(pathBefore, imageBefore);
+    cv::imwrite(pathAfter, imageAfter);
 
-    cv::imwrite(ssBefore.str(), imageBefore);
-    cv::imwrite(ssAfter.str(), imageAfter);
-
-    std::cout << "Saved: " << ssBefore.str() << " and " << ssAfter.str() << std::endl;
+    qDebug("Saved:%s and %s", pathBefore.c_str(),pathAfter.c_str());
 }
 #endif

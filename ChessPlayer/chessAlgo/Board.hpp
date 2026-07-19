@@ -199,6 +199,68 @@ public:
 		return Tables::ATTACK_TABLE[Piece::KING][square];
 	};
 
+    std::string extractFen() {
+        std::stringstream fen;
+
+        // 1. Piece Placement (Ranks 8 down to 1)
+            for (int rank = 7; rank >= 0; --rank) {
+                int empty_squares = 0;
+                for (int file = 0; file < 8; ++file) {
+                    char piece_char = getChar(file, rank);
+
+                    // Added check for '*' since Deepov flags empty spaces with asterisks
+                    if (piece_char == '*' || piece_char == ' ' || piece_char == '.' || piece_char == '\0') {
+                        empty_squares++;
+                    } else {
+                        if (empty_squares > 0) {
+                            fen << empty_squares;
+                            empty_squares = 0;
+                        }
+                        fen << piece_char;
+                    }
+                }
+                if (empty_squares > 0) {
+                    fen << empty_squares;
+                }
+                if (rank > 0) {
+                    fen << "/";
+                }
+            }
+
+        // 2. Active Color
+        fen << " " << (getColorToPlay() == Color::WHITE ? "w" : "b");
+
+        // 3. Castling Availability
+        std::string castling = "";
+        if (isKingSideCastlingAllowed(Color::WHITE))   castling += "K";
+        if (isQueenSideCastlingAllowed(Color::WHITE))  castling += "Q";
+        if (isKingSideCastlingAllowed(Color::BLACK))   castling += "k";
+        if (isQueenSideCastlingAllowed(Color::BLACK))  castling += "q";
+        fen << " " << (castling.empty() ? "-" : castling);
+
+        // 4. En Passant Target Square
+        Square ep = getLastEpSquare();
+        // Assuming Deepov defines an empty square as SQUARE_NB or NO_SQUARE (usually 64)
+        if (ep >= 64) {
+            fen << " -";
+        } else {
+            char ep_file = 'a' + (ep % 8);
+            char ep_rank = '1' + (ep / 8);
+            fen << " " << ep_file << ep_rank;
+        }
+
+        // 5. Halfmove Clock & Fullmove Number
+        // Your header tracks myHalfMovesCounter via getPly(),
+        // and fullmove can be calculated or derived from history size.
+        fen << " " << getPly();
+
+        // Deepov stores moves in myMoves vector. Fullmove number starts at 1
+        // and increments after every black move.
+        unsigned int fullmoves = 1 + (getMovesHistory().size() / 2);
+        fen << " " << fullmoves;
+
+        return fen.str();
+    }
 	inline bool hasBlackCastled() const
 	{
 		return myHasBlackCastled;
