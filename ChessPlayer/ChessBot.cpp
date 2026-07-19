@@ -12,6 +12,15 @@
 #include <QRegularExpressionMatch>
 #include "ChessBot.h"
 #include "chessAlgo/ChessController.h"
+// Platform-specific headers for directory scanning and creation
+#if defined(_WIN32)
+    #include <windows.h>
+    #include <direct.h>
+#else
+    #include <dirent.h>
+    #include <sys/stat.h>
+    #include <sys/types.h>
+#endif
 
 ChessBot::ChessBot(QThread *parent) :
     QThread(parent),
@@ -1869,44 +1878,92 @@ void ChessBot::speakMove(const QString &piece, const QString &move)
 }
 
 #ifdef IMAGE_PROCESS_MOVE
+// Custom padding helper to replace std::setw/std::setfill
+std::string ChessBot::formatFilename(const std::string& folder, int number) {
+    std::string numStr = std::to_string(number);
+    // Pad with leading zeros until the number length is 4 digits
+    while (numStr.length() < 4) {
+        numStr = "0" + numStr;
+    }
+    return folder + "/f" + numStr + ".jpg";
+}
+// Platform-independent directory creation for C++11
+void ChessBot::makeDirectory(const std::string& path) {
+#if defined(_WIN32)
+    _mkdir(path.c_str());
+#else
+    mkdir(path.c_str(), 0777);
+#endif
+}
+
+// C++11 compliant directory scanner
 int ChessBot::getNextFileCounter(const std::string& folderPath) {
     int maxIndex = 0;
-    
-    if (!std::filesystem::exists(folderPath)) {
-        return 1; 
-    }
 
-    // Direct loop utilizing full std::filesystem scopes
-    for (const auto& entry : std::filesystem::directory_iterator(folderPath)) {
-        if (entry.is_regular_file()) {
-            std::string filename = entry.path().stem().string(); 
-            
-            if (filename.size() > 1 && filename[0] == 'f') {
-                try {
-                    int num = std::stoi(filename.substr(1));
-                    if (num > maxIndex) {
-                        maxIndex = num;
-                    }
-                } catch (...) {
-                    // Ignore non-conforming filenames
+#if defined(_WIN32)
+    // Windows implementation using FindFirstFile / FindNextFile
+    std::string searchPath = folderPath + "/*.*";
+    WIN32_FIND_DATAA fileData;
+    HANDLE hFind = FindFirstFileA(searchPath.c_str(), &fileData);
+    
+    if (hFind != INVALID_HANDLE_VALUE) {
+        do {
+            if (!(fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+                std::string filename(fileData.cFileName);
+                // Strip extension if present to get the stem
+                size_t lastDot = filename.find_last_of(".");
+                if (lastDot != std::string::npos) {
+                    filename = filename.substr(0, lastDot);
+                }
+                
+                if (filename.size() > 1 && filename[0] == 'f') {
+                    try {
+                        int num = std::stoi(filename.substr(1));
+                        if (num > maxIndex) maxIndex = num;
+                    } catch (...) {}
+                }
+            }
+        } while (FindNextFileA(hFind, &fileData));
+        FindClose(hFind);
+    }
+#else
+    // Linux / macOS implementation using dirent.h
+    DIR* dir = opendir(folderPath.c_str());
+    if (dir != nullptr) {
+        struct dirent* entry;
+        while ((entry = readdir(dir)) != nullptr) {
+            if (entry->d_type == DT_REG) { // Regular file
+                std::string filename(entry->d_name);
+                size_t lastDot = filename.find_last_of(".");
+                if (lastDot != std::string::npos) {
+                    filename = filename.substr(0, lastDot);
+                }
+
+                if (filename.size() > 1 && filename[0] == 'f') {
+                    try {
+                        int num = std::stoi(filename.substr(1));
+                        if (num > maxIndex) maxIndex = num;
+                    } catch (...) {}
                 }
             }
         }
+        closedir(dir);
     }
-    
+#endif
+
     return maxIndex + 1;
 }
 
 void ChessBot::processAndSaveFailures(const cv::Mat& imageBefore, const cv::Mat& imageAfter) {
     std::string dirName = "failcases";
-    std::filesystem::create_directories(dirName); // Direct inline call
+    makeDirectory(dirName); // Uses our C++11 fallback folder creator
 
     static int fileCounter = getNextFileCounter(dirName);
 
     std::stringstream ssBefore, ssAfter;
     
-    ssBefore << dirName << "/f" << std::setw(4) << std::setfill('0') << fileCounter++ << ".jpg";
-    ssAfter  << dirName << "/f" << std::setw(4) << std::setfill('0') << fileCounter++ << ".jpg";
+    std::string pathBefore = formatFilename(dirName, fileCounter++);
+    std::string pathAfter  = formatFilename(dirName, fileCounter++);
 
     cv::imwrite(ssBefore.str(), imageBefore);
     cv::imwrite(ssAfter.str(), imageAfter);

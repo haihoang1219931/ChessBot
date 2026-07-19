@@ -175,6 +175,8 @@ private:
 #ifdef IMAGE_PROCESS_MOVE
     void processAndSaveFailures(const cv::Mat& imageBefore, const cv::Mat& imageAfter);
     int getNextFileCounter(const std::string& folderPath);
+    void makeDirectory(const std::string& path);
+    std::string formatFilename(const std::string& folder, int number);
 #endif
 
 private:
