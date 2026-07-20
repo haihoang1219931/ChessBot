@@ -57,7 +57,7 @@ public:
     // now accepts a params struct rather than many separate arguments
     bool detectMovePhase2Substraction(const cv::Mat& img_start, const cv::Mat& img_end,
                                       const MoveDetectParams& params,
-                                      std::vector<cv::Point>& top3cells);
+                                      std::vector<cv::Point>& listChangedCells);
     std::vector<std::string> detectMovePhase3ColorMatching(const cv::Mat& warped1, const cv::Mat& warped2,
                                     const std::vector<cv::Point>& startCells, std::vector<cv::Point> listChangedCell,
                                     const MoveDetectParams& params);
@@ -101,6 +101,8 @@ public:
       int hTol, int sTol, int vTol,
       int roiPercent, int minWhitePercent, int maxBlackPercent,
       std::string nameToShow);
+    bool isCastleMove(const cv::Mat& warpedGray1, const cv::Mat& warpedGray2, const MoveDetectParams& params,
+                      cv::Point& startCell, cv::Point& endCell);
 
 private:
     bool m_sourceConnected;
