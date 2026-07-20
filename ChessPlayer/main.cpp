@@ -49,6 +49,7 @@
 ****************************************************************************/
 
 #include <QGuiApplication>
+#include <QCursor>
 #include <QLoggingCategory>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -59,6 +60,8 @@ int main(int argc, char *argv[])
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
     QGuiApplication app(argc, argv);
     QQmlApplicationEngine engine;
+    // Hide the cursor globally across the entire application
+    QGuiApplication::setOverrideCursor(QCursor(Qt::BlankCursor));
     ChessBot backend; // Instantiate your class
     engine.rootContext()->setContextProperty("backend", &backend);
     engine.rootContext()->setContextProperty("chessController", backend.chessController());
