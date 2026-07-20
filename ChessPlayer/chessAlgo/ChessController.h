@@ -16,7 +16,6 @@ class ChessController : public QObject
     Q_PROPERTY(int selectedSquare READ selectedSquare NOTIFY selectedSquareChanged)
     Q_PROPERTY(QString sideToMove READ sideToMove NOTIFY sideToMoveChanged)
     Q_PROPERTY(QString status READ status WRITE setStatus NOTIFY statusChanged)
-    Q_PROPERTY(QStringList moveHistory READ moveHistory NOTIFY moveHistoryChanged)
     Q_PROPERTY(bool promotionPending READ promotionPending NOTIFY promotionPendingChanged)
     Q_PROPERTY(int checkedKingSquare READ checkedKingSquare NOTIFY checkedKingSquareChanged)
     Q_PROPERTY(int engineLevel READ engineLevel NOTIFY engineLevelChanged)
@@ -30,7 +29,7 @@ public:
     QString sideToMove() const;
     QString status() const;
     void setStatus(QString status);
-    QStringList moveHistory() const;
+    std::vector<Move> moveHistory() const;
     bool promotionPending() const;
     int checkedKingSquare() const;
     int engineLevel() const;
@@ -40,15 +39,22 @@ public:
     void playEngineMove();
     QString pieceType(QString square);
     QString extractFEN();
-
+    QString processRobotCommentary(const QString fen, const int color,
+                                   const QString pieceType, const QString pieceNotation, Move playerMove);
+    bool moveByCoordinates(const QString& startSquare, const QString& stopSquare, Move& chosenMove,
+                                           QChar promotionSuffix = QChar());
+    int uiIndexToSquare(int uiIndex);
+    int squareToUiIndex(int square);
+    QString uiIndexToPieceType(int uiIndex);
+    QString uiIndexToSquareNotation(int uiIndex);
+    std::string coordToNotation(int squareIndex);
     Q_INVOKABLE void newGame();
     Q_INVOKABLE void clickSquare(int uiIndex);
-    Q_INVOKABLE bool moveByUiSquares(int startUiIndex, int stopUiIndex);
+    Q_INVOKABLE bool moveByUiSquares(int startUiIndex, int stopUiIndex, Move& chosenMove);
     Q_INVOKABLE bool moveByUiIndex(int startUiIndex,
-                                            int stopUiIndex,
-                                            QChar promotionSuffix);
-    Q_INVOKABLE bool moveByCoordinates(const QString& startSquare, const QString& stopSquare,
-                                       QChar promotionSuffix = QChar());
+                                   int stopUiIndex,
+                                   Move& move,
+                                   QChar promotionSuffix);
     Q_INVOKABLE QStringList findBestMoveCoordinates() const;
     Q_INVOKABLE bool isValidDestination(int uiIndex) const;
     Q_INVOKABLE void choosePromotion(const QString& pieceLetter);
@@ -56,6 +62,7 @@ public:
     Q_INVOKABLE void setEngineLevel(int level);
     Q_INVOKABLE void setPlayerColor(int color);
     Q_INVOKABLE void undoMove();
+
 
 Q_SIGNALS:
     void boardChanged();
@@ -76,10 +83,7 @@ private:
     bool tryFindLegalMove(int originSquare, int destinationSquare, Move& outMove, QChar promotionSuffix = QChar());
     QString pieceCodeAtSquare(int square) const;
     QString convertPieceText(QString pieceShortName);
-    static bool tryParseCoordinate(const QString& coordinate, int& uiIndex);
-
-    static int uiIndexToSquare(int uiIndex);
-    static int squareToUiIndex(int square);
+    bool tryParseCoordinate(const QString& coordinate, int& uiIndex);
 
 private:
     std::shared_ptr<Board> m_board;
@@ -87,7 +91,7 @@ private:
     QSet<int> m_validDestinationUiSquares;
     QStringList m_boardModel;
     QString m_status;
-    QStringList m_moveHistory;
+    std::vector<Move> m_moveHistory;
     bool m_promotionPending;
     int m_checkedKingSquare;
     std::vector<Move> m_pendingPromotionMoves;

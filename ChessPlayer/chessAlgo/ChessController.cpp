@@ -10,6 +10,33 @@
 #include "Tables.hpp"
 #include "Utils.hpp"
 #include "Piece.hpp"
+#include "Eval.hpp"
+
+
+// Global speech phrase configurations for kids
+const QStringList BLUNDER_PHRASES = {
+    "Oh no! That is a major blunder!",
+    "Be careful! You left a piece hanging!",
+    "Ouch! That move hurts your position."
+};
+
+const QStringList MISTAKE_PHRASES = {
+    "Hmm, that's okay, but watch your defenses.",
+    "An interesting choice, but you missed a safer square.",
+    "Be cautious! The engine sees an opening there."
+};
+
+const QStringList BRILLIANT_PHRASES = {
+    "Wow! That move is absolutely brilliant!",
+    "Incredible play! Are you a grandmaster?",
+    "Excellent tactical vision!"
+};
+
+const QStringList GOOD_PHRASES = {
+    " is a very solid move.",
+    " helps you control the board.",
+    " is a nice strategic development."
+};
 
 ChessController::ChessController(QObject* parent)
     : QObject(parent)
@@ -60,7 +87,7 @@ void ChessController::setStatus(QString status)
     }
 }
 
-QStringList ChessController::moveHistory() const
+std::vector<Move> ChessController::moveHistory() const
 {
     return m_moveHistory;
 }
@@ -172,13 +199,16 @@ void ChessController::clickSquare(int uiIndex)
     Q_EMIT boardChanged();
 }
 
-bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex)
+bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex, Move& chosenMove)
 {
     if (startUiIndex < 0 || startUiIndex >= 64 || stopUiIndex < 0 || stopUiIndex >= 64)
     {
         return false;
     }
-
+    if (m_playerColor == Color::BLACK) {
+        startUiIndex = 63 - startUiIndex;
+        stopUiIndex = 63 - stopUiIndex;
+    }
     if (m_promotionPending)
     {
         setStatus("PROMOTION_PENDING");
@@ -201,14 +231,13 @@ bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex)
         return false;
     }
 
-    Move chosenMove;
     if (!tryFindLegalMove(originSquare, destinationSquare, chosenMove))
     {
         Q_EMIT boardChanged();
         return false;
     }
     m_board->executeMove(chosenMove);
-    m_moveHistory.append(QString::fromStdString(chosenMove.toShortString()));
+    m_moveHistory.push_back(chosenMove);
     Q_EMIT moveHistoryChanged();
     clearSelection();
     refreshBoardModel();
@@ -227,8 +256,9 @@ bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex)
 }
 
 bool ChessController::moveByUiIndex(int startUiIndex,
-                                        int stopUiIndex,
-                                        QChar promotionSuffix)
+                                    int stopUiIndex,
+                                    Move& chosenMove,
+                                    QChar promotionSuffix)
 {
     const int originSquare = uiIndexToSquare(startUiIndex);
     const int destinationSquare = uiIndexToSquare(stopUiIndex);
@@ -246,7 +276,6 @@ bool ChessController::moveByUiIndex(int startUiIndex,
         return false;
     }
 
-    Move chosenMove;
     if (!tryFindLegalMove(originSquare, destinationSquare, chosenMove, promotionSuffix))
     {
         Q_EMIT boardChanged();
@@ -254,7 +283,7 @@ bool ChessController::moveByUiIndex(int startUiIndex,
     }
 
     m_board->executeMove(chosenMove);
-    m_moveHistory.append(QString::fromStdString(chosenMove.toShortString()));
+    m_moveHistory.push_back(chosenMove);
     Q_EMIT moveHistoryChanged();
     clearSelection();
     refreshBoardModel();
@@ -272,6 +301,7 @@ bool ChessController::moveByUiIndex(int startUiIndex,
 }
 bool ChessController::moveByCoordinates(const QString& startSquare,
                                         const QString& stopSquare,
+                                        Move& chosenMove,
                                         QChar promotionSuffix)
 {
     int startUiIndex = -1;
@@ -305,7 +335,7 @@ bool ChessController::moveByCoordinates(const QString& startSquare,
         setStatus("PROTOMTION_PENDING");
         return false;
     }
-    return moveByUiIndex(startUiIndex,stopUiIndex,promotionSuffix);
+    return moveByUiIndex(startUiIndex,stopUiIndex,chosenMove,promotionSuffix);
 }
 
 QStringList ChessController::findBestMoveCoordinates() const
@@ -373,7 +403,7 @@ void ChessController::choosePromotion(const QString& pieceLetter)
     }
 
     m_board->executeMove(chosenMove);
-    m_moveHistory.append(QString::fromStdString(chosenMove.toShortString()));
+    m_moveHistory.push_back(chosenMove);
     Q_EMIT moveHistoryChanged();
     clearSelection();
     refreshBoardModel();
@@ -454,25 +484,24 @@ void ChessController::playEngineMove()
 {
     Search search(m_board);
     search.negaMaxRoot(m_engineDepth);
-
-    const QString bestMoveText = QString::fromStdString(Utils::Move16ToShortString(search.myBestMove));
-
+    Move bestMove = search.myBestMove;
     MoveGen moveGen(m_board);
     const auto legalMoves = moveGen.generateMoves();
     for (Move move : legalMoves)
     {
-        if (QString::fromStdString(move.toShortString()) == bestMoveText)
+        if (QString::fromStdString(move.toShortString()) ==
+                QString::fromStdString(bestMove.toShortString()))
         {
             m_board->executeMove(move);
-            m_botMove = Move(move.getMove());
-            m_moveHistory.append(bestMoveText);
+            m_moveHistory.push_back(move);
             Q_EMIT moveHistoryChanged();
             refreshBoardModel();
             refreshCheckState();
             Q_EMIT sideToMoveChanged();
 
             const QString result = buildResultText();
-            setStatus(result.isEmpty() ? QString("ENGINE_PLAY_") + bestMoveText : result);
+            setStatus(result.isEmpty() ?
+                          QString("ENGINE_PLAY_") + QString::fromStdString(bestMove.toShortString()) : result);
             return;
         }
     }
@@ -642,6 +671,35 @@ int ChessController::squareToUiIndex(int square)
     return rankFromTop * 8 + file;
 }
 
+QString ChessController::uiIndexToPieceType(int uiIndex)
+{
+    int squareIndex = uiIndexToSquare(m_playerColor == Color::WHITE?uiIndex:63-uiIndex);
+    QString piece = pieceCodeAtSquare(squareIndex);
+    QString pieceName = convertPieceText(piece);
+    return pieceName;
+}
+
+QString ChessController::uiIndexToSquareNotation(int uiIndex)
+{
+    int squareIndex = uiIndexToSquare(uiIndex);
+    return QString::fromStdString(coordToNotation(squareIndex));
+}
+
+std::string ChessController::coordToNotation(int squareIndex)
+{
+    int row = squareIndex/8;
+    int col = squareIndex%8;
+    if (row < 0 || row > 7 || col < 0 || col > 7) return "";
+    char file, rank;
+    if (m_playerColor == Color::WHITE) {
+        file = 'a' + col;
+        rank = '1' + row;
+    } else { // black at bottom
+        file = 'h' - col;
+        rank = '8' - row;
+    }
+    return std::string(1, file) + std::string(1, rank);
+}
 bool ChessController::tryParseCoordinate(const QString& coordinate, int& uiIndex)
 {
     const QString trimmed = coordinate.trimmed().toLower();
@@ -663,3 +721,46 @@ bool ChessController::tryParseCoordinate(const QString& coordinate, int& uiIndex
     uiIndex = squareToUiIndex(square);
     return true;
 }
+
+QString ChessController::processRobotCommentary(const QString fen, const int color,
+                                                const QString pieceType, const QString pieceNotation,
+                                                Move playerMove) {
+    std::shared_ptr<Board> cloneBoard = std::make_shared<Board>(fen.toStdString());
+    Eval eval(cloneBoard);
+    // 1. Get score before execution
+    int scoreBefore = eval.evaluate();
+
+    // 2. Play the move using Deepov's internal transition function
+    cloneBoard->executeMove(playerMove);
+    int scoreAfter = eval.evaluate();
+
+    // 4. Score drop calculation (Delta)
+    // Note: Since turn flipped, adjust delta relative to who just moved
+    std::cout << "scoreBefore: " << scoreBefore << " scoreAfter:" << scoreAfter << std::endl;
+    QString speechText = "";
+    QString moveNotation = pieceType+" to "+pieceNotation + " ";
+    // Seed random selection
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
+
+    // 5. Categorize score change
+//    int delta = scoreAfter - scoreBefore;
+//    if (delta >= 15) { // Loss of 1 whole pawn or more
+//        speechText = BLUNDER_PHRASES[std::rand() % BLUNDER_PHRASES.size()];
+//    }
+//    else if (delta >= 3) { // Slight loss of positional advantage
+//        speechText = MISTAKE_PHRASES[std::rand() % MISTAKE_PHRASES.size()];
+//    }
+//    else if (delta <= 15) { // Huge unexpected strategic gain
+//        speechText = BRILLIANT_PHRASES[std::rand() % BRILLIANT_PHRASES.size()];
+//    }
+//    else
+    { // Safe, standard development choice
+        speechText = moveNotation + GOOD_PHRASES[std::rand() % GOOD_PHRASES.size()];
+    }
+
+    // 6. Direct command execution to offline Text-to-Speech Engine
+    std::cout << "[Robot Voice Engine]: " << speechText.toStdString() << std::endl;
+
+    return speechText;
+}
+

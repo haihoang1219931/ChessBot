@@ -248,10 +248,21 @@ void ChessBot::run()
     qDebug("Dowork finished");
 }
 
-void ChessBot::playInputMove(int startIndex, int stopIndex, int promotePiece) {
-    qDebug("======== playInputMove %d->%d",startIndex,stopIndex);
+void ChessBot::playInputMove(int startUiIndex, int stopUiIndex, int promotePiece) {
+    qDebug("======== playInputMove %d->%d",startUiIndex,stopUiIndex);
+    for(int row = 0; row < 8; row ++) {
+        for(int col = 0; col < 8 ; col++) {
+            printf("%s ",m_chessController->uiIndexToSquareNotation(row*8+col).toStdString().c_str());
+        }
+        printf("\r\n");
+    }
     if(promotePiece < 0) {
-        if(m_chessController->moveByUiSquares(startIndex,stopIndex)) {
+        QString fenBeforeMove = m_chessController->extractFEN();
+        QString pieceType = m_chessController->uiIndexToPieceType(startUiIndex);
+        QString pieceTargetNotation = m_chessController->uiIndexToSquareNotation(stopUiIndex);
+        Move chosenMove;
+        if(m_chessController->moveByUiSquares(startUiIndex,stopUiIndex,chosenMove)) {
+            speakMove(fenBeforeMove,m_side,pieceType,pieceTargetNotation,chosenMove);
             m_state = STATE_PLAY;
             m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
             Q_EMIT playTurnChanged(1-m_side);
@@ -273,8 +284,6 @@ void ChessBot::playInputMove(int startIndex, int stopIndex, int promotePiece) {
         togglePause(false);
         startService();
     }
-
-
 }
 
 void ChessBot::playInputCancelPromotion()
@@ -287,8 +296,12 @@ void ChessBot::playLoop()
     switch (m_statePlay) {
     case PLAY_SETUP: {
         qDebug("PLAY_SETUP");
-        sendTestCommand("rs");
+        logWithTimestampQt("===New game===");
+        qDebug("Init FEN: %s",m_chessController->extractFEN().toStdString().c_str());
+        logWithTimestampQt(m_chessController->extractFEN());
+        qDebug("Init FEN done");
 #ifdef IMAGE_PROCESS_MOVE
+        sendTestCommand("rs");
         readFrame(imageBefore);
         qDebug("First image [%d,%d]",
                imageBefore.rows,imageBefore.cols);
@@ -325,7 +338,10 @@ void ChessBot::playLoop()
     }
         break;
     case PLAY_CALCULATE_NEXT_MOVE_RESET: {
+        qDebug("PLAY_CALCULATE_NEXT_MOVE_RESET");
+#ifdef IMAGE_PROCESS_MOVE
         sendTestCommand("rs");
+#endif
         m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
     }
         break;
@@ -489,6 +505,10 @@ uint8_t ChessBot::playDetectMove()
 {
     qDebug("playDetectMove");
     bool foundValidMove = false;
+    Move choosenMove;
+    QString choosenPiece;
+    QString choosenPieceMoveNotation;
+    QString fenBeforeMove = m_chessController->extractFEN();
 #ifdef IMAGE_PROCESS_MOVE
     if(!readFrame(imageAfter)){
         return STATE_DONE_FAIL;
@@ -502,7 +522,9 @@ uint8_t ChessBot::playDetectMove()
             qDebug("Possible Move %s",chessMoves[i].c_str());
             QString from = QString::fromStdString(chessMoves[i]).left(2);  // Result: "e2"
             QString to = QString::fromStdString(chessMoves[i]).right(2);   // Result: "e4"
-            if(m_chessController->moveByCoordinates(from,to)) {
+            choosenPiece = m_chessController->pieceType(from);
+            choosenPieceMoveNotation = to;
+            if(m_chessController->moveByCoordinates(from,to,choosenMove)) {
                 foundValidMove = true;
                 break;
             }
@@ -510,19 +532,21 @@ uint8_t ChessBot::playDetectMove()
     }
 
 #endif
+    if(foundValidMove) {
+        speakMove(fenBeforeMove,m_side,choosenPiece, choosenPieceMoveNotation, choosenMove);
+    }
     return foundValidMove?STATE_DONE_SUCCESS:STATE_DONE_FAIL;
 }
 
 uint8_t ChessBot::playRandomMove()
 {
     QStringList randomMoves = m_chessController->findBestMoveCoordinates();
+    Move choosenMove;
     printf("=== Player move %s->%s\r\n",
             randomMoves[0].toStdString().c_str(),
             randomMoves[1].toStdString().c_str());
-    if(randomMoves[0] != randomMoves[1]) {
-        speakMove(m_chessController->pieceType(randomMoves[0]),
-                randomMoves[1]);
-        m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1]);
+    if(randomMoves[0] != randomMoves[1]) {        
+        m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1],choosenMove);
         return STATE_DONE_SUCCESS;
     } else {
         speakText("No invalid move found\r\n");
@@ -557,13 +581,13 @@ uint8_t ChessBot::playCalculateNextMove()
 {
     qDebug("playCalculateNextMove FEN: %s",m_chessController->extractFEN().toStdString().c_str());
     logWithTimestampQt(m_chessController->extractFEN());
+    // play engine move
     m_chessController->playEngineMove();
-    QString lastMove = m_chessController->moveHistory().last();
+    QString lastMove = QString::fromStdString(m_chessController->moveHistory()[m_chessController->moveHistory().size()-1].toShortString());
     printf("lastMove %s\r\n", lastMove.toStdString().c_str());
     QString from = lastMove.left(2);  // Result: "e2"
     QString to = lastMove.right(2);   // Result: "e4"
     QPoint fromCoord, toCoord;
-    speakMove(m_chessController->pieceType(to), to);
     fromCoord = notationToCoord(from.toStdString(),
                                                 m_side != 0?"white":"black");
     toCoord = notationToCoord(to.toStdString(),
@@ -1712,10 +1736,7 @@ QObject* ChessBot::chessControllerObject() const
 
 void ChessBot::resetGame(){
     qDebug("Reset game side[%d]",m_side);
-    logWithTimestampQt("======= NEW GAME =======");
-    m_chessController->newGame();
-    qDebug("Init FEN: %s",m_chessController->extractFEN().toStdString().c_str());
-    logWithTimestampQt(m_chessController->extractFEN());
+    m_chessController->newGame();    
     if(m_side == 1) {
         m_state = STATE_PLAY;
         m_statePlay = PLAY_CALCULATE_NEXT_MOVE_RESET;
@@ -1868,17 +1889,10 @@ void ChessBot::speakText(const QString &text)
 #endif
 }
 
-void ChessBot::speakMove(const QString &piece, const QString &move)
+void ChessBot::speakMove(const QString fen, const int color,
+                         QString pieceType, const QString pieceNotation, const Move &move)
 {
-    if (move.isEmpty()) return;
-    qDebug("Speak %s",move.toStdString().c_str());
-    QString formattedMove = "Detect move " + piece + " to ";
-    // Format "E4E5" to "E 4 E 5 " for proper spelling pronunciation
-    for (int i = 0; i < move.length(); ++i) {
-        formattedMove.append(move.at(i).toUpper());
-        formattedMove.append(" ");
-    }
-
+    QString formattedMove = m_chessController->processRobotCommentary(fen,color, pieceType, pieceNotation, move);
     speakText(formattedMove);
 }
 void ChessBot::logWithTimestampQt(QString data) {

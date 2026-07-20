@@ -21,6 +21,7 @@
 
 class ChessController;
 class MoveDetectParams;
+class Move;
 #ifdef IMAGE_PROCESS_MOVE
     #include "ChessImageProcessing.h"
 #endif
@@ -129,7 +130,8 @@ public Q_SLOTS:
     void connectCamera();
     void disconnectCamera();
     void speakText(const QString &text);
-    void speakMove(const QString &piece, const QString &move);
+    void speakMove(const QString fen, const int color,
+                   const QString pieceType, const QString pieceNotation, const Move& move);
     void playInputMove(int startIndex, int stopIndex, int promotePiece = -1);
     void playInputCancelPromotion();
 
