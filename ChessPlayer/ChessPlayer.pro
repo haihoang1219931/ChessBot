@@ -6,7 +6,8 @@ CONFIG += c++11
 
 CONFIG += use_chess_algo
 
-#CONFIG += use_image_processing
+CONFIG += use_image_processing
+#DEFINES += TEST_RANDOM_MOVE
 use_image_processing {
 #DEFINES += DEBUG_SHOW_IMAGE
 #DEFINES += DEBUG_WRITE_IMAGE

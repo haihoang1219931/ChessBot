@@ -265,7 +265,7 @@ void ChessBot::playInputMove(int startUiIndex, int stopUiIndex, int promotePiece
             speakMove(fenBeforeMove,m_side,pieceType,pieceTargetNotation,chosenMove);
             m_state = STATE_PLAY;
             m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
-            Q_EMIT playTurnChanged(1-m_side);
+            Q_EMIT playTurnChanged(m_side == Color::WHITE ? 1-m_side:m_side);
             togglePause(false);
             startService();
         } else {
@@ -376,7 +376,7 @@ void ChessBot::playLoop()
 
     case PLAY_PROCESS_DONE: {
         qDebug("PLAY_PROCESS_DONE");
-        Q_EMIT playTurnChanged(m_side);
+        Q_EMIT playTurnChanged(m_side == Color::WHITE ? m_side:1-m_side);
         playCheckEndGame();
         togglePause(true);
     }
@@ -530,6 +530,21 @@ uint8_t ChessBot::playDetectMove()
             }
         }
     }
+#elif defined(TEST_RANDOM_MOVE)
+        QStringList randomMoves = m_chessController->findBestMoveCoordinates();
+        printf("=== Player move %s->%s\r\n",
+                randomMoves[0].toStdString().c_str(),
+                randomMoves[1].toStdString().c_str());
+        if(randomMoves[0] != randomMoves[1]) {
+            QString from = randomMoves[0].left(2);  // Result: "e2"
+            QString to = randomMoves[1].right(2);   // Result: "e4"
+            choosenPiece = m_chessController->pieceType(from);
+            choosenPieceMoveNotation = to;
+            m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1],choosenMove);
+            foundValidMove = true;
+        } else {
+            speakText("No invalid move found\r\n");
+        }
 
 #endif
     if(foundValidMove) {
@@ -1668,7 +1683,7 @@ void ChessBot::processNextMove()
     m_state = STATE_PLAY;
     m_statePlay = PLAY_INIT;
 //    m_statePlay = PLAY_INFORM_ERROR;
-    Q_EMIT playTurnChanged(1-m_side);
+    Q_EMIT playTurnChanged(m_side == Color::WHITE ? 1-m_side : m_side);
     togglePause(false);
     startService();
 }
