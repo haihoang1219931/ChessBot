@@ -141,7 +141,8 @@ const std::string whiteMateFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
 const std::string blackMateFen = "7K/6q1/6k1/8/8/8/8/8 w - - 0 1";
 const std::string staleMateFen = "7k/5Q2/7K/8/8/8/8/8 b - - 0 1";
 const std::string ongoingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-
+const std::string whitePawnPromotionCapture = "1r6/2P1k3/8/3K4/8/8/8/8 w - - 0 1";
+const std::string whitePawnDoubleCapture = "3r1r2/4P3/8/k7/8/8/8/1K6 w - - 0 1";
 void ChessController::newGame()
 {
     m_board = std::make_shared<Board>();

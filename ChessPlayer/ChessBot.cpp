@@ -327,8 +327,11 @@ void ChessBot::playLoop()
         break;
     case PLAY_DETECT_MOVE: {
         qDebug("PLAY_DETECT_MOVE");
-        if(playDetectMove() == STATE_DONE_SUCCESS){
+        int detectMoveState = playDetectMove();
+        if(detectMoveState == STATE_DONE_SUCCESS){
             m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
+        } else if (detectMoveState == STATE_PENDING) {
+            m_statePlay = PLAY_REQUEST_PROMOTE_PIECE;
         } else {
             m_statePlay = PLAY_INFORM_ERROR;
 #ifdef IMAGE_PROCESS_MOVE
@@ -364,6 +367,12 @@ void ChessBot::playLoop()
         if(playInformResult()== STATE_DONE_SUCCESS){
             m_statePlay = PLAY_PROCESS_DONE;
         }
+    }
+        break;
+    case PLAY_REQUEST_PROMOTE_PIECE: {
+        qDebug("PLAY_REQUEST_PROMOTE_PIECE");
+        speakText("Choose your promotion piece");
+        m_statePlay = PLAY_PROCESS_DONE;
     }
         break;
     case PLAY_INFORM_ERROR:{
@@ -504,7 +513,7 @@ bool ChessBot::playCheckEndGame()
 uint8_t ChessBot::playDetectMove()
 {
     qDebug("playDetectMove");
-    bool foundValidMove = false;
+    int detectState = STATE_DONE_FAIL;
     Move choosenMove;
     QString choosenPiece;
     QString choosenPieceMoveNotation;
@@ -525,8 +534,14 @@ uint8_t ChessBot::playDetectMove()
             choosenPiece = m_chessController->pieceType(from);
             choosenPieceMoveNotation = to;
             if(m_chessController->moveByCoordinates(from,to,choosenMove)) {
-                foundValidMove = true;
+                detectState = STATE_DONE_SUCCESS;
                 break;
+            } else {
+                if(m_chessController->status() == "CHOOSE_PROMOTION_PIECE") {
+                    Q_EMIT showPromotionPieces();
+                    detectState = STATE_PENDING;
+                    break;
+                }
             }
         }
     }
@@ -540,17 +555,25 @@ uint8_t ChessBot::playDetectMove()
             QString to = randomMoves[1].right(2);   // Result: "e4"
             choosenPiece = m_chessController->pieceType(from);
             choosenPieceMoveNotation = to;
-            m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1],choosenMove);
-            foundValidMove = true;
+            if(m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1],choosenMove)) {
+                detectState = STATE_DONE_SUCCESS;
+                break;
+            } else {
+                if(m_chessController->status() == "CHOOSE_PROMOTION_PIECE") {
+                    Q_EMIT showPromotionPieces();
+                    detectState = STATE_PENDING;
+                    break;
+                }
+            }
         } else {
             speakText("No invalid move found\r\n");
         }
 
 #endif
-    if(foundValidMove) {
+    if(detectState == STATE_DONE_SUCCESS) {
         speakMove(fenBeforeMove,m_side,choosenPiece, choosenPieceMoveNotation, choosenMove);
     }
-    return foundValidMove?STATE_DONE_SUCCESS:STATE_DONE_FAIL;
+    return detectState;
 }
 
 uint8_t ChessBot::playRandomMove()
