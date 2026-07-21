@@ -52,7 +52,8 @@ SOURCES += chessDetector/ChessImageProcessing.cpp \
     main_dnn.cpp \
     main_dnn_origin.cpp \
     main_gray_filter.cpp \
-    main_v4l2.cpp
+    main_v4l2.cpp \
+    main_3d_projection.cpp
 HEADERS += chessDetector/ChessImageProcessing.h
 }
 
