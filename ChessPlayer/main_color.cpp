@@ -164,7 +164,7 @@
 //                Scalar boxColor = isColorDetected ? Scalar(0, 255, 0) : Scalar(0, 0, 255);
 //                rectangle(display, roiRect, boxColor, 2);
 //                if (isColorDetected) {
-//                    putText(display, "MATCH", Point(roiRect.x + 2, roiRect.y + 16), FONT_HERSHEY_SIMPLEX, 0.4, boxColor, 1);
+//                    putText(display, std::to_string(whiteFrac), Point(roiRect.x + 2, roiRect.y + 16), FONT_HERSHEY_SIMPLEX, 0.4, boxColor, 1);
 //                }
 //                Mat maskAllRoi = maskAll(roiRect);
 //                bitwise_or(maskAllRoi, roiMask, maskAllRoi);

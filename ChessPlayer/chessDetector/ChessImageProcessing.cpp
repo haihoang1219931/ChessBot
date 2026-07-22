@@ -178,7 +178,6 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& 
             listMoves = detectMovePhase3ColorMatchingFromFilter(possibleStartCells, listChangedCell, params,
                                                         matColorMap1, matColorMap2);
     }
-
     return listMoves;
 }
 
@@ -341,6 +340,7 @@ bool ChessImageProcessing::detectMovePhase2Substraction(const cv::Mat& img_start
 
     listChangedCells.clear();
     for (int i = 0; i < 4 && i < (int)counts.size(); ++i) {
+        if(std::get<0>(counts[i]) < 1500) continue;
         int cnt = std::get<0>(counts[i]);
         int c = std::get<1>(counts[i]);
         int r = std::get<2>(counts[i]);
@@ -436,7 +436,9 @@ std::vector<std::string> ChessImageProcessing::detectMovePhase3ColorMatchingFrom
                                 const std::vector<std::vector<int>> matColorMapAfter)
 {
     std::vector<std::string> listMoves;
+    std::vector<cv::Point> filterChangedCell;
     for (int i=0; i< listChangedCell.size(); i++) {
+        filterChangedCell.push_back(cv::Point(listChangedCell[i].x,listChangedCell[i].y));
         std::cout << "detectMovePhase2Substraction: listChangedCell " << listChangedCell[i] << std::endl;
     }
     for (int i=0; i< startCells.size(); i++) {
@@ -456,22 +458,22 @@ std::vector<std::string> ChessImageProcessing::detectMovePhase3ColorMatchingFrom
         if(foundValidStartCell) break;
     }
     // 2) Exclude the start cell from changed-cell candidates (if present)
-    if (startCell.x >= 0 && startCell.y >= 0 && !listChangedCell.empty()) {
-        for (int i=0; i< listChangedCell.size(); i++) {
-            if (listChangedCell[i].x == startCell.x && listChangedCell[i].y == startCell.y) {
-                listChangedCell.erase(listChangedCell.begin() + i);
+    if (startCell.x >= 0 && startCell.y >= 0 && !filterChangedCell.empty()) {
+        for (int i=0; i< filterChangedCell.size(); i++) {
+            if (filterChangedCell[i].x == startCell.x && filterChangedCell[i].y == startCell.y) {
+                filterChangedCell.erase(filterChangedCell.begin() + i);
                 break;
             }
         }
     }
 
-    for(cv::Point filterCell: listChangedCell) {
+    for(cv::Point filterCell: filterChangedCell) {
         std::cout << "end cell [" << filterCell << "]" << std::endl;
     }
     // 3) If we have a start from phase1 and remaining candidates, try color matching
-    if (startCell.x >= 0 && startCell.y >= 0 && !listChangedCell.empty()) {
+    if (startCell.x >= 0 && startCell.y >= 0 && !filterChangedCell.empty()) {
         std::string from = coordToNotation(startCell, params.playerSide);
-        for(cv::Point filterCell: listChangedCell) {
+        for(cv::Point filterCell: filterChangedCell) {
             std::cout << "filterCell y:" << filterCell.y << " x:" << filterCell.x << " v:" << matColorMapAfter[filterCell.y][filterCell.x] << std::endl;
             if(matColorMapAfter[filterCell.y][filterCell.x] != 0 &&
                     matColorMapBefore[filterCell.y][filterCell.x] == 0) {
@@ -482,10 +484,16 @@ std::vector<std::string> ChessImageProcessing::detectMovePhase3ColorMatchingFrom
                 listMoves.push_back(from + to);
             }
         }
-    } else if (!listChangedCell.empty()) {
+    }
+    if (listMoves.size() == 0 && listChangedCell.size()>=2) {
+        printf("Check last possible move from substraction\r\n");
         // No binary start found; if only changed cells remain, return their notations as possible moves
-        for (const auto& pt : listChangedCell) {
-            listMoves.push_back(coordToNotation(pt, params.playerSide));
+        for (const auto& from : listChangedCell) {
+            for (const auto& to : listChangedCell) {
+                if(from.x != to.x || from.y != to.y) {
+                    listMoves.push_back(coordToNotation(from, params.playerSide)+coordToNotation(to, params.playerSide));
+                }
+            }
         }
     }
     return listMoves;
@@ -1152,7 +1160,7 @@ bool ChessImageProcessing::isCastleMove(const cv::Mat& warpedGray1, const cv::Ma
         int diff_px = 0;
         if (roiRect.width > 0 && roiRect.height > 0)
             diff_px = cv::countNonZero(diff_bin(roiRect));
-        if(diff_px < params.pieceMinPoints) continue;
+        if(diff_px < 1500) continue;
         counts.emplace_back(diff_px, c, 0);
 #if defined(DEBUG_SHOW_IMAGE) || defined(DEBUG_WRITE_IMAGE)
         // draw small rectangle and count
