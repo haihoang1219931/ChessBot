@@ -1,7 +1,8 @@
 #include "ChessImageProcessing.h"
-
+#include <set>
+#include <algorithm>
 const int WARP_SIZE = 640;
-
+const int MIN_BINARY_POINT = 600;
 typedef enum {
     DETECT_MOVE_PHASE1_BINARY,
     DETECT_MOVE_PHASE2_SUBSTRACTION,
@@ -156,28 +157,19 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& 
 
     std::vector<cv::Point> listChangedCell;
     detectMovePhase2Substraction(gray1, gray2, params, listChangedCell);
-
+    printf("Color checking start binary[%d] color[%d] sub[%d]\r\n",
+           startCellsBinary.size(),
+           startCellsColor.size(),
+           listChangedCell.size());
 //    listMoves = detectMovePhase3ColorMatching(warped1, warped2, startCells, listChangedCell, params);
-    if(startCellsBinary.size() == 0) {
+    if(startCellsColor.size() > 0) {
         listMoves = detectMovePhase3ColorMatchingFromFilter(startCellsColor, listChangedCell, params,
                                                         matColorMap1, matColorMap2);
-    } else if(startCellsBinary.size() == 1) {
+    } else {
         listMoves = detectMovePhase3ColorMatchingFromFilter(startCellsBinary, listChangedCell, params,
                                                         matColorMap1, matColorMap2);
-    } else {
-        std::vector<cv::Point> possibleStartCells;
-        if(startCellsColor.size() > 0) {
-            for (const auto& point : startCellsBinary) {
-                // Check if the current point exists in the color list
-                if (std::find(startCellsColor.begin(), startCellsColor.end(), point) != startCellsColor.end()) {
-                    possibleStartCells.push_back(point);
-                }
-            }
-        }
-        if(possibleStartCells.size() == 1)
-            listMoves = detectMovePhase3ColorMatchingFromFilter(possibleStartCells, listChangedCell, params,
-                                                        matColorMap1, matColorMap2);
     }
+    printf("Color checking done\r\n");
     return listMoves;
 }
 
@@ -238,6 +230,8 @@ bool ChessImageProcessing::detectMovePhase1ColorFilter(const cv::Mat& color1, co
     matColorMapAfter = getPieceMatrixColor(color2,params,"warp2");
 
     comparePieceMatrices(matColorMapBefore, matColorMapAfter, starts, ends);
+    std::cout << "comparePieceMatrices done with num start " << starts.size() << std::endl;
+    if(starts.size() > 0) return false;
     for(cv::Point start: starts) {
         std::cout << "Possible start: " << start << std::endl;
 #if defined(DEBUG_SHOW_IMAGE) || defined(DEBUG_WRITE_IMAGE)
@@ -278,92 +272,110 @@ bool ChessImageProcessing::detectMovePhase2Substraction(const cv::Mat& img_start
     // use passed images (expected to be warped/grayscale or edge images)
     const cv::Mat& gray1 = img_start;
     const cv::Mat& gray2 = img_end;
+    std::cout << "detectMovePhase2Substraction" << std::endl;
     if (gray1.empty() || gray2.empty()) return false;
 
-    cv::Mat diff_bin;
-    cv::absdiff(gray1, gray2, diff_bin);
+    cv::Mat diff_gray, diff_bin;
+    cv::absdiff(gray1, gray2, diff_gray);
 #if defined(DEBUG_SHOW_IMAGE)
-    cv::imshow("diff_bin_gray",diff_bin);
+    cv::imshow("diff_bin_gray",diff_gray);
 #elif defined(DEBUG_WRITE_IMAGE)
-    cv::imwrite("diff_bin_gray.jpg",diff_bin);
+    cv::imwrite("diff_bin_gray.jpg",diff_gray);
 #endif
-    cv::threshold(diff_bin, diff_bin, params.diff_thresh, 255, cv::THRESH_BINARY);
-    int sq = gray1.cols / 8;
-    int sub = std::max(1, (sq * params.roi_percent) / 100);
-    int off = (sq - sub) / 2;
+    int listThresh[2] = {30,70};
+    listChangedCells.clear();
+    for(int i = 0; i< sizeof(listThresh)/sizeof(int); i++){
+        cv::threshold(diff_gray, diff_bin, listThresh[i], 255, cv::THRESH_BINARY);
+        int sq = gray1.cols / 8;
+        int sub = std::max(1, (sq * params.roi_percent) / 100);
+        int off = (sq - sub) / 2;
 
-    // Prepare visualization image (color) from diff for drawing counts
-    cv::Mat vis;
-    cv::cvtColor(diff_bin, vis, cv::COLOR_GRAY2BGR);
+        // Prepare visualization image (color) from diff for drawing counts
+        cv::Mat vis;
+        cv::cvtColor(diff_bin, vis, cv::COLOR_GRAY2BGR);
 
-    // Compute count of non-zero pixels in each cell's ROI (centered)
-    std::vector<std::tuple<int, int, int>> counts; // (count, col, row)
-    counts.reserve(64);
-    for (int r = 0; r < 8; ++r) {
-        for (int c = 0; c < 8; ++c) {
-            int x = c * sq + off;
-            int y = r * sq + off;
-            cv::Rect roiRect(x, y, sub, sub);
-            // clamp
-            roiRect &= cv::Rect(0, 0, diff_bin.cols, diff_bin.rows);
-            int diff_px = 0;
-            if (roiRect.width > 0 && roiRect.height > 0)
-                diff_px = cv::countNonZero(diff_bin(roiRect));
-            counts.emplace_back(diff_px, c, r);
+        // Compute count of non-zero pixels in each cell's ROI (centered)
+        std::vector<std::tuple<int, int, int>> counts; // (count, col, row)
+        counts.reserve(64);
+        for (int r = 0; r < 8; ++r) {
+            for (int c = 0; c < 8; ++c) {
+                int x = c * sq + off;
+                int y = r * sq + off;
+                cv::Rect roiRect(x, y, sub, sub);
+                // clamp
+                roiRect &= cv::Rect(0, 0, diff_bin.cols, diff_bin.rows);
+                int diff_px = 0;
+                if (roiRect.width > 0 && roiRect.height > 0)
+                    diff_px = cv::countNonZero(diff_bin(roiRect));
+                counts.emplace_back(diff_px, c, r);
 #if defined(DEBUG_SHOW_IMAGE) || defined(DEBUG_WRITE_IMAGE)
-            // draw small rectangle and count
-            cv::Scalar col = diff_px > 0 ? cv::Scalar(0, 0, 255) : cv::Scalar(120, 120, 120);
-            cv::rectangle(vis, roiRect, col, 1);
-            std::string txt = std::to_string(diff_px);
-            int font = cv::FONT_HERSHEY_SIMPLEX;
-            double fs = 0.5;
-            int thickness = 1;
-            cv::Point textOrg(roiRect.x + 2, roiRect.y + std::max(12, roiRect.height/5));
-            cv::putText(vis, txt, textOrg, font, fs, col, thickness);
+                // draw small rectangle and count
+                cv::Scalar col = diff_px > 0 ? cv::Scalar(0, 0, 255) : cv::Scalar(120, 120, 120);
+                cv::rectangle(vis, roiRect, col, 1);
+                std::string txt = std::to_string(diff_px);
+                int font = cv::FONT_HERSHEY_SIMPLEX;
+                double fs = 0.5;
+                int thickness = 1;
+                cv::Point textOrg(roiRect.x + 2, roiRect.y + std::max(12, roiRect.height/5));
+                cv::putText(vis, txt, textOrg, font, fs, col, thickness);
+#endif
+            }
+        }
+#if defined(DEBUG_SHOW_IMAGE) || defined(DEBUG_WRITE_IMAGE)
+        // Highlight center cell(s)
+        int centerR = 3; int centerC = 3; // choose (3,3) as center-ish
+        int cx = centerC * sq + off;
+        int cy = centerR * sq + off;
+        cv::Rect centerRect(cx, cy, sub, sub);
+        centerRect &= cv::Rect(0,0,diff_bin.cols,diff_bin.rows);
+        cv::rectangle(vis, centerRect, cv::Scalar(0,255,0), 2);
+        cv::putText(vis, "CENTER", cv::Point(centerRect.x+2, centerRect.y+centerRect.height-2), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0,255,0), 2);
+#endif
+        // Sort counts descending to get top changed cells
+        std::sort(counts.begin(), counts.end(), [](const std::tuple<int,int,int>& a, const std::tuple<int,int,int>& b){
+            return std::get<0>(a) > std::get<0>(b);
+        });
+        std::vector<cv::Point> listChangedCellsInThresh;
+        for (int i = 0; i < (int)counts.size(); ++i) {
+            if(std::get<0>(counts[i]) < MIN_BINARY_POINT) continue;
+            int cnt = std::get<0>(counts[i]);
+            int c = std::get<1>(counts[i]);
+            int r = std::get<2>(counts[i]);
+            listChangedCellsInThresh.push_back(cv::Point(c, r));
+#if defined(DEBUG_SHOW_IMAGE) || defined(DEBUG_WRITE_IMAGE)
+            // mark top cells with thicker rectangle
+            int x = c * sq + off; int y = r * sq + off;
+            cv::Rect roiRect(x, y, sub, sub);
+            roiRect &= cv::Rect(0,0,diff_bin.cols,diff_bin.rows);
+            cv::rectangle(vis, roiRect, cv::Scalar(255,0,0), 2);
+            std::string txt = "TOP:" + std::to_string(cnt);
+            cv::putText(vis, txt, cv::Point(roiRect.x+2, roiRect.y+12), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255,255,0), 2);
 #endif
         }
-    }
-#if defined(DEBUG_SHOW_IMAGE) || defined(DEBUG_WRITE_IMAGE)
-    // Highlight center cell(s)
-    int centerR = 3; int centerC = 3; // choose (3,3) as center-ish
-    int cx = centerC * sq + off;
-    int cy = centerR * sq + off;
-    cv::Rect centerRect(cx, cy, sub, sub);
-    centerRect &= cv::Rect(0,0,diff_bin.cols,diff_bin.rows);
-    cv::rectangle(vis, centerRect, cv::Scalar(0,255,0), 2);
-    cv::putText(vis, "CENTER", cv::Point(centerRect.x+2, centerRect.y+centerRect.height-2), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0,255,0), 2);
-#endif
-    // Sort counts descending to get top changed cells
-    std::sort(counts.begin(), counts.end(), [](const std::tuple<int,int,int>& a, const std::tuple<int,int,int>& b){
-        return std::get<0>(a) > std::get<0>(b);
-    });
-
-    listChangedCells.clear();
-    for (int i = 0; i < 4 && i < (int)counts.size(); ++i) {
-        if(std::get<0>(counts[i]) < 1500) continue;
-        int cnt = std::get<0>(counts[i]);
-        int c = std::get<1>(counts[i]);
-        int r = std::get<2>(counts[i]);
-        listChangedCells.push_back(cv::Point(c, r));
-#if defined(DEBUG_SHOW_IMAGE) || defined(DEBUG_WRITE_IMAGE)
-        // mark top cells with thicker rectangle
-        int x = c * sq + off; int y = r * sq + off;
-        cv::Rect roiRect(x, y, sub, sub);
-        roiRect &= cv::Rect(0,0,diff_bin.cols,diff_bin.rows);
-        cv::rectangle(vis, roiRect, cv::Scalar(255,0,0), 2);
-        std::string txt = "TOP:" + std::to_string(cnt);
-        cv::putText(vis, txt, cv::Point(roiRect.x+2, roiRect.y+12), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255,255,0), 2);
-#endif
-    }
 
 #if defined(DEBUG_SHOW_IMAGE)
-    cv::imshow("diff_bin", diff_bin);
-    cv::imshow("diff_counts", vis);
+        cv::imshow("diff_bin_thresh_"+std::to_string(listThresh[i]), diff_bin);
+        cv::imshow("diff_counts_thresh_"+std::to_string(listThresh[i]), vis);
 #elif defined (DEBUG_WRITE_IMAGE)
-    cv::imwrite("diff_bin.jpg",diff_bin);
-    cv::imwrite("diff_counts.jpg",vis);
+        cv::imwrite("diff_bin_thresh_"+std::to_string(listThresh[i])+".jpg",diff_bin);
+        cv::imwrite("diff_counts_thresh_"+std::to_string(listThresh[i])+".jpg",vis);
 #endif
-
+        if(listChangedCellsInThresh.size() <= 5) {
+            for(cv::Point tmpChangedCellInThresh: listChangedCellsInThresh) {
+                bool dupCell = false;
+                for(cv::Point tmpChangedCell: listChangedCells) {
+                    if(tmpChangedCell.x == tmpChangedCellInThresh.x &&
+                       tmpChangedCell.y == tmpChangedCellInThresh.y) {
+                        dupCell = true;
+                        break;
+                    }
+                }
+                if(!dupCell) listChangedCells.push_back(tmpChangedCellInThresh);
+            }
+        }
+    }
+    std::cout << "detectMovePhase2Substraction done with " << listChangedCells.size()
+              << " cells" << std::endl;
     return true;
 }
 
@@ -426,6 +438,7 @@ std::vector<std::string> ChessImageProcessing::detectMovePhase3ColorMatching(con
             listMoves.push_back(coordToNotation(pt, params.playerSide));
         }
     }
+    fflush(stdout);
     return listMoves;
 }
 
@@ -437,41 +450,20 @@ std::vector<std::string> ChessImageProcessing::detectMovePhase3ColorMatchingFrom
 {
     std::vector<std::string> listMoves;
     std::vector<cv::Point> filterChangedCell;
+    std::cout << "detectMovePhase3ColorMatchingFromFilter" << std::endl;
     for (int i=0; i< listChangedCell.size(); i++) {
         filterChangedCell.push_back(cv::Point(listChangedCell[i].x,listChangedCell[i].y));
-        std::cout << "detectMovePhase2Substraction: listChangedCell " << listChangedCell[i] << std::endl;
-    }
-    for (int i=0; i< startCells.size(); i++) {
-        std::cout << "detectMovePhase2Substraction: startCells " << startCells[i] << std::endl;
-    }
-    cv::Point startCell(-1,-1);
-    bool foundValidStartCell = false;
-    for(cv::Point tmpStartCell: startCells) {
-        for(cv::Point tmpMoveCell: listChangedCell) {
-            if(tmpStartCell.x == tmpMoveCell.x && tmpStartCell.y == tmpMoveCell.y) {
-                startCell.x = tmpMoveCell.x;
-                startCell.y = tmpMoveCell.y;
-                foundValidStartCell = true;
-                break;
-            }
-        }
-        if(foundValidStartCell) break;
-    }
-    // 2) Exclude the start cell from changed-cell candidates (if present)
-    if (startCell.x >= 0 && startCell.y >= 0 && !filterChangedCell.empty()) {
-        for (int i=0; i< filterChangedCell.size(); i++) {
-            if (filterChangedCell[i].x == startCell.x && filterChangedCell[i].y == startCell.y) {
-                filterChangedCell.erase(filterChangedCell.begin() + i);
-                break;
-            }
-        }
-    }
-
-    for(cv::Point filterCell: filterChangedCell) {
-        std::cout << "end cell [" << filterCell << "]" << std::endl;
     }
     // 3) If we have a start from phase1 and remaining candidates, try color matching
-    if (startCell.x >= 0 && startCell.y >= 0 && !filterChangedCell.empty()) {
+    for(cv::Point startCell: startCells) {
+        bool startCellInListChangeCell = false;
+        for(cv::Point changeCell: listChangedCell) {
+            if(startCell.x == changeCell.x && startCell.y == changeCell.y) {
+                startCellInListChangeCell = true;
+                break;
+            }
+        }
+        if(!startCellInListChangeCell) continue;
         std::string from = coordToNotation(startCell, params.playerSide);
         for(cv::Point filterCell: filterChangedCell) {
             std::cout << "filterCell y:" << filterCell.y << " x:" << filterCell.x << " v:" << matColorMapAfter[filterCell.y][filterCell.x] << std::endl;
@@ -485,17 +477,15 @@ std::vector<std::string> ChessImageProcessing::detectMovePhase3ColorMatchingFrom
             }
         }
     }
-    if (listMoves.size() == 0 && listChangedCell.size()>=2) {
-        printf("Check last possible move from substraction\r\n");
-        // No binary start found; if only changed cells remain, return their notations as possible moves
-        for (const auto& from : listChangedCell) {
-            for (const auto& to : listChangedCell) {
-                if(from.x != to.x || from.y != to.y) {
-                    listMoves.push_back(coordToNotation(from, params.playerSide)+coordToNotation(to, params.playerSide));
-                }
-            }
+    // No binary start found; if only changed cells remain, return their notations as possible moves
+    for (int fromIndex = 0; fromIndex < listChangedCell.size(); fromIndex ++) {
+        for (int toIndex = 0; toIndex < listChangedCell.size(); toIndex ++) {
+            if(toIndex != fromIndex)
+            listMoves.push_back(coordToNotation(listChangedCell[fromIndex], params.playerSide)+
+                                coordToNotation(listChangedCell[toIndex], params.playerSide));
         }
     }
+    std::cout << "detectMovePhase3ColorMatchingFromFilter done" << std::endl;
     return listMoves;
 }
 
@@ -1127,6 +1117,7 @@ std::vector<cv::Point> ChessImageProcessing::matchStartToCandidates(const cv::Ma
 bool ChessImageProcessing::isCastleMove(const cv::Mat& warpedGray1, const cv::Mat& warpedGray2, const MoveDetectParams& params,
                                         cv::Point& startCell, cv::Point& endCell)
 {
+    bool foundCastle = false;
     printf("isCastleMove check\r\n");
     // use passed images (expected to be warped/grayscale or edge images)
     const cv::Mat& gray1 = warpedGray1(cv::Rect(0,0,warpedGray1.cols,warpedGray1.rows/8));
@@ -1160,7 +1151,7 @@ bool ChessImageProcessing::isCastleMove(const cv::Mat& warpedGray1, const cv::Ma
         int diff_px = 0;
         if (roiRect.width > 0 && roiRect.height > 0)
             diff_px = cv::countNonZero(diff_bin(roiRect));
-        if(diff_px < 1500) continue;
+        if(diff_px < MIN_BINARY_POINT) continue;
         counts.emplace_back(diff_px, c, 0);
 #if defined(DEBUG_SHOW_IMAGE) || defined(DEBUG_WRITE_IMAGE)
         // draw small rectangle and count
@@ -1207,6 +1198,7 @@ bool ChessImageProcessing::isCastleMove(const cv::Mat& warpedGray1, const cv::Ma
         startCell.y = 0;
         endCell.x = nums[2];
         endCell.y = 0;
+        foundCastle = true;
     }
 
     // 4. Check the second possible window of 3 consecutive elements
@@ -1215,6 +1207,7 @@ bool ChessImageProcessing::isCastleMove(const cv::Mat& warpedGray1, const cv::Ma
         startCell.y = 0;
         endCell.x = nums[1];
         endCell.y = 0;
+        foundCastle = true;
     }
     printf("Start(%d,%d) end(%d,%d)\r\n",startCell.x,startCell.y,endCell.x,endCell.y);
 #if defined(DEBUG_SHOW_IMAGE) || defined(DEBUG_WRITE_IMAGE)
@@ -1239,5 +1232,5 @@ bool ChessImageProcessing::isCastleMove(const cv::Mat& warpedGray1, const cv::Ma
     cv::imwrite("castle_diff_bin.jpg",diff_bin);
     cv::imwrite("castle_diff_counts.jpg",vis);
 #endif
-    return true;
+    return foundCastle;
 }

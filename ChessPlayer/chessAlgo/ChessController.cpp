@@ -300,6 +300,93 @@ bool ChessController::moveByUiIndex(int startUiIndex,
     }
     return true;
 }
+
+bool ChessController::isValidMoveByCoordinates(const QString& startSquare,
+                                        const QString& stopSquare,
+                                        Move& chosenMove,
+                                        QChar promotionSuffix)
+{
+    int startUiIndex = -1;
+    if (!tryParseCoordinate(startSquare, startUiIndex))
+    {
+        return false;
+    }
+
+    const QString stopTrimmed = stopSquare.trimmed().toLower();
+    if (stopTrimmed.size() != 2 && stopTrimmed.size() != 3)
+    {
+        return false;
+    }
+
+    int stopUiIndex = -1;
+    if (!tryParseCoordinate(stopTrimmed.left(2), stopUiIndex))
+    {
+        return false;
+    }
+
+    if (startUiIndex < 0 || startUiIndex >= 64 || stopUiIndex < 0 || stopUiIndex >= 64)
+    {
+        return false;
+    }
+
+    if (m_promotionPending)
+    {
+        return false;
+    }
+
+    const int originSquare = uiIndexToSquare(startUiIndex);
+    const int destinationSquare = uiIndexToSquare(stopUiIndex);
+
+    const QString piece = pieceCodeAtSquare(originSquare);
+    if (piece.isEmpty())
+    {
+        return false;
+    }
+
+    const bool isWhitePiece = piece.startsWith("w");
+    if ((isWhitePiece && m_board->getColorToPlay() != WHITE) || (!isWhitePiece && m_board->getColorToPlay() != BLACK))
+    {
+        return false;
+    }
+
+    // check if the move is legal
+    MoveGen moveGen(m_board);
+    const auto legalMoves = moveGen.generateMoves();
+
+    m_pendingPromotionMoves.clear();
+    bool hasMatchingPromotion = false;
+
+    for (const Move& move : legalMoves)
+    {
+        if (move.getOrigin() == originSquare && move.getDestination() == destinationSquare)
+        {
+            if (move.isPromotion())
+            {
+                hasMatchingPromotion = true;
+                if (!promotionSuffix.isNull())
+                {
+                    const QString moveText = QString::fromStdString(move.toShortString());
+                    if (moveText.endsWith(promotionSuffix))
+                    {
+                        chosenMove = move;
+                        return true;
+                    }
+                }
+                else
+                {
+                    m_pendingPromotionMoves.push_back(move);
+                }
+            }
+            else
+            {
+                chosenMove = move;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool ChessController::moveByCoordinates(const QString& startSquare,
                                         const QString& stopSquare,
                                         Move& chosenMove,

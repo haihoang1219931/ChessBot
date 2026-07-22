@@ -21,7 +21,7 @@ struct MoveDetectParams {
     int threshold = 500;         // general threshold (unused currently)
     int roi_percent = 80;       // ROI percent of cell used for diff counting
     int canny_low = 14;         // Canny low threshold
-    int diff_thresh = 30;       // threshold for absdiff -> binary
+    int diff_thresh = 70;       // threshold for absdiff -> binary
     int pieceMinPoints = 200;   // minimum edge points to consider a piece present
     int pieceRoiPercent = 80;  // ROI percent for piece detection
     int colorThreshold = 93;  // Color threshold

@@ -41,6 +41,8 @@ public:
     QString extractFEN();
     QString processRobotCommentary(const QString fen, const int color,
                                    const QString pieceType, const QString pieceNotation, Move playerMove);
+    bool isValidMoveByCoordinates(const QString& startSquare, const QString& stopSquare, Move& chosenMove,
+                                           QChar promotionSuffix = QChar());
     bool moveByCoordinates(const QString& startSquare, const QString& stopSquare, Move& chosenMove,
                                            QChar promotionSuffix = QChar());
     int uiIndexToSquare(int uiIndex);

@@ -527,20 +527,29 @@ uint8_t ChessBot::playDetectMove()
         cv::imwrite("imageAfter.jpg",imageAfter);
         std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves(imageBefore, imageAfter,
             *m_detectParams);
+        std::string possibleMove = "";
+        int numPossibleMove = 0;
         for(int i = 0; i< chessMoves.size(); i++) {
-            qDebug("Possible Move %s",chessMoves[i].c_str());
+            qDebug("Checking Move %s",chessMoves[i].c_str());
             QString from = QString::fromStdString(chessMoves[i]).left(2);  // Result: "e2"
             QString to = QString::fromStdString(chessMoves[i]).right(2);   // Result: "e4"
+            if(m_chessController->isValidMoveByCoordinates(from,to,choosenMove)) {
+                numPossibleMove++;
+                possibleMove = chessMoves[i];
+            }
+        }
+        if(numPossibleMove == 1) {
+            qDebug("Found Move %s",possibleMove.c_str());
+            QString from = QString::fromStdString(possibleMove).left(2);  // Result: "e2"
+            QString to = QString::fromStdString(possibleMove).right(2);   // Result: "e4"
             choosenPiece = m_chessController->pieceType(from);
             choosenPieceMoveNotation = to;
             if(m_chessController->moveByCoordinates(from,to,choosenMove)) {
                 detectState = STATE_DONE_SUCCESS;
-                break;
             } else {
                 if(m_chessController->status() == "CHOOSE_PROMOTION_PIECE") {
                     Q_EMIT showPromotionPieces();
                     detectState = STATE_PENDING;
-                    break;
                 }
             }
         }
