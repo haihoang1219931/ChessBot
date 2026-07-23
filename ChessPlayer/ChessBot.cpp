@@ -1557,8 +1557,8 @@ bool ChessBot::loadCalibrationData(QString fileName)
                 m_chessboardConners[1].x(),m_chessboardConners[1].y(),
                 m_chessboardConners[2].x(),m_chessboardConners[2].y(),
                 m_chessboardConners[3].x(),m_chessboardConners[3].y());
-        cv::Mat src1 = cv::imread("/home/hainh/Desktop/Project/ChessBot/ChessPlayer/build/failcases/f0053.jpg");
-        cv::Mat src2 = cv::imread("/home/hainh/Desktop/Project/ChessBot/ChessPlayer/build/failcases/f0054.jpg");
+        cv::Mat src1 = cv::imread("/home/hainh/Desktop/Project/ChessBot/ChessPlayer/build/failcases/f0083.jpg");
+        cv::Mat src2 = cv::imread("/home/hainh/Desktop/Project/ChessBot/ChessPlayer/build/failcases/f0084.jpg");
         if(!src1.empty() && !src2.empty()) {
             std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves(src1, src2, *m_detectParams);
             for(int i = 0; i< chessMoves.size(); i++) {

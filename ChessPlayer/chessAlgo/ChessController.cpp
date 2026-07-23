@@ -147,7 +147,7 @@ const std::string blackPrePromotion = "k7/8/8/8/8/8/2p5/4K3 w - - 0 1";
 const std::string blackCapturePromotion = "k7/8/8/8/8/8/1p6/2R1K3 w - - 0 1";
 void ChessController::newGame()
 {
-    m_board = std::make_shared<Board>(blackCapturePromotion);
+    m_board = std::make_shared<Board>();
     globalTT.clearTT();
     m_moveHistory.clear();
     Q_EMIT moveHistoryChanged();
