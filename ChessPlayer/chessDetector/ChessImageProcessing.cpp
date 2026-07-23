@@ -480,9 +480,18 @@ std::vector<std::string> ChessImageProcessing::detectMovePhase3ColorMatchingFrom
     // No binary start found; if only changed cells remain, return their notations as possible moves
     for (int fromIndex = 0; fromIndex < listChangedCell.size(); fromIndex ++) {
         for (int toIndex = 0; toIndex < listChangedCell.size(); toIndex ++) {
-            if(toIndex != fromIndex)
-            listMoves.push_back(coordToNotation(listChangedCell[fromIndex], params.playerSide)+
-                                coordToNotation(listChangedCell[toIndex], params.playerSide));
+            if(toIndex != fromIndex) {
+                std::string detectMove = coordToNotation(listChangedCell[fromIndex], params.playerSide)+
+                        coordToNotation(listChangedCell[toIndex], params.playerSide);
+                bool existMove = false;
+                for(std::string move: listMoves) {
+                    if(move == detectMove) {
+                        existMove = true;
+                        break;
+                    }
+                }
+                if(!existMove) listMoves.push_back(detectMove);
+            }
         }
     }
     std::cout << "detectMovePhase3ColorMatchingFromFilter done" << std::endl;

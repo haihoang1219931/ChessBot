@@ -10,8 +10,8 @@ CONFIG += use_image_processing
 #DEFINES += TEST_RANDOM_MOVE
 use_image_processing {
 #DEFINES += DEBUG_SHOW_IMAGE
-#DEFINES += DEBUG_WRITE_IMAGE
-#DEFINES += DEBUG_SIMPLE_MOVE
+DEFINES += DEBUG_WRITE_IMAGE
+DEFINES += DEBUG_SIMPLE_MOVE
 DEFINES += IMAGE_PROCESS_MOVE
 unix:!macx: INCLUDEPATH += /usr/local/include/opencv4
 unix:!macx: DEPENDPATH += /usr/local/include/opencv4
