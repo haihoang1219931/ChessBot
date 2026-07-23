@@ -1550,21 +1550,23 @@ bool ChessBot::loadCalibrationData(QString fileName)
                                           obj.value("y").toInt()*m_height/360));
     }
     qDebug("m_chessboardConners.size() %d",m_chessboardConners.size());
-#if defined(IMAGE_PROCESS_MOVE) && defined(DEBUG_SIMPLE_MOVE)
+#if defined(IMAGE_PROCESS_MOVE)
     if(m_chessboardConners.size() == 4)
     {
         m_moveDetector->setCorners(m_chessboardConners[0].x(),m_chessboardConners[0].y(),
                 m_chessboardConners[1].x(),m_chessboardConners[1].y(),
                 m_chessboardConners[2].x(),m_chessboardConners[2].y(),
                 m_chessboardConners[3].x(),m_chessboardConners[3].y());
-        cv::Mat src1 = cv::imread("/home/hainh/Desktop/Project/ChessBot/ChessPlayer/build/failcases/f0083.jpg");
-        cv::Mat src2 = cv::imread("/home/hainh/Desktop/Project/ChessBot/ChessPlayer/build/failcases/f0084.jpg");
+#ifdef defined(DEBUG_SIMPLE_MOVE)
+        cv::Mat src1 = cv::imread("/home/hainh/Desktop/Project/ChessBot/ChessPlayer/build/failcases/f0109.jpg");
+        cv::Mat src2 = cv::imread("/home/hainh/Desktop/Project/ChessBot/ChessPlayer/build/failcases/f0110.jpg");
         if(!src1.empty() && !src2.empty()) {
             std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves(src1, src2, *m_detectParams);
             for(int i = 0; i< chessMoves.size(); i++) {
                 qDebug("Possible Move %s",chessMoves[i].c_str());
             }
         }
+#endif
     }
 #endif
 

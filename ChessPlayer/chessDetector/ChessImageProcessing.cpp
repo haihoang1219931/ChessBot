@@ -118,9 +118,17 @@ cv::Point ChessImageProcessing::notationToCoord(const std::string& notation, con
 std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& img_start, const cv::Mat& img_end,
                                                                   const MoveDetectParams& params)
 {
+    printf("findPossibleMoves\r\n");
     // No longer identify start/stop/occupied, just collect top 3 cells
     std::vector<std::string> listMoves;
-    if (img_start.empty() || img_end.empty() || !m_transformMaxtrixValid) return listMoves;
+    if (img_start.empty() || img_end.empty() || !m_transformMaxtrixValid) {
+        printf("Return due to img_start.empty() = %s | img_end.empty() = %s | m_transformMaxtrixValid = %s\r\n",
+               img_start.empty() ? "true" : "false",
+               img_end.empty() ? "true" : "false",
+               m_transformMaxtrixValid ? "true" : "false");
+        return listMoves;
+    }
+    printf("findPossibleMoves preprocessing\r\n");
     cv::Mat gray1, gray2, warped1, warped2, edges1, edges2;
     std::vector<cv::Point> startCellsBinary, startCellsColor;
     std::vector<cv::Point> endsCellsBinary, endCellsColor;
