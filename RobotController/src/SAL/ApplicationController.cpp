@@ -1079,15 +1079,15 @@ bool ApplicationController::calculateSequenceMoveNormal(int startCol, int startR
     }
     
     // append move from start -> stop -> standy
-    Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
+    m_startPoint = m_chessBoard->convertPoint(startRow,startCol);
 #ifdef DEBUG_COMMAND
     printf("start[%d,%d] to Point(%d,%d)\r\n",
            startRow,startCol,
-           (int)(startPoint.x*10), (int)(startPoint.y*10));
+           (int)(m_startPoint.x*10), (int)(m_startPoint.y*10));
 #endif
-    Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
+    m_stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
     clearSequenceMove();
-    appendSequenceMove(startPoint, stopPoint, straightMove);
+    appendSequenceMove(m_startPoint, m_stopPoint, straightMove);
     return true;
 }
 
@@ -1102,14 +1102,17 @@ bool ApplicationController::calculateSequenceAttack(int startCol, int startRow,
     
     // get free drop point
     // append move from stop -> drop -> start -> stop -> standby
-    DropPoint dropPoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
-    Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
-    Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
+    m_dropCapturePoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
+    if(m_dropCapturePoint.valid == false) {
+        return false;
+    }
+    m_startPoint = m_chessBoard->convertPoint(startRow,startCol);
+    m_stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
 
     clearSequenceMove();
-    appendSequenceMove(stopPoint, dropPoint.location);
-    appendSequenceMove(startPoint, stopPoint, straightMove);
-    m_chessBoard->updateDropZone(attackPiece, dropPoint.rowID, dropPoint.colID, (ZONE_TYPE)dropPoint.zoneType);
+    appendSequenceMove(m_stopPoint, m_dropCapturePoint.location);
+    appendSequenceMove(m_startPoint, m_stopPoint, straightMove);
+    m_chessBoard->updateDropZone(attackPiece, m_dropCapturePoint.rowID, m_dropCapturePoint.colID, ZONE_BOT);
     return true;
 }
 
@@ -1123,14 +1126,17 @@ bool ApplicationController::calculateSequencePastPawn(int startCol, int startRow
     }
 
     // append move from attack pawn -> drop -> start -> stop -> standby
-    DropPoint dropPoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
-    Point pawnPoint = m_chessBoard->convertPoint(startRow,stopCol);
-    Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
-    Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
+    m_dropCapturePoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
+    if(m_dropCapturePoint.valid == false) {
+        return false;
+    }
+    m_pawnPoint = m_chessBoard->convertPoint(startRow,stopCol);
+    m_startPoint = m_chessBoard->convertPoint(startRow,startCol);
+    m_stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
     clearSequenceMove();
-    appendSequenceMove(pawnPoint, dropPoint.location);
-    appendSequenceMove(startPoint, stopPoint, straightMove);
-    m_chessBoard->updateDropZone('p', dropPoint.rowID, dropPoint.colID, (ZONE_TYPE)dropPoint.zoneType);
+    appendSequenceMove(m_pawnPoint, m_dropCapturePoint.location);
+    appendSequenceMove(m_startPoint, m_stopPoint, straightMove);
+    m_chessBoard->updateDropZone('p', m_dropCapturePoint.rowID, m_dropCapturePoint.colID, ZONE_BOT);
     return true;
 }
 
@@ -1146,21 +1152,40 @@ bool ApplicationController::calculateSequencePromotePiece(int startCol, int star
         return false;
     }
     // append move from attack piece -> drop -> promote -> stop -> start -> drop -> standby
-    DropPoint promotePiecePoint = m_chessBoard->getFreeDropPoint(ZONE_PLAYER,promotePiece);
-    DropPoint dropPiecePoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
-    DropPoint dropPieceBotPoint = m_chessBoard->getFreeDropPoint(ZONE_PLAYER);
-    Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
-    Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
+    m_promotePiecePoint = m_chessBoard->getFreeDropPoint(ZONE_PLAYER,promotePiece);
+    if(m_promotePiecePoint.valid == false) {
+        return false;
+    }
+    m_dropCapturePoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
+    if(m_dropCapturePoint.valid == false) {
+        return false;
+    }
+    m_dropPieceBotPoint = m_chessBoard->getFreeDropPoint(ZONE_PLAYER);
+    if(m_dropPieceBotPoint.valid == false) {
+        return false;
+    }
+    m_startPoint = m_chessBoard->convertPoint(startRow,startCol);
+    m_stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
 
     clearSequenceMove();
     if(startCol != stopCol){
         // pawn attack piece, move attack piece -> drop
-        appendSequenceMove(stopPoint, dropPiecePoint.location);
-        m_chessBoard->updateDropZone(attackPiece, dropPiecePoint.rowID, dropPiecePoint.colID, (ZONE_TYPE)dropPiecePoint.zoneType);
+        appendSequenceMove(m_stopPoint, m_dropCapturePoint.location);
+        m_chessBoard->updateDropZone(attackPiece, m_dropCapturePoint.rowID, m_dropCapturePoint.colID, ZONE_BOT);
     }
-    appendSequenceMove(promotePiecePoint.location, stopPoint);
-    appendSequenceMove(startPoint, dropPieceBotPoint.location);
-    m_chessBoard->updateDropZone('p', promotePiecePoint.rowID, promotePiecePoint.colID, (ZONE_TYPE)promotePiecePoint.zoneType);
+    appendSequenceMove(m_startPoint, m_dropPieceBotPoint.location);    
+    appendSequenceMove(m_promotePiecePoint.location, m_stopPoint); 
+    m_chessBoard->updateDropZone(0, m_promotePiecePoint.rowID, m_promotePiecePoint.colID, ZONE_PLAYER);
+#ifdef DEBUG_COMMAND
+    printf("promotePiecePoint [%c,%d,%d] (%d,%d)\r\n", promotePiece, m_promotePiecePoint.rowID, m_promotePiecePoint.colID, 
+        (int)(m_promotePiecePoint.location.x * 10), (int)(m_promotePiecePoint.location.y * 10));
+    printf("m_dropCapturePoint [%c,%d,%d] (%d,%d)\r\n", attackPiece, m_dropCapturePoint.rowID, m_dropCapturePoint.colID, 
+        (int)(m_dropCapturePoint.location.x * 10), (int)(m_dropCapturePoint.location.y * 10));
+    printf("m_startPoint [%c,%d,%d] (%d,%d)\r\n", attackPiece, startRow, startCol, 
+        (int)(m_startPoint.x * 10), (int)(m_startPoint.y * 10));
+    printf("m_stopPoint [%c,%d,%d] (%d,%d)\r\n", attackPiece, stopRow, stopCol, 
+        (int)(m_stopPoint.x * 10), (int)(m_stopPoint.y * 10));
+#endif
     return true;
 }
 

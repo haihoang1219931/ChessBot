@@ -8,24 +8,7 @@ ChessBoard::ChessBoard(float x, float y, float rect, float dropZoneSpace):
     m_chessBoardRect(rect),
     m_dropZoneSpace(dropZoneSpace)
 {
-    memset(m_dropZoneMapPlayer,0,16);
-    memset(m_dropZoneMapBot,0,16);
-//    m_dropZoneMap[0][0] = 'c';
-//    m_dropZoneMap[0][1] = 'c';
-//    m_dropZoneMap[1][0] = 'c';
-//    m_dropZoneMap[1][1] = 'c';
-//    m_dropZoneMap[2][0] = 'c';
-//    m_dropZoneMap[2][1] = 'c';
-
-    m_dropZoneMapPlayer[0][0] = 'q';
-    m_dropZoneMapPlayer[1][0] = 'r';
-    m_dropZoneMapPlayer[2][0] = 'k';
-    m_dropZoneMapPlayer[3][0] = 'b';
-
-    m_dropZoneMapBot[4][0] = 'q';
-    m_dropZoneMapBot[6][0] = 'r';
-    m_dropZoneMapBot[6][0] = 'k';
-    m_dropZoneMapBot[7][0] = 'b';
+    resetDropZoneMap();
 
     for(int rowId = 0; rowId < 8; rowId ++){
         for(int colId = 0; colId < 2; colId ++){
@@ -93,6 +76,7 @@ DropPoint ChessBoard::getFreeDropPoint(ZONE_TYPE zone, uint8_t promotePiece)
                 freePoint.rowID = rowId;
                 freePoint.colID = colId;
                 freePoint.zoneType = zone;
+                freePoint.valid = true;
                 foundDropPoint = true;
                 break;
             }
@@ -167,6 +151,15 @@ void ChessBoard::resetDropZoneMap()
             m_dropZoneMapBot[rowId][colId] = 0;
         }
     }
+    m_dropZoneMapPlayer[0][0] = 'q';
+    m_dropZoneMapPlayer[1][0] = 'r';
+    m_dropZoneMapPlayer[2][0] = 'n';
+    m_dropZoneMapPlayer[3][0] = 'b';
+
+    m_dropZoneMapBot[4][0] = 'q';
+    m_dropZoneMapBot[5][0] = 'r';
+    m_dropZoneMapBot[6][0] = 'n';
+    m_dropZoneMapBot[7][0] = 'b';
 }
 
 void ChessBoard::moveGuestPieceOut(uint8_t piece) {

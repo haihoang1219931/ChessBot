@@ -95,6 +95,12 @@ public:
     Command m_sequenceCommand[MAX_MOVE_SEQUENCE];
     Command m_nextPoint;
     char m_commandRead[64];
+    DropPoint m_promotePiecePoint;
+    DropPoint m_dropCapturePoint;
+    DropPoint m_dropPieceBotPoint;
+    Point m_startPoint;
+    Point m_stopPoint;
+    Point m_pawnPoint;
     uint8_t m_standByCommandState;
     uint8_t m_homeCalibCommandState;
     uint8_t m_numCommand;

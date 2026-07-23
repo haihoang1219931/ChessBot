@@ -115,6 +115,7 @@ void ApplicationArduino::initRobot()
 
 int ApplicationArduino::printf(const char *fmt, ...) {
     va_start(m_args, fmt);
+    memset(m_buffer, 0, sizeof(m_buffer));
     int rc = vsprintf(m_buffer, fmt, m_args);
     va_end(m_args);
     Serial.print((const char*)m_buffer);

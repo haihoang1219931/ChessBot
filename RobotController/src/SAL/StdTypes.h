@@ -187,6 +187,7 @@ typedef struct{
     int colID;
     int zoneType;
     Point location;
+    bool valid;
 }DropPoint;
 
 
