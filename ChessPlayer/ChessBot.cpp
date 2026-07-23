@@ -301,7 +301,7 @@ void ChessBot::playLoop()
         logWithTimestampQt(m_chessController->extractFEN());
         qDebug("Init FEN done");
 #ifdef IMAGE_PROCESS_MOVE
-        sendTestCommand("rs");
+        executeCommand("rs");
         readFrame(imageBefore);
         qDebug("First image [%d,%d]",
                imageBefore.rows,imageBefore.cols);
@@ -343,7 +343,7 @@ void ChessBot::playLoop()
     case PLAY_CALCULATE_NEXT_MOVE_RESET: {
         qDebug("PLAY_CALCULATE_NEXT_MOVE_RESET");
 #ifdef IMAGE_PROCESS_MOVE
-        sendTestCommand("rs");
+        executeCommand("rs");
 #endif
         m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
     }
@@ -459,22 +459,33 @@ bool ChessBot::canMoveStraight(int startRow, int startCol, int stopRow, int stop
     if(abs(startCol - stopCol) > 2 || abs(startRow - stopRow) > 2) return false;
     // check pieces inside 3x3 block
     QStringList board = m_chessController->board();
+    for(int row = 0; row < 8; row ++) {
+        for(int col = 0 ; col < 8; col ++) {
+            printf("%s ",board[row*8+col] != "" ? board[row*8+col].toStdString().c_str():
+                    "__");
+        }
+        printf("\r\n");
+    }
     int minRow = std::min(startRow,stopRow);
     int maxRow = std::max(startRow,stopRow);
     int minCol = std::min(startCol,stopCol);
     int maxCol = std::max(startCol,stopCol);
+    printf("Check from rc[%d,%d] to rc[%d,%d]\r\n",
+           minRow,minCol,maxRow,maxCol);
     for(int row = minRow; row<= maxRow; row++) {
         for(int col = minCol; col <= maxCol; col++) {
-            printf("row[%d] col[%d] %s\r\n",row,col,board[row*8+col].toStdString().c_str());
-            if((row == minRow && col == minCol) ||
-                (row == maxRow && col == maxCol) ||
-                (moveType == PIECE_MOVE_CAPTURE && row == stopCol && col == stopCol) ||
+            QString pieceType = (m_side == Color::WHITE ? board[row*8+col]:board[(7-row)*8+(7-col)]);
+            printf("%s ",pieceType != "" ? pieceType.toStdString().c_str():
+                    "__");
+            if((row == startRow && col == startCol) ||
+                (row == stopRow && col == stopCol) ||
                 (moveType == PIECE_MOVE_ENPASSANT && row == startRow))
                 continue;
-            if(board[row*8+col] != "") {
+            if(pieceType != "") {
                 foundBlockingPiece = true;
             }
         }
+        printf("\r\n");
     }
     return !foundBlockingPiece;
 }
@@ -1690,6 +1701,12 @@ void ChessBot::sendTestCommand(QString command)
     togglePause(false);
 }
 
+void ChessBot::executeCommand(QString command)
+{
+    m_commandTest = command;
+    testRobot();
+}
+
 void ChessBot::homingRobot()
 {
     sendTestCommand("ha");
@@ -1732,11 +1749,9 @@ void ChessBot::setSide(int side)
     qDebug("Set side: %d",side);
     m_side = side;
     m_chessController->setPlayerColor(side);
+    m_detectParams->playerSide = m_side == 0?
+                "white":"black";
     resetGame();
-    m_state = STATE_PLAY;
-    m_statePlay = PLAY_SETUP;
-    togglePause(false);
-    startService();
 }
 
 int ChessBot::levelType()
@@ -1781,6 +1796,11 @@ void ChessBot::resetGame(){
     if(m_side == 1) {
         m_state = STATE_PLAY;
         m_statePlay = PLAY_CALCULATE_NEXT_MOVE_RESET;
+        togglePause(false);
+        startService();
+    } else {
+        m_state = STATE_PLAY;
+        m_statePlay = PLAY_SETUP;
         togglePause(false);
         startService();
     }
