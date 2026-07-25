@@ -83,6 +83,12 @@ Rectangle {
         loaderDialogEndgame.setSource("HomeOption.qml");
     }
 
+    function openConfirmPlayOption() {
+        // 1. Set the source to your QML file
+        if(loaderDialogEndgame.item === null)
+        loaderDialogEndgame.setSource("ConfirmPlay.qml");
+    }
+
     Column {
         anchors.fill: parent
         // --- TOP OVERLAY SECTION ---
@@ -260,8 +266,21 @@ Rectangle {
             }
         }
 
+
         onGoback: {
             loaderDialogEndgame.source = ""; // Close it
+        }
+
+        onConfirmNextStep: {
+            loaderDialogEndgame.source = ""; // Close it
+            console.log((nextStep === 0?"Confirm":"Reject")+" to play last FEN ");
+            backend.acceptPlayFENFromHistory(nextStep === 0);
+        }
+
+        onGobackNormal: {
+            loaderDialogEndgame.source = ""; // Close it
+            console.log("Reject to play last FEN ");
+            backend.acceptPlayFENFromHistory(false);
         }
     }
 
@@ -300,6 +319,10 @@ Rectangle {
         }
         onPlayTurnChanged:{
             root.gameTurn = root.side == 0 ? nextTurn:1-nextTurn;
+        }
+        onFoundLastFEN: {
+            console.log("Found last FEN");
+            openConfirmPlayOption();
         }
     }
 }

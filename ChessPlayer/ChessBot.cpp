@@ -10,6 +10,11 @@
 #include <QDebug>
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
+#include <QDir>
+#include <QFileInfo>
+#include <QStringList>
+#include <QString>
+#include <QDebug>
 #include "ChessBot.h"
 #include "chessAlgo/ChessController.h"
 // Platform-specific headers for directory scanning and creation
@@ -21,6 +26,7 @@
     #include <sys/stat.h>
     #include <sys/types.h>
 #endif
+#include <fstream>
 
 ChessBot::ChessBot(QThread *parent) :
     QThread(parent),
@@ -294,6 +300,20 @@ void ChessBot::playInputCancelPromotion()
 void ChessBot::playLoop()
 {
     switch (m_statePlay) {
+    case PLAY_CHECK_LOG: {
+        qDebug("PLAY_CHECK_LOG");
+        if(findLastFENInLog()) {
+            Q_EMIT foundLastFEN();
+            togglePause(true);
+        } else {
+            if(m_side == 1) {
+                m_statePlay = PLAY_CALCULATE_NEXT_MOVE_RESET;
+            } else {
+                m_statePlay = PLAY_SETUP;
+            }
+        }
+    }
+        break;
     case PLAY_SETUP: {
         qDebug("PLAY_SETUP");
         logWithTimestampQt("===New game===");
@@ -641,7 +661,9 @@ uint8_t ChessBot::playCalculateNextMove()
     logWithTimestampQt(m_chessController->extractFEN());
     // play engine move
     m_chessController->playEngineMove();
+    if(m_chessController->moveHistory().size()==0) return STATE_DONE_FAIL;
     QString lastMove = QString::fromStdString(m_chessController->moveHistory()[m_chessController->moveHistory().size()-1].toShortString());
+    if(lastMove.length() < 4) return STATE_DONE_FAIL;
     printf("lastMove %s\r\n", lastMove.toStdString().c_str());
     QString from = lastMove.left(2);  // Result: "e2"
     QString to = lastMove.mid(2, 2);   // Result: "e4"
@@ -655,6 +677,9 @@ uint8_t ChessBot::playCalculateNextMove()
     printf("Bot move %s->%s\r\n",
            from.toStdString().c_str(),
            to.toStdString().c_str());
+    if(fromCoord.x() < 0 || fromCoord.x() > 7 || fromCoord.y() < 0 || fromCoord.y() > 7 ||
+        toCoord.x() < 0 || toCoord.x() > 7 || toCoord.y() < 0 || toCoord.y() > 7)
+        return STATE_DONE_FAIL;
     if(m_chessController->botMove().isQuiet())
     {
         printf("Move quited\r\n");
@@ -719,15 +744,15 @@ uint8_t ChessBot::playCalculateNextMove()
             if(m_chessController->botMove().isCapture())
             {
                 switch (capturedPieceType) {
-                    case 0: capturedPieceChar = m_side = Color::WHITE ? 'P':'p';
+                    case 0: capturedPieceChar = 'p';
                         break;
-                    case 1: capturedPieceChar = m_side = Color::WHITE ? 'N':'n';
+                    case 1: capturedPieceChar = 'n';
                         break;
-                    case 2: capturedPieceChar = m_side = Color::WHITE ? 'B':'b';
+                    case 2: capturedPieceChar = 'b';
                         break;
-                    case 3: capturedPieceChar = m_side = Color::WHITE ? 'R':'r';
+                    case 3: capturedPieceChar = 'r';
                         break;
-                    case 4: capturedPieceChar = m_side = Color::WHITE ? 'Q':'q';
+                    case 4: capturedPieceChar = 'q';
                         break;
                 }
             }
@@ -1792,18 +1817,11 @@ QObject* ChessBot::chessControllerObject() const
 
 void ChessBot::resetGame(){
     qDebug("Reset game side[%d]",m_side);
-    m_chessController->newGame();    
-    if(m_side == 1) {
-        m_state = STATE_PLAY;
-        m_statePlay = PLAY_CALCULATE_NEXT_MOVE_RESET;
-        togglePause(false);
-        startService();
-    } else {
-        m_state = STATE_PLAY;
-        m_statePlay = PLAY_SETUP;
-        togglePause(false);
-        startService();
-    }
+    m_chessController->newGame();
+    m_state = STATE_PLAY;
+    m_statePlay = PLAY_CHECK_LOG;
+    togglePause(false);
+    startService();
 }
 
 bool ChessBot::detectArduinoPort(int baudRate)
@@ -1956,6 +1974,156 @@ void ChessBot::speakMove(const QString fen, const int color,
     QString formattedMove = m_chessController->processRobotCommentary(fen,color, pieceType, pieceNotation, move);
     speakText(formattedMove);
 }
+
+void ChessBot::acceptPlayFENFromHistory(bool accept)
+{
+    qDebug("Reset game side[%d]",m_side);
+    if(accept) {
+        qDebug("Play last fen [%s]\r\n",m_lastGame.fen.c_str());
+        m_chessController->newGame(QString::fromStdString(m_lastGame.fen));
+        m_side = m_lastGame.turn == "White"?Color::BLACK:Color::WHITE;
+        m_chessController->setPlayerColor(m_side);
+        m_detectParams->playerSide = m_side == 0?
+                    "white":"black";
+        setLevel(700);
+        if(m_side == 0) {
+            m_state = STATE_PLAY;
+            m_statePlay = PLAY_CALCULATE_NEXT_MOVE_RESET;
+            togglePause(false);
+            startService();
+        } else {
+            m_state = STATE_PLAY;
+            m_statePlay = PLAY_SETUP;
+            togglePause(false);
+            startService();
+        }
+    } else {
+        if(m_side == 1) {
+            m_state = STATE_PLAY;
+            m_statePlay = PLAY_CALCULATE_NEXT_MOVE_RESET;
+            togglePause(false);
+            startService();
+        } else {
+            m_state = STATE_PLAY;
+            m_statePlay = PLAY_SETUP;
+            togglePause(false);
+            startService();
+        }
+    }
+}
+
+bool ChessBot::findLastFENInLog()
+{
+    // Look in the current app deployment directory (or specify an absolute path)
+    QString latestFilePath = getLatestLogFile(".");
+
+    if (!latestFilePath.isEmpty()) {
+        std::cout << "Targeting file: " << latestFilePath.toStdString() << std::endl;
+
+        // Pass it right along to your C++11 function from earlier
+        m_lastGame = getLastChessState(latestFilePath.toStdString());
+
+        if (m_lastGame.success) {
+            std::cout << "Timestamp: " << m_lastGame.timestamp << std::endl;
+            std::cout << "FEN:       " << m_lastGame.fen << std::endl;
+            std::cout << "Turn:      " << m_lastGame.turn << std::endl;
+            return  true;
+        }
+    } else {
+        std::cout << "No valid chess log files found in the directory." << std::endl;
+    }
+    return false;
+}
+QString ChessBot::getLatestLogFile(const QString& folderPath) {
+    QDir directory(folderPath);
+
+    // 1. Safety check to make sure the folder path exists
+    if (!directory.exists()) {
+        qWarning() << "Directory does not exist:" << folderPath;
+        return QString();
+    }
+
+    // 2. Set up wildcard filters to only look for files matching your pattern
+    QStringList nameFilters;
+    nameFilters << "play_history_*.txt";
+
+    // 3. Scan directory.
+    // QDir::Name sorts alphabetically. Because your files use "yyyy-MM-dd",
+    // alphabetical sorting naturally puts the oldest first and latest last.
+    QFileInfoList fileList = directory.entryInfoList(
+        nameFilters,
+        QDir::Files,
+        QDir::Name
+    );
+
+    // 4. If the list isn't empty, the very last element is our latest file
+    if (!fileList.isEmpty()) {
+        return fileList.last().absoluteFilePath();
+    }
+
+    return QString(); // Return empty string if no matching files found
+}
+
+GameInfo ChessBot::getLastChessState(const std::string& filepath) {
+    std::ifstream file(filepath);
+    GameInfo info;
+
+    if (!file.is_open()) {
+        return info; // success defaults to false
+    }
+
+    std::string line;
+    std::vector<std::string> gameLines;
+    bool activeGame = false;
+
+    // Phase 1: Collect lines belonging ONLY to the most recent game
+    while (std::getline(file, line)) {
+        if (line.find("===New game===") != std::string::npos) {
+            gameLines.clear(); // Wipe older games
+            activeGame = true;
+            continue;
+        }
+        if (activeGame && !line.empty()) {
+            gameLines.push_back(line);
+        }
+    }
+    file.close();
+
+    // Phase 2: Read backwards from the end to find the last valid log entry
+    for (auto it = gameLines.rbegin(); it != gameLines.rend(); ++it) {
+        std::string currentLine = *it;
+
+        size_t openBracket = currentLine.find('[');
+        size_t closeBracket = currentLine.find(']');
+
+        // Ensure the line contains a timestamp and data after it
+        if (openBracket != std::string::npos && closeBracket != std::string::npos && closeBracket + 1 < currentLine.length()) {
+
+            // 1. Extract Timestamp
+            info.timestamp = currentLine.substr(openBracket + 1, closeBracket - openBracket - 1);
+
+            // 2. Extract raw FEN string
+            size_t fenStart = currentLine.find_first_not_of(" \t", closeBracket + 1);
+            if (fenStart == std::string::npos) continue;
+            info.fen = currentLine.substr(fenStart);
+
+            // 3. Extract Turn to Play
+            std::stringstream ss(info.fen);
+            std::string board, color;
+            if (ss >> board >> color) {
+                if (color == "w") info.turn = "White";
+                else if (color == "b") info.turn = "Black";
+                else info.turn = "Unknown";
+            }
+
+            info.success = true;
+            break; // Found the last update, exit
+        }
+    }
+
+    return info;
+}
+
 void ChessBot::logWithTimestampQt(QString data) {
     // 1. Get current date and format as yyyy-MM-dd
     QString dateString = QDate::currentDate().toString("yyyy-MM-dd");

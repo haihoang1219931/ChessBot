@@ -50,7 +50,7 @@ public:
     QString uiIndexToPieceType(int uiIndex);
     QString uiIndexToSquareNotation(int uiIndex);
     std::string coordToNotation(int squareIndex);
-    Q_INVOKABLE void newGame();
+    Q_INVOKABLE void newGame(QString lastMove = "");
     Q_INVOKABLE void clickSquare(int uiIndex);
     Q_INVOKABLE bool moveByUiSquares(int startUiIndex, int stopUiIndex, Move& chosenMove);
     Q_INVOKABLE bool moveByUiIndex(int startUiIndex,

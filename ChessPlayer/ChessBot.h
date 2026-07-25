@@ -50,6 +50,7 @@ typedef enum {
 } STATE_CHESBOT;
 
 typedef enum{
+    PLAY_CHECK_LOG,
     PLAY_CALCULATE_NEXT_MOVE_RESET,
     PLAY_SETUP,
     PLAY_INIT,
@@ -94,6 +95,14 @@ typedef enum{
     PIECE_MOVE_CAPTURE,
     PIECE_MOVE_ENPASSANT
 } PIECE_MOVE_TYPE;
+
+struct GameInfo {
+    std::string timestamp = "";
+    std::string fen = "";
+    std::string turn = "";
+    bool success = false;
+};
+
 class ChessBot : public QThread {
     Q_OBJECT
     Q_PROPERTY(int levelType READ levelType NOTIFY levelTypeChanged)
@@ -114,6 +123,7 @@ public:
     Q_INVOKABLE bool loadCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
     Q_INVOKABLE void updateCorners(QVariantList corners);
     Q_INVOKABLE void updateCalibrationData(int type, int row, int col, int x, int y);
+    Q_INVOKABLE void acceptPlayFENFromHistory(bool accept);
 
 public Q_SLOTS:
     void run() override;
@@ -147,6 +157,7 @@ Q_SIGNALS:
     void calibrationUploadProgress(int direction, int progress);
     void calibrationUploadComplete(int direction, bool success);
     void showPromotionPieces();
+    void foundLastFEN();
 
 private:
     void playLoop();
@@ -177,6 +188,10 @@ private:
     bool isCalibDataLoaded();
     QPoint notationToCoord(const std::string& notation, const std::string& playerSide);
     void logWithTimestampQt(QString data);
+    GameInfo getLastChessState(const std::string& filepath);
+    QString getLatestLogFile(const QString& folderPath);
+    bool findLastFENInLog();
+
 #ifdef IMAGE_PROCESS_MOVE
     void processAndSaveFailures(const cv::Mat& imageBefore, const cv::Mat& imageAfter);
     int getNextFileCounter(const std::string& folderPath);
@@ -225,6 +240,7 @@ private:
     QString m_cmdId;
     bool m_validCalibFileFound;
     QString m_robotCommand;
+    GameInfo m_lastGame;
 };
 
 #endif // CHESSBOT_H

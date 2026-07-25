@@ -145,9 +145,13 @@ const std::string whitePawnPromotionCapture = "1r6/2P1k3/8/3K4/8/8/8/8 w - - 0 1
 const std::string whitePawnDoubleCapture = "3r1r2/4P3/8/k7/8/8/8/1K6 w - - 0 1";
 const std::string blackPrePromotion = "k7/8/8/8/8/8/2p5/4K3 w - - 0 1";
 const std::string blackCapturePromotion = "k7/8/8/8/8/8/1p6/2R1K3 w - - 0 1";
-void ChessController::newGame()
+const std::string crashMove = "r3k2r/p1p3pp/1p6/2K2p2/8/2N1n3/PP5P/1R6 w kq - 39 20";
+void ChessController::newGame(QString lastMove)
 {
-    m_board = std::make_shared<Board>();
+    if(lastMove != "")
+        m_board = std::make_shared<Board>(lastMove.toStdString());
+    else
+        m_board = std::make_shared<Board>();
     globalTT.clearTT();
     m_moveHistory.clear();
     Q_EMIT moveHistoryChanged();
@@ -156,6 +160,13 @@ void ChessController::newGame()
     Q_EMIT promotionPendingChanged();
     clearSelection();
     refreshBoardModel();
+    printf("new game\r\n");
+    for(int row = 0; row < 8; row++) {
+        for(int col = 0; col < 8; col ++) {
+            printf("%s ",m_boardModel[row*8+col] == ""?"__":m_boardModel[row*8+col].toStdString().c_str());
+        }
+        printf("\r\n");
+    }
     refreshCheckState();
     setStatus("NEW_GAME");
     Q_EMIT sideToMoveChanged();

@@ -19,5 +19,6 @@
         <file>qml/DownloadProgress.qml</file>
         <file>qml/PromotionPieces.qml</file>
         <file>qml/HomeOption.qml</file>
+        <file>qml/ConfirmPlay.qml</file>
     </qresource>
 </RCC>
