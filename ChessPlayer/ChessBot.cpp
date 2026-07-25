@@ -8,6 +8,7 @@
 #include <QSerialPortInfo>
 #include <QTime>
 #include <QDebug>
+#include <QTextCodec>
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
 #include <QDir>
@@ -660,6 +661,7 @@ uint8_t ChessBot::playCalculateNextMove()
     QString currentFen = m_chessController->extractFEN();
     qDebug("playCalculateNextMove FEN: %s",currentFen.toStdString().c_str());
     logWithTimestampQt(currentFen);
+    qDebug("playCalculateNextMove log FEN done");
     // play engine move
     m_chessController->playEngineMove();
     printf("check move history\r\n");
@@ -808,6 +810,22 @@ void ChessBot::sendRobotCommand(const char* cmd, int waitTime)
     robotController->waitForBytesWritten(waitTime);
 }
 
+
+bool isByteArrayAscii(const QByteArray &data) {
+    QTextCodec::ConverterState state;
+    QTextCodec *codec = QTextCodec::codecForName("UTF-8");
+
+    if (codec) {
+        // Attempt to parse the byte array into Unicode
+        codec->toUnicode(data.constData(), data.size(), &state);
+
+        // invalidChars counts non-UTF8 sequences.
+        // remainingChars checks if it cut off mid-character (multi-byte UTF-8 markers).
+        return (state.invalidChars == 0 && state.remainingChars == 0);
+    }
+    return false;
+}
+
 QByteArray ChessBot::readRobotResponse(int waitTime)
 {
     QByteArray chunk;
@@ -815,7 +833,11 @@ QByteArray ChessBot::readRobotResponse(int waitTime)
         chunk = robotController->readAll();
     }
     printf("Robot rep [%d]:",chunk.size());
-    printf("%s\r\n", chunk.constData());
+    if(!isByteArrayAscii(chunk)) return QByteArray();
+    for(int i = 0 ; i < chunk.size(); i++) {
+        printf("%02X ",(unsigned char) chunk.at(i));
+    }
+    printf("\r\n");
     return chunk;
 }
 uint8_t ChessBot::playExecuteNextMove()
@@ -838,7 +860,20 @@ uint8_t ChessBot::playExecuteNextMove()
 
             sendRobotCommand("cmd");
             QByteArray chunk = readRobotResponse();
-            QString moveCmdIDStr = QString::fromLatin1(chunk);
+            QString moveCmdIDStr  = "";
+            if (chunk.size() >= 4) {
+                moveCmdIDStr = QString::fromLatin1(chunk);
+                if(moveCmdIDStr.contains("[cmd]")) {
+                    QRegularExpression re("\\d+");
+                    QRegularExpressionMatch match = re.match(moveCmdIDStr);
+                    if (match.hasMatch()) {
+                        moveCmdID = match.captured(0);
+                        qDebug() << "Extracted numbers:" << moveCmdID; // Outputs: "0001"
+                        break;
+                    }
+                }
+            }
+
             if(moveCmdIDStr.contains("[cmd]")) {
                 moveCmdID = moveCmdIDStr.section(']', 1);
                 qDebug("move: %s", moveCmdID.toStdString().c_str());
@@ -853,7 +888,6 @@ uint8_t ChessBot::playExecuteNextMove()
             do {
                 sendRobotCommand(moveCmdRequest.toStdString().c_str());
                 QByteArray chunk = readRobotResponse();
-                qDebug("Received progress chunk: %s", chunk.constData());
                 QString moveCmdStateStr = QString::fromLatin1(chunk);
                 if(moveCmdStateStr.contains("]DONE")) {
                     moveCmdState = moveCmdStateStr.section(']', 1);
