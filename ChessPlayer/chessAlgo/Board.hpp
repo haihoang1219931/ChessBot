@@ -140,7 +140,12 @@ public:
 	void rewindCastlingRights(const Move &move);
 
     // EP methods
-    inline Square getLastEpSquare() const {return myEpSquares.back();}
+    inline Square getLastEpSquare() const {
+        if(myEpSquares.empty())
+            return SQ_NONE;
+        else
+            return myEpSquares.back();
+    }
 
 	//PieceType method
 	Piece::Piece findPieceType(const Square position) const;
@@ -201,7 +206,7 @@ public:
 
     std::string extractFen() {
         std::stringstream fen;
-
+        printf("1. Piece Placement\r\n");
         // 1. Piece Placement (Ranks 8 down to 1)
             for (int rank = 7; rank >= 0; --rank) {
                 int empty_squares = 0;
@@ -227,9 +232,11 @@ public:
                 }
             }
 
+        printf("2. Active Color\r\n");
         // 2. Active Color
         fen << " " << (getColorToPlay() == Color::WHITE ? "w" : "b");
 
+        printf("3. Castling Availability\r\n");
         // 3. Castling Availability
         std::string castling = "";
         if (isKingSideCastlingAllowed(Color::WHITE))   castling += "K";
@@ -238,6 +245,7 @@ public:
         if (isQueenSideCastlingAllowed(Color::BLACK))  castling += "q";
         fen << " " << (castling.empty() ? "-" : castling);
 
+        printf("4. En Passant Target Square\r\n");
         // 4. En Passant Target Square
         Square ep = getLastEpSquare();
         // Assuming Deepov defines an empty square as SQUARE_NB or NO_SQUARE (usually 64)
@@ -248,17 +256,19 @@ public:
             char ep_rank = '1' + (ep / 8);
             fen << " " << ep_file << ep_rank;
         }
-
+        printf("5. Halfmove Clock & Fullmove Number\r\n");
         // 5. Halfmove Clock & Fullmove Number
         // Your header tracks myHalfMovesCounter via getPly(),
         // and fullmove can be calculated or derived from history size.
         fen << " " << getPly();
 
+        printf("Deepov stores moves in myMoves vector\r\n");
         // Deepov stores moves in myMoves vector. Fullmove number starts at 1
         // and increments after every black move.
         unsigned int fullmoves = 1 + (getMovesHistory().size() / 2);
         fen << " " << fullmoves;
 
+        printf("extractFen done [%s]\r\n",fen.str().c_str());
         return fen.str();
     }
 	inline bool hasBlackCastled() const

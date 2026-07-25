@@ -154,7 +154,6 @@ void ChessController::newGame(QString lastMove)
         m_board = std::make_shared<Board>();
     globalTT.clearTT();
     m_moveHistory.clear();
-    Q_EMIT moveHistoryChanged();
     m_promotionPending = false;
     m_pendingPromotionMoves.clear();
     Q_EMIT promotionPendingChanged();
@@ -252,7 +251,6 @@ bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex, Move& c
     }
     m_board->executeMove(chosenMove);
     m_moveHistory.push_back(chosenMove);
-    Q_EMIT moveHistoryChanged();
     clearSelection();
     refreshBoardModel();
     refreshCheckState();
@@ -298,7 +296,6 @@ bool ChessController::moveByUiIndex(int startUiIndex,
 
     m_board->executeMove(chosenMove);
     m_moveHistory.push_back(chosenMove);
-    Q_EMIT moveHistoryChanged();
     clearSelection();
     refreshBoardModel();
     refreshCheckState();
@@ -505,7 +502,6 @@ void ChessController::choosePromotion(const QString& pieceLetter)
 
     m_board->executeMove(chosenMove);
     m_moveHistory.push_back(chosenMove);
-    Q_EMIT moveHistoryChanged();
     clearSelection();
     refreshBoardModel();
     refreshCheckState();
@@ -583,31 +579,31 @@ void ChessController::clearSelection()
 
 void ChessController::playEngineMove()
 {
+    printf("ChessController::playEngineMove");
+    bool foundMove = false;
     Search search(m_board);
     search.negaMaxRoot(m_engineDepth);
     Move bestMove = search.myBestMove;
     MoveGen moveGen(m_board);
     const auto legalMoves = moveGen.generateMoves();
+    printf("ChessController::playEngineMove generateMoves done with %d legal move\r\n",legalMoves.size());
     for (Move move : legalMoves)
     {
         if (QString::fromStdString(move.toShortString()) ==
                 QString::fromStdString(bestMove.toShortString()))
         {
+            printf("ChessController::playEngineMove found bot move");
+            foundMove = true;
             m_botMove = move;
             m_board->executeMove(move);
             m_moveHistory.push_back(move);
-            Q_EMIT moveHistoryChanged();
             refreshBoardModel();
             refreshCheckState();
             Q_EMIT sideToMoveChanged();
-
-            const QString result = buildResultText();
-            setStatus(result.isEmpty() ?
-                          QString("ENGINE_PLAY_") + QString::fromStdString(bestMove.toShortString()) : result);
-            return;
+            break;
         }
     }
-    setStatus("NO_LEGAL_ENGINE_MOVE_FOUND");
+    if(!foundMove) setStatus("NO_LEGAL_ENGINE_MOVE_FOUND");
 }
 
 QString ChessController::convertPieceText(QString pieceShortName)

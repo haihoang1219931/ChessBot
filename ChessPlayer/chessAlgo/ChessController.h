@@ -71,7 +71,6 @@ Q_SIGNALS:
     void selectedSquareChanged();
     void sideToMoveChanged();
     void statusChanged();
-    void moveHistoryChanged();
     void promotionPendingChanged();
     void checkedKingSquareChanged();
     void engineLevelChanged();

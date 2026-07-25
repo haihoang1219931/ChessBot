@@ -657,19 +657,23 @@ QPoint ChessBot::notationToCoord(const std::string& notation, const std::string&
 }
 uint8_t ChessBot::playCalculateNextMove()
 {
-    qDebug("playCalculateNextMove FEN: %s",m_chessController->extractFEN().toStdString().c_str());
-    logWithTimestampQt(m_chessController->extractFEN());
+    QString currentFen = m_chessController->extractFEN();
+    qDebug("playCalculateNextMove FEN: %s",currentFen.toStdString().c_str());
+    logWithTimestampQt(currentFen);
     // play engine move
     m_chessController->playEngineMove();
-    if(m_chessController->moveHistory().size()==0) return STATE_DONE_FAIL;
+    printf("check move history\r\n");
+    if(m_chessController->moveHistory().size()==0) {
+        return STATE_DONE_FAIL;
+    }
+    printf("get last move\r\n");
     QString lastMove = QString::fromStdString(m_chessController->moveHistory()[m_chessController->moveHistory().size()-1].toShortString());
     if(lastMove.length() < 4) return STATE_DONE_FAIL;
     printf("lastMove %s\r\n", lastMove.toStdString().c_str());
     QString from = lastMove.left(2);  // Result: "e2"
     QString to = lastMove.mid(2, 2);   // Result: "e4"
 
-    QPoint fromCoord, toCoord;
-    char robotCommand[32];
+    QPoint fromCoord, toCoord;    
     fromCoord = notationToCoord(from.toStdString(),
                                                 m_side != 0?"white":"black");
     toCoord = notationToCoord(to.toStdString(),
@@ -683,7 +687,7 @@ uint8_t ChessBot::playCalculateNextMove()
     if(m_chessController->botMove().isQuiet())
     {
         printf("Move quited\r\n");
-        sprintf(robotCommand,"c%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
+        sprintf(m_robotCommand,"c%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
                 canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x())?'-':'n');
     }
     else //Castling or Promotion or Capture
@@ -729,7 +733,7 @@ uint8_t ChessBot::playCalculateNextMove()
 
             //move rook
             printf("Castling move rook\r\n");
-            sprintf(robotCommand,"CST%d%d%d%d%c",fromCoord.y(),fromCoord.x(),
+            sprintf(m_robotCommand,"CST%d%d%d%d%c",fromCoord.y(),fromCoord.x(),
                     toCoord.y(),toCoord.x() > fromCoord.x()?7:0,
                     '-');
         }
@@ -767,7 +771,7 @@ uint8_t ChessBot::playCalculateNextMove()
                     break;
             }
 
-            sprintf(robotCommand,"pm%d%d%d%d%c%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
+            sprintf(m_robotCommand,"pm%d%d%d%d%c%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
                     capturedPieceChar,promotePieceChar);
         }
         else
@@ -775,7 +779,7 @@ uint8_t ChessBot::playCalculateNextMove()
             if (m_chessController->botMove().isEnPassant()) // watch out ep capture is a capture
             {
                 printf("Capture remove pawn color[%d] \r\n",m_side != 0?"White":"Black");
-                sprintf(robotCommand,"pp%d%d%d%d%c%c%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
+                sprintf(m_robotCommand,"pp%d%d%d%d%c%c%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
                         'p','0',
                         canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),PIECE_MOVE_ENPASSANT)?'-':'n');
             }
@@ -784,19 +788,36 @@ uint8_t ChessBot::playCalculateNextMove()
                 //remove the captured piece
                 unsigned int type(m_chessController->botMove().getCapturedPieceType());
                 printf("Capture remove captured piece[%d] color[%s] \r\n",type,m_side != 0?"White":"Black");
-                sprintf(robotCommand,"a%d%d%d%d%c%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
+                sprintf(m_robotCommand,"a%d%d%d%d%c%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
                         'p',
                         canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),PIECE_MOVE_CAPTURE)?'-':'n');
             }
         }
     }
-    m_robotCommand = QString(robotCommand);
     qDebug("playCalculateNextMove %s to cmd[%s]\r\n",
            lastMove.toStdString().c_str(),
-           robotCommand);
+           m_robotCommand);
     return STATE_DONE_SUCCESS;
 }
 
+void ChessBot::sendRobotCommand(const char* cmd, int waitTime)
+{
+    printf("sendRobotCommand:");
+    printf("[%s]\r\n",cmd);
+    robotController->write(cmd);
+    robotController->waitForBytesWritten(waitTime);
+}
+
+QByteArray ChessBot::readRobotResponse(int waitTime)
+{
+    QByteArray chunk;
+    if (robotController->waitForReadyRead(waitTime)) {
+        chunk = robotController->readAll();
+    }
+    printf("Robot rep [%d]:",chunk.size());
+    printf("%s\r\n", chunk.constData());
+    return chunk;
+}
 uint8_t ChessBot::playExecuteNextMove()
 {
     // TODO: Send command to robot and wait until execution is done
@@ -806,29 +827,22 @@ uint8_t ChessBot::playExecuteNextMove()
         qDebug("Serial port is not open for abort.");
         return STATE_DONE_SUCCESS;
     } else {
-        robotController->write(m_robotCommand.toUtf8());
-        robotController->waitForBytesWritten(1000);
+        sendRobotCommand(m_robotCommand,1000);
         sleep(1);
-        if (robotController->waitForReadyRead(500)) {
-            QByteArray chunk = robotController->readAll();
-            qDebug("Received progress chunk: %s", chunk.constData());
-        }
+        readRobotResponse();
         QString moveCmdID = "";
         QString moveCmdRequest = "";
         QString moveCmdState = "";
         int retry = 0;
         do {
-            robotController->write("cmd");
-            robotController->waitForBytesWritten(200);
-            if (robotController->waitForReadyRead(500)) {
-                QByteArray chunk = robotController->readAll();
-                qDebug("Received progress chunk: %s", chunk.constData());
-                QString moveCmdIDStr = QString::fromLatin1(chunk);
-                if(moveCmdIDStr.contains("[cmd]")) {
-                    moveCmdID = moveCmdIDStr.section(']', 1);
-                    qDebug("move: %s", moveCmdID.toStdString().c_str());
-                    break;
-                }
+
+            sendRobotCommand("cmd");
+            QByteArray chunk = readRobotResponse();
+            QString moveCmdIDStr = QString::fromLatin1(chunk);
+            if(moveCmdIDStr.contains("[cmd]")) {
+                moveCmdID = moveCmdIDStr.section(']', 1);
+                qDebug("move: %s", moveCmdID.toStdString().c_str());
+                break;
             }
             retry++;
         } while(retry < 5);
@@ -837,17 +851,14 @@ uint8_t ChessBot::playExecuteNextMove()
             moveCmdRequest = "_"+moveCmdID;
             retry = 0;
             do {
-                robotController->write(moveCmdRequest.toStdString().c_str());
-                robotController->waitForBytesWritten(200);
-                if (robotController->waitForReadyRead(200)) {
-                    QByteArray chunk = robotController->readAll();
-                    qDebug("Received progress chunk: %s", chunk.constData());
-                    QString moveCmdStateStr = QString::fromLatin1(chunk);
-                    if(moveCmdStateStr.contains("]DONE")) {
-                        moveCmdState = moveCmdStateStr.section(']', 1);
-                        qDebug("move State: %s", moveCmdState.toStdString().c_str());
-                        break;
-                    }
+                sendRobotCommand(moveCmdRequest.toStdString().c_str());
+                QByteArray chunk = readRobotResponse();
+                qDebug("Received progress chunk: %s", chunk.constData());
+                QString moveCmdStateStr = QString::fromLatin1(chunk);
+                if(moveCmdStateStr.contains("]DONE")) {
+                    moveCmdState = moveCmdStateStr.section(']', 1);
+                    qDebug("move State: %s", moveCmdState.toStdString().c_str());
+                    break;
                 }
                 sleep(1);
                 retry++;
@@ -887,26 +898,9 @@ uint8_t ChessBot::configureLevel()
 uint8_t ChessBot::testRobot()
 {
     uint8_t testState = STATE_PENDING;
-    robotController->write(m_commandTest.toStdString().c_str());
-    robotController->waitForBytesWritten(200);
-    if (robotController->waitForReadyRead(500)) {
-        QByteArray chunk = robotController->readAll();
-        qDebug("Received progress chunk: %s", chunk.constData());
-        testState = STATE_DONE_SUCCESS;
-    }
-//    sleep(1);
-//    robotController->write("cmd");
-//    robotController->waitForBytesWritten(200);
-//    if (robotController->waitForReadyRead(500)) {
-//        QByteArray chunk = robotController->readAll();
-//        qDebug("Received progress chunk: %s", chunk.constData());
-//        QString positionCmdIDStr = QString::fromLatin1(chunk);
-//        if(positionCmdIDStr.contains("[cmd]")) {
-//            m_cmdId = positionCmdIDStr.section(']', 1);
-//            qDebug("position Cmd ID: %s", m_cmdId.toStdString().c_str());
-//            testState = STATE_DONE_SUCCESS;
-//        }
-//    }
+    sendRobotCommand(m_commandTest.toStdString().c_str());
+    QByteArray chunk = readRobotResponse();
+    if(chunk.size() > 0) testState = STATE_DONE_SUCCESS;
     return testState;
 }
 
@@ -938,8 +932,7 @@ bool ChessBot::readCalibrationPoint(const QString &command,QPoint& point)
 
     // Send calibration request command
     qDebug("Sending calibration command: %s", command.toStdString().c_str());
-    robotController->write(command.toLatin1());
-    robotController->waitForBytesWritten(500);
+    sendRobotCommand(command.toLatin1(),500);
 
     // Determine expected response prefix based on command
     QString expectedPrefix;
@@ -1018,8 +1011,7 @@ bool ChessBot::sendCalibrationCells()
     qDebug("Sending calibration data to RobotController...");
 
     // Send start marker and wait for acknowledgment
-    robotController->write("CALIB_START\n");
-    robotController->waitForBytesWritten(200);
+    sendRobotCommand("CALIB_START\n");
 
     // Wait for CALIB_START_ACK response within 2 seconds
     if (!robotController->waitForReadyRead(2000)) {
@@ -1046,8 +1038,7 @@ bool ChessBot::sendCalibrationCells()
             QPoint p = m_chessboardCalib[r][c];
             QString cmd = QString("SC r%1 c%2 x%3 y%4\n")
                 .arg(r).arg(c).arg(p.x()).arg(p.y());
-            robotController->write(cmd.toLatin1());
-            robotController->waitForBytesWritten(20);
+            sendRobotCommand(cmd.toLatin1(),20);
 
             // Wait for progress response
             if (!waitForCalibrationProgress()) {
@@ -1067,8 +1058,7 @@ bool ChessBot::sendCalibrationCells()
             QPoint p = m_dropzoneRightCalib[r][c];
             QString cmd = QString("SR r%1 c%2 x%3 y%4\n")
                 .arg(r).arg(c).arg(p.x()).arg(p.y());
-            robotController->write(cmd.toLatin1());
-            robotController->waitForBytesWritten(20);
+            sendRobotCommand(cmd.toLatin1(),20);
 
             // Wait for progress response
             if (!waitForCalibrationProgress()) {
@@ -1088,8 +1078,7 @@ bool ChessBot::sendCalibrationCells()
             QPoint p = m_dropzoneLeftCalib[r][c];
             QString cmd = QString("SL r%1 c%2 x%3 y%4\n")
                 .arg(r).arg(c).arg(p.x()).arg(p.y());
-            robotController->write(cmd.toLatin1());
-            robotController->waitForBytesWritten(20);
+            sendRobotCommand(cmd.toLatin1(),20);
 
             // Wait for progress response
             if (!waitForCalibrationProgress()) {
@@ -1104,8 +1093,7 @@ bool ChessBot::sendCalibrationCells()
     }
 
     // Send end marker
-    robotController->write("CALIB_END\n");
-    robotController->waitForBytesWritten(200);
+    sendRobotCommand("CALIB_END\n");
 
     // Wait for final response
     if (robotController->waitForReadyRead(3000)) {
@@ -1141,8 +1129,7 @@ void ChessBot::abortCalibrationUpload()
     }
 
     qDebug("Aborting calibration upload...");
-    robotController->write("CALIB_ABORT\n");
-    robotController->waitForBytesWritten(100);
+    sendRobotCommand("CALIB_ABORT\n",100);
      Q_EMIT calibrationUploadComplete(CALIB_UPLOAD_TO_ROBOT, false);
 }
 
@@ -1155,11 +1142,8 @@ bool ChessBot::waitForCalibrationProgress()
 
     qDebug("Collecting calibration progress responses for 2 seconds...");
     while (timer.elapsed() < 100) {
-        if (robotController->waitForReadyRead(50)) {
-            QByteArray chunk = robotController->readAll();
-            allResponses.append(chunk);
-            qDebug("Received progress chunk: %s", chunk.constData());
-        }
+        QByteArray chunk = readRobotResponse(50);
+        if(chunk.size() > 0) allResponses.append(chunk);
     }
 
     if (allResponses.isEmpty()) {
@@ -1378,16 +1362,13 @@ uint8_t ChessBot::enableRobot()
         qDebug("Serial port is not open for abort.");
         return STATE_DONE_SUCCESS;
     } else {
-        robotController->write("ee");
-        robotController->waitForBytesWritten(1000);
+        sendRobotCommand("ee",1000);
         bool robotEnabled = false;
         int retry = 0;
         do {
-            robotController->write("es");
-            robotController->waitForBytesWritten(200);
-            if (robotController->waitForReadyRead(500)) {
-                QByteArray chunk = robotController->readAll();
-                qDebug("Received progress chunk: %s", chunk.constData());
+            sendRobotCommand("es");
+            QByteArray chunk = readRobotResponse();
+            if (chunk.size() > 0) {
                 QString responseStr = QString::fromLatin1(chunk);
                 if(responseStr.contains("[es] Enabled")) {
                     robotEnabled = true;
@@ -1406,23 +1387,17 @@ uint8_t ChessBot::goHome()
         qDebug("Serial port is not open for abort.");
         return STATE_DONE_SUCCESS;
     } else {
-        robotController->write("ha");
-        robotController->waitForBytesWritten(1000);
+        sendRobotCommand("ha",1000);
         sleep(1);
-        if (robotController->waitForReadyRead(500)) {
-            QByteArray chunk = robotController->readAll();
-            qDebug("CMD[ha] Received progress chunk: %s", chunk.constData());
-        }
+        readRobotResponse();
         QString homeCmdID = "";
         QString homeCmdRequest = "";
         QString homeCmdState = "";
         int retry = 0;
         do {
-            robotController->write("cmd");
-            robotController->waitForBytesWritten(200);
-            if (robotController->waitForReadyRead(500)) {
-                QByteArray chunk = robotController->readAll();
-                qDebug("CMD[cmd] Received progress chunk: %s", chunk.constData());
+            sendRobotCommand("cmd");
+            QByteArray chunk = readRobotResponse();
+            if (chunk.size() >= 4) {
                 QString homeCmdIDStr = QString::fromLatin1(chunk);
                 if(homeCmdIDStr.contains("[cmd]")) {
                     QRegularExpression re("\\d+");
@@ -1441,13 +1416,9 @@ uint8_t ChessBot::goHome()
             homeCmdRequest = "_"+homeCmdID;
             retry = 0;
             do {
-                robotController->write(homeCmdRequest.toStdString().c_str());
-                robotController->waitForBytesWritten(200);
-                if (robotController->waitForReadyRead(200)) {
-                    QByteArray chunk = robotController->readAll();
-                    qDebug("CMD[%s] Received progress chunk: %s",
-                           homeCmdRequest.toStdString().c_str(),
-                           chunk.constData());
+                sendRobotCommand(homeCmdRequest.toStdString().c_str());
+                QByteArray chunk = readRobotResponse();
+                if (chunk.size() >= 10) {
                     QString homeCmdStateStr = QString::fromLatin1(chunk);
                     if(homeCmdStateStr.contains("]DONE")) {
                         homeCmdState = homeCmdStateStr.section(']', 1);
@@ -1863,8 +1834,7 @@ bool ChessBot::detectArduinoPort(int baudRate)
             }
             for(int i=0; i< 2; i++) {
                 // Send version request
-                robotController->write("v");
-                robotController->waitForBytesWritten(500);
+                sendRobotCommand("v");
 
                 // Wait for response with timeout
                 if (robotController->waitForReadyRead(1000)) {
@@ -1901,8 +1871,7 @@ bool ChessBot::getArduinoVersion()
 
     // Send version request
     qDebug("Sending version request...");
-    robotController->write("v");
-    robotController->waitForBytesWritten(500);
+    sendRobotCommand("v");
 
     // Collect all responses for 2 seconds
     QByteArray allResponses;
@@ -1911,10 +1880,9 @@ bool ChessBot::getArduinoVersion()
 
     qDebug("Collecting responses for 2 seconds...");
     while (timer.elapsed() < 2000) {
-        if (robotController->waitForReadyRead(100)) {
-            QByteArray chunk = robotController->readAll();
+        QByteArray chunk = readRobotResponse();
+        if (chunk.size() > 0) {
             allResponses.append(chunk);
-            qDebug("Received chunk: %s", chunk.constData());
         }
     }
 

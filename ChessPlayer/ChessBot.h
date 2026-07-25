@@ -191,6 +191,8 @@ private:
     GameInfo getLastChessState(const std::string& filepath);
     QString getLatestLogFile(const QString& folderPath);
     bool findLastFENInLog();
+    void sendRobotCommand(const char* cmd, int waitTime = 200);
+    QByteArray readRobotResponse(int waitTime = 500);
 
 #ifdef IMAGE_PROCESS_MOVE
     void processAndSaveFailures(const cv::Mat& imageBefore, const cv::Mat& imageAfter);
@@ -239,7 +241,7 @@ private:
     int m_calibCellCount;
     QString m_cmdId;
     bool m_validCalibFileFound;
-    QString m_robotCommand;
+    char m_robotCommand[32];
     GameInfo m_lastGame;
 };
 
