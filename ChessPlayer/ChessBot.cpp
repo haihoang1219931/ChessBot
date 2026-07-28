@@ -380,6 +380,8 @@ void ChessBot::playLoop()
         qDebug("PLAY_EXECUTE_NEXT_MOVE");
         if(playExecuteNextMove()== STATE_DONE_SUCCESS){
             m_statePlay = PLAY_INFORM_RESULT;
+        } else {
+            m_statePlay = PLAY_INFORM_ERROR;
         }
     }
         break;
@@ -804,26 +806,28 @@ uint8_t ChessBot::playCalculateNextMove()
 
 void ChessBot::sendRobotCommand(const char* cmd, int waitTime)
 {
-    printf("sendRobotCommand:");
-    printf("[%s]\r\n",cmd);
+    qDebug("sendRobotCommand %d",strlen(cmd));
+    qDebug("[%s]",cmd);
     robotController->write(cmd);
     robotController->waitForBytesWritten(waitTime);
 }
 
 
 bool isByteArrayAscii(const QByteArray &data) {
-    QTextCodec::ConverterState state;
-    QTextCodec *codec = QTextCodec::codecForName("UTF-8");
-
-    if (codec) {
-        // Attempt to parse the byte array into Unicode
-        codec->toUnicode(data.constData(), data.size(), &state);
-
-        // invalidChars counts non-UTF8 sequences.
-        // remainingChars checks if it cut off mid-character (multi-byte UTF-8 markers).
-        return (state.invalidChars == 0 && state.remainingChars == 0);
+    bool foundInvalidChar = false;
+    for(int i=0; i< data.size(); i++) {
+        if(data.at(i) == ' ' || data.at(i) == '_' ||
+            data.at(i) == '[' || data.at(i) == ']' ||
+            data.at(i) == '(' || data.at(i) == ')' ||
+            data.at(i) == '.' || data.at(i) == '-' ||
+            data.at(i) == '*') continue;
+        if(data.at(i) >= '0' && data.at(i) <= '9') continue;
+        if(data.at(i) >= 'a' && data.at(i) <= 'z') continue;
+        if(data.at(i) >= 'A' && data.at(i) <= 'Z') continue;
+        foundInvalidChar = true;
+        break;
     }
-    return false;
+    return !foundInvalidChar;
 }
 
 QByteArray ChessBot::readRobotResponse(int waitTime)
@@ -847,8 +851,9 @@ uint8_t ChessBot::playExecuteNextMove()
     qDebug("Request Robot playExecuteNextMove");
     if (!robotController->isOpen()) {
         qDebug("Serial port is not open for abort.");
-        return STATE_DONE_SUCCESS;
+        return STATE_DONE_FAIL;
     } else {
+        qDebug("Serial port is open");
         sendRobotCommand(m_robotCommand,1000);
         sleep(1);
         readRobotResponse();
@@ -1230,7 +1235,7 @@ void ChessBot::initRobot()
     case INIT_DETECT_PORT: {
         qDebug("[Step 1] Detecting Arduino port...");
         if (detectArduinoPort()) {
-            m_stateInit = INIT_GET_VERSION;
+            m_stateInit = INIT_ENABLE_ROBOT;
         } else {
             qDebug("Failed to detect Arduino port. Initialization aborted.");
             Q_EMIT calibrationUploadComplete(INIT_COMMUNICATION, false);
@@ -1860,6 +1865,7 @@ bool ChessBot::detectArduinoPort(int baudRate)
 
         if (robotController->open(QIODevice::ReadWrite)) {
             qDebug("Opened port: %s", portInfo.portName().toStdString().c_str());
+            robotController->clear(QSerialPort::Input);
             for(int i=0; i< 2; i++) {
                 if (robotController->waitForReadyRead(1000)) {
                     QByteArray response = robotController->readAll();
