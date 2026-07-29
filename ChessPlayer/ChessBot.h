@@ -74,7 +74,6 @@ typedef enum{
 
 typedef enum{
     INIT_DETECT_PORT,
-    INIT_GET_VERSION,
     INIT_SEND_CALIBRATION,
     INIT_REQUEST_CALIB_CHESSBOARD,
     INIT_REQUEST_CALIB_RIGHT_DROPZONE,
@@ -178,7 +177,6 @@ private:
     uint8_t testCheckResult();
     void initRobot();
     bool detectArduinoPort(int baudRate = 38400);
-    bool getArduinoVersion();
     bool readCalibrationPoint(const QString &command, QPoint& point);
     bool sendCalibrationCells();
     void abortCalibrationUpload();
@@ -191,8 +189,8 @@ private:
     GameInfo getLastChessState(const std::string& filepath);
     QString getLatestLogFile(const QString& folderPath);
     bool findLastFENInLog();
-    void sendRobotCommand(const char* cmd, int waitTime = 200);
-    QByteArray readRobotResponse(int waitTime = 500);
+    bool sendRobotCommand(const char* cmd, int waitTime = 200);
+    QString readRobotResponse(int waitTime = 500);
 
 #ifdef IMAGE_PROCESS_MOVE
     void processAndSaveFailures(const cv::Mat& imageBefore, const cv::Mat& imageAfter);
