@@ -358,7 +358,7 @@ void Board::executeMove(Move &move)
 {
 	Square origin = move.getOrigin();
 	Square destination = move.getDestination();
-	unsigned int pieceType = move.getPieceType();
+    unsigned int pieceType = move.getPieceType();
 	Color oppositeColor = Utils::getOppositeColor(myColorToPlay);
 
 	if(move.isQuiet())

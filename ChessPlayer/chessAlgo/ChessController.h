@@ -12,7 +12,6 @@
 class ChessController : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QStringList board READ board NOTIFY boardChanged)
     Q_PROPERTY(int selectedSquare READ selectedSquare NOTIFY selectedSquareChanged)
     Q_PROPERTY(QString sideToMove READ sideToMove NOTIFY sideToMoveChanged)
     Q_PROPERTY(QString status READ status WRITE setStatus NOTIFY statusChanged)
@@ -29,7 +28,7 @@ public:
     QString sideToMove() const;
     QString status() const;
     void setStatus(QString status);
-    std::vector<Move> moveHistory() const;
+//    std::vector<Move> moveHistory() const;
     bool promotionPending() const;
     int checkedKingSquare() const;
     int engineLevel() const;
@@ -65,9 +64,8 @@ public:
     Q_INVOKABLE void setPlayerColor(int color);
     Q_INVOKABLE void undoMove();
 
-
 Q_SIGNALS:
-    void boardChanged();
+    void boardChanged(QStringList boardModel);
     void selectedSquareChanged();
     void sideToMoveChanged();
     void statusChanged();
@@ -77,6 +75,7 @@ Q_SIGNALS:
     void playerColorChanged();
 
 private:
+    void updateBoard();
     void refreshBoardModel();
     void refreshSelectionMoves();
     void refreshCheckState();
@@ -92,7 +91,7 @@ private:
     QSet<int> m_validDestinationUiSquares;
     QStringList m_boardModel;
     QString m_status;
-    std::vector<Move> m_moveHistory;
+//    std::vector<Move> m_moveHistory;
     bool m_promotionPending;
     int m_checkedKingSquare;
     std::vector<Move> m_pendingPromotionMoves;

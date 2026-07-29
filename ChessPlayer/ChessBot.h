@@ -60,6 +60,7 @@ typedef enum{
     PLAY_EXECUTE_NEXT_MOVE,
     PLAY_INFORM_RESULT,
     PLAY_INFORM_ERROR,
+    PLAY_INFORM_BOT_ERROR,
     PLAY_REQUEST_PROMOTE_PIECE,
     PLAY_PROCESS_DONE,
 } STATE_PLAY_PHASE;
@@ -147,6 +148,7 @@ public Q_SLOTS:
     void playInputCancelPromotion();
 
 Q_SIGNALS:
+    void boardChanged(QStringList boardModel);
     void detectFailed();
     void playTurnChanged(int nextTurn);
     void gameEnded(int endState);

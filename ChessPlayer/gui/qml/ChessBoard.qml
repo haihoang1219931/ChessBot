@@ -1,7 +1,10 @@
 import QtQuick 2.0
 Item {
     id: root
-    property var controller
+    property var board
+    property var playerColor
+    property var selectedSquare
+    property var checkedKingSquare
     property bool activeUserInput: false
     property int userInputIndex: 56
     property int userInputIndexStart:-1
@@ -83,7 +86,7 @@ Item {
             model: 64
 
             Rectangle {
-                property int boardIndex: controller && controller.playerColor === 1 ? (63 - index) : index
+                property int boardIndex: playerColor === 1 ? (63 - index) : index
 
                 width: chessGrid.tileSize
                 height: chessGrid.tileSize
@@ -92,10 +95,8 @@ Item {
                     var rank = Math.floor(index / 8)
                     var file = index % 8
                     var light = ((rank + file) % 2) === 0
-                    if (!controller) return light ? "white" : "black"
-                    if (controller.selectedSquare === boardIndex) return "#d35400"
-                    if (controller.checkedKingSquare === boardIndex) return "#bb1f1f"
-                    if (controller.isValidDestination(boardIndex)) return "#2e8b57"
+                    if (selectedSquare === boardIndex) return "#d35400"
+                    if (checkedKingSquare === boardIndex) return "#bb1f1f"
                     return light ? "white" : "black"
                 }
                 Rectangle {
@@ -127,15 +128,10 @@ Item {
                 }
                 Text {
                     anchors.centerIn: parent
-                    text: pieceText(controller && controller.board ? controller.board[boardIndex] : "")
-                    color: pieceColor(controller && controller.board ? controller.board[boardIndex] : "")
+                    text: pieceText(board ? board[boardIndex] : "")
+                    color: pieceColor(board ? board[boardIndex] : "")
                     font.pixelSize: chessGrid.tileSize
                     font.bold: true
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: if (controller) controller.clickSquare(boardIndex)
                 }
             }
         }

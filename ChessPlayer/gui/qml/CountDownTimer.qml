@@ -186,7 +186,6 @@ Rectangle {
                 width: 400
                 height: 400
                 anchors.centerIn: parent
-                controller: backend ? backend.chessController : null
             }
         }
     }
@@ -323,6 +322,13 @@ Rectangle {
         onFoundLastFEN: {
             console.log("Found last FEN");
             openConfirmPlayOption();
+        }
+        onBoardChanged: {
+            console.log("===============Update chess board");
+            chessboard.board = boardModel;
+            chessboard.playerColor = backend.chessController.playerColor
+            chessboard.selectedSquare = backend.chessController.selectedSquare
+            chessboard.checkedKingSquare = backend.chessController.checkedKingSquare
         }
     }
 }

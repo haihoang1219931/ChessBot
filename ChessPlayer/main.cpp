@@ -57,7 +57,7 @@
 #include "ChessController.h"
 int main(int argc, char *argv[])
 {
-    QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
+//    QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
     QGuiApplication app(argc, argv);
     QQmlApplicationEngine engine;
     // Hide the cursor globally across the entire application

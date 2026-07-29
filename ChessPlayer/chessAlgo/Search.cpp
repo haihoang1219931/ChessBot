@@ -317,14 +317,14 @@ int Search::negaMaxRoot(const int depth)
 	myMoveOrder.sortMoves(moveList);
 
 	for (auto currentMove : moveList)
-	{
-		myBoard->executeMove(currentMove);
+    {
+        myBoard->executeMove(currentMove);
 		myEval.updateEvalAttributes(currentMove);
 		myPly++;
 
 	    score = -negaMax(depth - 1, -beta, -alpha);
 
-		myBoard->undoMove(currentMove);
+        myBoard->undoMove(currentMove);
 		myEval.rewindEvalAttributes(currentMove);
 		myPly--;
 
@@ -339,7 +339,7 @@ int Search::negaMaxRoot(const int depth)
                 myPvTable[myPly][i] = myPvTable[myPly+1][i] ; // copy the pv from the deeper ply
             }
             myPvLength[myPly] = myPvLength[myPly+1]; // update the length of the PV to the one assigned
-		}
+        }
 	}
 
 	globalTT.setTTEntry(myBoard->key, depth, alpha, NodeType::EXACT, myBestMove, myBoard->getPly());

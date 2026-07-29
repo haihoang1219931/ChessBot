@@ -1,9 +1,10 @@
 TEMPLATE = app
-CONFIG += c++11 no_keywords console
+CONFIG += c++11 no_keywords console debug
 
 QT += qml quick qml serialport texttospeech multimedia
 CONFIG += c++11
-
+QMAKE_CXXFLAGS += -fsanitize=address -fno-omit-frame-pointer
+QMAKE_LFLAGS += -fsanitize=address
 CONFIG += use_chess_algo
 
 CONFIG += use_image_processing

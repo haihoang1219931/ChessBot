@@ -1,7 +1,7 @@
 #include "ChessController.h"
 
 #include <QString>
-
+#include <QDebug>
 #include "MagicMoves.hpp"
 #include "MoveGen.hpp"
 #include "Pawn.hpp"
@@ -53,9 +53,6 @@ ChessController::ChessController(QObject* parent)
     ZK::initZobristKeys();
     Pawn::initPawnTable();
     globalTT.init_TT_size(TT::TEST_MB_SIZE);
-
-    refreshBoardModel();
-    refreshCheckState();
 }
 
 QStringList ChessController::board() const
@@ -87,10 +84,10 @@ void ChessController::setStatus(QString status)
     }
 }
 
-std::vector<Move> ChessController::moveHistory() const
-{
-    return m_moveHistory;
-}
+//std::vector<Move> ChessController::moveHistory() const
+//{
+//    return m_moveHistory;
+//}
 
 bool ChessController::promotionPending() const
 {
@@ -146,20 +143,10 @@ const std::string whitePawnDoubleCapture = "3r1r2/4P3/8/k7/8/8/8/1K6 w - - 0 1";
 const std::string blackPrePromotion = "k7/8/8/8/8/8/2p5/4K3 w - - 0 1";
 const std::string blackCapturePromotion = "k7/8/8/8/8/8/1p6/2R1K3 w - - 0 1";
 const std::string crashMove = "r3k2r/p1p3pp/1p6/2K2p2/8/2N1n3/PP5P/1R6 w kq - 39 20";
-void ChessController::newGame(QString lastMove)
+
+void ChessController::updateBoard()
 {
-    if(lastMove != "")
-        m_board = std::make_shared<Board>(lastMove.toStdString());
-    else
-        m_board = std::make_shared<Board>();
-    globalTT.clearTT();
-    m_moveHistory.clear();
-    m_promotionPending = false;
-    m_pendingPromotionMoves.clear();
-    Q_EMIT promotionPendingChanged();
-    clearSelection();
     refreshBoardModel();
-    printf("new game\r\n");
     for(int row = 0; row < 8; row++) {
         for(int col = 0; col < 8; col ++) {
             printf("%s ",m_boardModel[row*8+col] == ""?"__":m_boardModel[row*8+col].toStdString().c_str());
@@ -167,8 +154,31 @@ void ChessController::newGame(QString lastMove)
         printf("\r\n");
     }
     refreshCheckState();
-    setStatus("NEW_GAME");
     Q_EMIT sideToMoveChanged();
+}
+
+void ChessController::newGame(QString lastMove)
+{
+//    for(int i=0; i< 1000; i++) {
+//        std::shared_ptr<Board> sp = std::shared_ptr<Board>(new Board("r2q1rk1/ppp2ppp/2n5/2P1pP2/4pB2/P6P/2P5/RN1QKBNR b KQ - 7 3"));
+//        Search search(sp);
+//        search.negaMaxRoot(1);
+//        Move move = search.myBestMove;
+//        printf("Best move is %s\r\n",move.toShortString().c_str());
+//    }
+    printf("new game\r\n");
+    if(lastMove != "")
+        m_board = std::make_shared<Board>(lastMove.toStdString());
+    else
+        m_board = std::make_shared<Board>();
+    globalTT.clearTT();
+//    m_moveHistory.clear();
+    m_promotionPending = false;
+    m_pendingPromotionMoves.clear();
+    Q_EMIT promotionPendingChanged();
+    clearSelection();
+    updateBoard();
+    setStatus("NEW_GAME");
 }
 
 void ChessController::clickSquare(int uiIndex)
@@ -189,7 +199,7 @@ void ChessController::clickSquare(int uiIndex)
     {
         QString piece = pieceCodeAtSquare(square);
         QString pieceName =  convertPieceText(piece);
-        printf("Click at %s\r\n",pieceName.toStdString().c_str());
+        qDebug("Click at %s",pieceName.toStdString().c_str());
         if (piece.isEmpty())
         {
             return;
@@ -205,11 +215,8 @@ void ChessController::clickSquare(int uiIndex)
         m_selectedUiSquare = uiIndex;
         refreshSelectionMoves();
         Q_EMIT selectedSquareChanged();
-        Q_EMIT boardChanged();
         return;
     }
-
-    Q_EMIT boardChanged();
 }
 
 bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex, Move& chosenMove)
@@ -246,22 +253,17 @@ bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex, Move& c
 
     if (!tryFindLegalMove(originSquare, destinationSquare, chosenMove))
     {
-        Q_EMIT boardChanged();
         return false;
     }
     m_board->executeMove(chosenMove);
-    m_moveHistory.push_back(chosenMove);
+//    m_moveHistory.push_back(chosenMove);
     clearSelection();
-    refreshBoardModel();
-    refreshCheckState();
-    Q_EMIT sideToMoveChanged();
+    updateBoard();
 
     const QString resultAfterPlayer = buildResultText();
     if (!resultAfterPlayer.isEmpty())
     {
         setStatus(resultAfterPlayer);
-        Q_EMIT boardChanged();
-        return true;
     }
 
     return true;
@@ -290,23 +292,18 @@ bool ChessController::moveByUiIndex(int startUiIndex,
 
     if (!tryFindLegalMove(originSquare, destinationSquare, chosenMove, promotionSuffix))
     {
-        Q_EMIT boardChanged();
         return false;
     }
 
     m_board->executeMove(chosenMove);
-    m_moveHistory.push_back(chosenMove);
+//    m_moveHistory.push_back(chosenMove);
     clearSelection();
-    refreshBoardModel();
-    refreshCheckState();
-    Q_EMIT sideToMoveChanged();
+    updateBoard();
 
     const QString resultAfterPlayer = buildResultText();
     if (!resultAfterPlayer.isEmpty())
     {
         setStatus(resultAfterPlayer);
-        Q_EMIT boardChanged();
-        return true;
     }
     return true;
 }
@@ -501,20 +498,15 @@ void ChessController::choosePromotion(const QString& pieceLetter)
     }
 
     m_board->executeMove(chosenMove);
-    m_moveHistory.push_back(chosenMove);
+//    m_moveHistory.push_back(chosenMove);
     clearSelection();
-    refreshBoardModel();
-    refreshCheckState();
-    Q_EMIT sideToMoveChanged();
+    updateBoard();
 
     const QString resultAfterPlayer = buildResultText();
     if (!resultAfterPlayer.isEmpty())
     {
         setStatus(resultAfterPlayer);
-        Q_EMIT boardChanged();
-        return;
     }
-    Q_EMIT boardChanged();
 }
 
 void ChessController::cancelPromotion()
@@ -531,7 +523,8 @@ void ChessController::refreshBoardModel()
         m_boardModel.append(pieceCodeAtSquare(uiIndexToSquare(uiIndex)));
     }
 
-    Q_EMIT boardChanged();
+    QStringList boardModelEmit(m_boardModel);
+    Q_EMIT boardChanged(boardModelEmit);
 }
 
 void ChessController::refreshSelectionMoves()
@@ -579,31 +572,38 @@ void ChessController::clearSelection()
 
 void ChessController::playEngineMove()
 {
-    printf("ChessController::playEngineMove");
-    bool foundMove = false;
+    qDebug("ChessController::playEngineMove m_engineDepth[%d]",m_engineDepth);
+    bool foundBestMove = false;
+    Move chosenMove;
     Search search(m_board);
     search.negaMaxRoot(m_engineDepth);
     Move bestMove = search.myBestMove;
-    MoveGen moveGen(m_board);
-    const auto legalMoves = moveGen.generateMoves();
-    printf("ChessController::playEngineMove generateMoves done with %d legal move\r\n",legalMoves.size());
-    for (Move move : legalMoves)
-    {
-        if (QString::fromStdString(move.toShortString()) ==
-                QString::fromStdString(bestMove.toShortString()))
-        {
-            printf("ChessController::playEngineMove found bot move");
-            foundMove = true;
-            m_botMove = move;
-            m_board->executeMove(move);
-            m_moveHistory.push_back(move);
-            refreshBoardModel();
-            refreshCheckState();
-            Q_EMIT sideToMoveChanged();
-            break;
+    qDebug("ChessController::playEngineMove bestmove %s",
+           bestMove.toShortString().c_str());
+    if (tryFindLegalMove(bestMove.getOrigin(), bestMove.getDestination(), chosenMove)) {
+        foundBestMove = true;
+    } else {
+        MoveGen moveGen(m_board);
+        std::vector<Move> moveList = moveGen.generateMoves();
+        if(moveList.size() > 0) {
+            int randomMove = rand()%moveList.size();
+            if(randomMove < 0) randomMove = 0;
+            qDebug("ChessController::playEngineMove random move %s",
+                   moveList[randomMove].toShortString().c_str());
+            if (tryFindLegalMove(moveList[randomMove].getOrigin(), moveList[randomMove].getDestination(), chosenMove)) {
+                foundBestMove = true;
+            }
         }
     }
-    if(!foundMove) setStatus("NO_LEGAL_ENGINE_MOVE_FOUND");
+    if(foundBestMove) {
+        m_botMove = chosenMove;
+        m_board->executeMove(chosenMove);
+        qDebug("ChessController::playEngineMove execute bot move done");
+        updateBoard();
+        qDebug("ChessController::playEngineMove playEngineMove done");
+    } else {
+        setStatus("NO_LEGAL_ENGINE_MOVE_FOUND");
+    }
 }
 
 QString ChessController::convertPieceText(QString pieceShortName)

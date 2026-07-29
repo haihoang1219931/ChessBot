@@ -18,6 +18,7 @@
 #include <QDebug>
 #include "ChessBot.h"
 #include "chessAlgo/ChessController.h"
+#include "Move.hpp"
 // Platform-specific headers for directory scanning and creation
 #if defined(_WIN32)
     #include <windows.h>
@@ -78,6 +79,8 @@ ChessBot::ChessBot(QThread *parent) :
 #ifdef IMAGE_PROCESS_MOVE
 #endif
     m_validCalibFileFound = loadCalibrationData();
+    connect(m_chessController,&ChessController::boardChanged,
+            this,&ChessBot::boardChanged);
 }
 
 ChessBot::~ChessBot()
@@ -377,6 +380,8 @@ void ChessBot::playLoop()
         qDebug("PLAY_CALCULATE_NEXT_MOVE");
         if(playCalculateNextMove() == STATE_DONE_SUCCESS){
             m_statePlay = PLAY_EXECUTE_NEXT_MOVE;
+        } else {
+            m_statePlay = PLAY_INFORM_BOT_ERROR;
         }
     }
         break;
@@ -403,13 +408,18 @@ void ChessBot::playLoop()
     }
         break;
     case PLAY_INFORM_ERROR:{
-        printf("Can not detect move\r\n");
+        qDebug("Can not detect move");
         speakText("Can not detect move");
         Q_EMIT detectFailed();
         m_statePlay = PLAY_PROCESS_DONE;
     }
         break;
-
+    case PLAY_INFORM_BOT_ERROR: {
+        qDebug("Can not calculate best move");
+        speakText("Wait for my move");
+        m_statePlay = PLAY_PROCESS_DONE;
+    }
+        break;
     case PLAY_PROCESS_DONE: {
         qDebug("PLAY_PROCESS_DONE");
         Q_EMIT playTurnChanged(m_side == Color::WHITE ? m_side:1-m_side);
@@ -523,7 +533,7 @@ bool ChessBot::canMoveStraight(int startRow, int startCol, int stopRow, int stop
 bool ChessBot::playCheckEndGame()
 {
     QString gameState = m_chessController->buildResultText();
-    printf("gameState[%s]\r\n",gameState.toStdString().c_str());
+    qDebug("gameState[%s]",gameState.toStdString().c_str());
     if(gameState != "") {
         if(gameState == "DRAW_STALEMATE" ||
                 gameState == "DRAW_PIECE") {
@@ -630,7 +640,7 @@ uint8_t ChessBot::playRandomMove()
 {
     QStringList randomMoves = m_chessController->findBestMoveCoordinates();
     Move choosenMove;
-    printf("=== Player move %s->%s\r\n",
+    qDebug("=== Player move %s->%s",
             randomMoves[0].toStdString().c_str(),
             randomMoves[1].toStdString().c_str());
     if(randomMoves[0] != randomMoves[1]) {        
@@ -673,23 +683,29 @@ uint8_t ChessBot::playCalculateNextMove()
     qDebug("playCalculateNextMove log FEN done");
     // play engine move
     m_chessController->playEngineMove();
-    printf("check move history\r\n");
-    if(m_chessController->moveHistory().size()==0) {
+    qDebug("check move history");
+    if(m_chessController->status() == "NO_LEGAL_ENGINE_MOVE_FOUND") {
         return STATE_DONE_FAIL;
     }
-    printf("get last move\r\n");
-    QString lastMove = QString::fromStdString(m_chessController->moveHistory()[m_chessController->moveHistory().size()-1].toShortString());
-    if(lastMove.length() < 4) return STATE_DONE_FAIL;
-    printf("lastMove %s\r\n", lastMove.toStdString().c_str());
-    QString from = lastMove.left(2);  // Result: "e2"
-    QString to = lastMove.mid(2, 2);   // Result: "e4"
+    qDebug("get last move");
+    Move lastMove = m_chessController->botMove();
+    qDebug("get last move string");
+    QString lastMoveStr = QString::fromStdString(lastMove.toShortString());
+    qDebug("parsing move");
+    if(lastMoveStr.length() < 4) {
+        qDebug("invalid move");
+        return STATE_DONE_FAIL;
+    }
+    qDebug("lastMove %s", lastMoveStr.toStdString().c_str());
+    QString from = lastMoveStr.left(2);  // Result: "e2"
+    QString to = lastMoveStr.mid(2, 2);   // Result: "e4"
 
     QPoint fromCoord, toCoord;    
     fromCoord = notationToCoord(from.toStdString(),
                                                 m_side != 0?"white":"black");
     toCoord = notationToCoord(to.toStdString(),
                                                 m_side != 0?"white":"black");
-    printf("Bot move %s->%s\r\n",
+    qDebug("Bot move %s->%s",
            from.toStdString().c_str(),
            to.toStdString().c_str());
     if(fromCoord.x() < 0 || fromCoord.x() > 7 || fromCoord.y() < 0 || fromCoord.y() > 7 ||
@@ -697,7 +713,7 @@ uint8_t ChessBot::playCalculateNextMove()
         return STATE_DONE_FAIL;
     if(m_chessController->botMove().isQuiet())
     {
-        printf("Move quited\r\n");
+        qDebug("Move quited");
         sprintf(m_robotCommand,"c%d%d%d%d%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
                 canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x())?'-':'n');
     }
@@ -707,7 +723,7 @@ uint8_t ChessBot::playCalculateNextMove()
         {
 
             //move King
-            printf("Castling move king\r\n");
+            qDebug("Castling move king");
             Square rookOrigin = SQ_NONE;
             Square rookDestination = SQ_NONE;
 
@@ -717,13 +733,13 @@ uint8_t ChessBot::playCalculateNextMove()
                 {
                     rookOrigin = SQ_H1;
                     rookDestination = SQ_F1;
-                    printf("Castling H1->F1\r\n");
+                    qDebug("Castling H1->F1");
                 }
                 else
                 {
                     rookOrigin = SQ_H8;
                     rookDestination = SQ_F8;
-                    printf("Castling H8->F8\r\n");
+                    qDebug("Castling H8->F8");
                 }
             }
             else // QueenSideCastling
@@ -732,18 +748,18 @@ uint8_t ChessBot::playCalculateNextMove()
                 {
                     rookOrigin = SQ_A1;
                     rookDestination = SQ_D1;
-                    printf("Castling A1->D1\r\n");
+                    qDebug("Castling A1->D1");
                 }
                 else
                 {
                     rookOrigin = SQ_A8;
                     rookDestination = SQ_D8;
-                    printf("Castling A8->D8\r\n");
+                    qDebug("Castling A8->D8");
                 }
             }
 
             //move rook
-            printf("Castling move rook\r\n");
+            qDebug("Castling move rook");
             sprintf(m_robotCommand,"CST%d%d%d%d%c",fromCoord.y(),fromCoord.x(),
                     toCoord.y(),toCoord.x() > fromCoord.x()?7:0,
                     '-');
@@ -752,8 +768,8 @@ uint8_t ChessBot::playCalculateNextMove()
         {
             unsigned int promotedType = m_chessController->botMove().getPromotedPieceType();
             unsigned int capturedPieceType = m_chessController->botMove().getCapturedPieceType();
-            printf("Capture remove pawn color[%d] \r\n",m_side == 0?"White":"Black");
-            printf("Capture Add piece[%d] color[%d] \r\n",promotedType,m_side == 0?"White":"Black");
+            qDebug("Capture remove pawn color[%d]",m_side == 0?"White":"Black");
+            qDebug("Capture Add piece[%d] color[%d]",promotedType,m_side == 0?"White":"Black");
             char capturedPieceChar = '0';
             char promotePieceChar = 'q';
             if(m_chessController->botMove().isCapture())
@@ -789,7 +805,7 @@ uint8_t ChessBot::playCalculateNextMove()
         {
             if (m_chessController->botMove().isEnPassant()) // watch out ep capture is a capture
             {
-                printf("Capture remove pawn color[%d] \r\n",m_side != 0?"White":"Black");
+                qDebug("Capture remove pawn color[%d]",m_side != 0?"White":"Black");
                 sprintf(m_robotCommand,"pp%d%d%d%d%c%c%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
                         'p','0',
                         canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),PIECE_MOVE_ENPASSANT)?'-':'n');
@@ -798,7 +814,7 @@ uint8_t ChessBot::playCalculateNextMove()
             {
                 //remove the captured piece
                 unsigned int type(m_chessController->botMove().getCapturedPieceType());
-                printf("Capture remove captured piece[%d] color[%s] \r\n",type,m_side != 0?"White":"Black");
+                qDebug("Capture remove captured piece[%d] color[%s]",type,m_side != 0?"White":"Black");
                 sprintf(m_robotCommand,"a%d%d%d%d%c%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
                         'p',
                         canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),PIECE_MOVE_CAPTURE)?'-':'n');
@@ -806,7 +822,7 @@ uint8_t ChessBot::playCalculateNextMove()
         }
     }
     qDebug("playCalculateNextMove %s to cmd[%s]\r\n",
-           lastMove.toStdString().c_str(),
+           lastMoveStr.toStdString().c_str(),
            m_robotCommand);
     return STATE_DONE_SUCCESS;
 }
@@ -1741,7 +1757,7 @@ void ChessBot::setLevel(int level)
 {
     qDebug("Set level: %d",level);
     m_levelScore = level;
-    m_levelType = level/400+1;
+    m_levelType = level/700;
     m_chessController->setEngineLevel(m_levelType);
 }
 
