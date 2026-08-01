@@ -126,9 +126,9 @@ void ApplicationArduino::initRobot()
     }
 
     // Define your 4 known exact corner centers here
-    Point c00 = {68,90,0,false};     // Row 0, Col 0
+    Point c00 = {64,90,0,false};     // Row 0, Col 0
     Point c07 = {-175,100,0,false};  // Row 0, Col 7
-    Point c70 = {65,345,0,false};    // Row 7, Col 0
+    Point c70 = {64,345,0,false};    // Row 7, Col 0
     Point c77 = {-180,348,0,false};  // Row 7, Col 7
 
     // Compute and print centers for all cells
