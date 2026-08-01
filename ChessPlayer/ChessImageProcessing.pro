@@ -3,7 +3,7 @@ CONFIG += console c++11
 CONFIG -= app_bundle
 CONFIG -= qt
 
-CONFIG += use_image_processing
+#CONFIG += use_image_processing
 use_image_processing {
 DEFINES += DEBUG_SHOW_IMAGE
 unix:!macx: INCLUDEPATH += /usr/local/include/opencv4
@@ -56,5 +56,8 @@ SOURCES += chessDetector/ChessImageProcessing.cpp \
     main_3d_projection.cpp
 HEADERS += chessDetector/ChessImageProcessing.h
 }
+
+SOURCES += \
+    main_calib.cpp
 
 

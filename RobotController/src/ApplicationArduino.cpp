@@ -80,12 +80,25 @@ ApplicationArduino::~ApplicationArduino()
 
 }
 
-int16_t ApplicationArduino::readA13() {
-  ADCSRB |= (1 << MUX5);
-  ADMUX = (ADMUX & 0xF8) | 0x05; 
-  ADCSRA |= (1 << ADSC);
-  while (ADCSRA & (1 << ADSC));
-  return ADC;
+Point ApplicationArduino::calculateCellCenter(int row, int col, Point c00, Point c70, Point c77, Point c07) {
+    Point center;
+
+    // Normalize coordinates to a 0.0 to 1.0 range
+    double u = (double)row / 7.0;
+    double v = (double)col / 7.0;
+
+    // Bilinear interpolation formula
+    center.x = (1.0 - u) * (1.0 - v) * c00.x +
+               u * (1.0 - v) * c70.x +
+               u * v * c77.x +
+               (1.0 - u) * v * c07.x;
+
+    center.y = (1.0 - u) * (1.0 - v) * c00.y +
+               u * (1.0 - v) * c70.y +
+               u * v * c77.y +
+               (1.0 - u) * v * c07.y;
+
+    return center;
 }
 
 void ApplicationArduino::initRobot()
@@ -110,6 +123,20 @@ void ApplicationArduino::initRobot()
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
         m_robot->setMotorParam(motor,armPrams[motor]);
         m_robot->updateInitAngle(motor,armPrams[motor].initAngle);
+    }
+
+    // Define your 4 known exact corner centers here
+    Point c00 = {68,90,0,false};     // Row 0, Col 0
+    Point c07 = {-175,100,0,false};  // Row 0, Col 7
+    Point c70 = {65,345,0,false};    // Row 7, Col 0
+    Point c77 = {-180,348,0,false};  // Row 7, Col 7
+
+    // Compute and print centers for all cells
+    for (int r = 0; r < 8; r++) {
+        for (int c = 0; c < 8; c++) {
+            Point center = calculateCellCenter(r, c, c00, c70, c77, c07);
+            m_chessBoard->setCalibChessBoardPoint(r, c, center);
+        }
     }
 }
 
@@ -175,7 +202,6 @@ void ApplicationArduino::specificPlatformGohome(int motorID, bool stopOtherStepp
             stateGoHome = STATE_GO_TO_MAX_POSITION;
             delay(100);
             digitalWrite(dirPin, HIGH);
-            Serial.println("Found home position at step: " + String(currentStep));
           }
         }
         break;
@@ -189,7 +215,6 @@ void ApplicationArduino::specificPlatformGohome(int motorID, bool stopOtherStepp
             currentStep ++;
           } 
           else {
-            Serial.println("STATE_GO_TO_MAX_POSITION stop at step: " + String(currentStep));
             m_robot->m_motorParamList[motorID].currentStep = currentStep;
             stateGoHome = STATE_HOME_DONE;
           }
