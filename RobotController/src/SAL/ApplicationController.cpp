@@ -857,8 +857,8 @@ void ApplicationController::goToReadyPosition()
 void ApplicationController::goToHomeToCalibPosition()
 {
     jointSteps[MOTOR_CAPTURE] = m_robot->maxStep(MOTOR_CAPTURE);
-    jointSteps[MOTOR_ARM1] = m_robot->angleToStep(MOTOR_ARM1,m_robot->homeAngle(MOTOR_ARM1));
-    jointSteps[MOTOR_ARM2] = m_robot->angleToStep(MOTOR_ARM2,m_robot->homeAngle(MOTOR_ARM2));
+    jointSteps[MOTOR_ARM1] = m_robot->angleToStep(MOTOR_ARM1,m_robot->homeAngle(MOTOR_ARM1)+5);
+    jointSteps[MOTOR_ARM2] = m_robot->angleToStep(MOTOR_ARM2,m_robot->homeAngle(MOTOR_ARM2)+5);
     jointSteps[MOTOR_ARM3] = m_robot->homeAngle(MOTOR_ARM3);
     jointSteps[MOTOR_ARM4] = m_robot->homeAngle(MOTOR_ARM4);
     jointSteps[MOTOR_ARM5] = m_robot->angleToStep(MOTOR_ARM5,m_robot->homeAngle(MOTOR_ARM5));

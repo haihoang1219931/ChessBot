@@ -155,11 +155,6 @@ void ChessBoard::resetDropZoneMap()
     m_dropZoneMapPlayer[1][0] = 'r';
     m_dropZoneMapPlayer[2][0] = 'n';
     m_dropZoneMapPlayer[3][0] = 'b';
-
-    m_dropZoneMapBot[4][0] = 'q';
-    m_dropZoneMapBot[5][0] = 'r';
-    m_dropZoneMapBot[6][0] = 'n';
-    m_dropZoneMapBot[7][0] = 'b';
 }
 
 void ChessBoard::moveGuestPieceOut(uint8_t piece) {
