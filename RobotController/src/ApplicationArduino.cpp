@@ -112,7 +112,7 @@ void ApplicationArduino::initRobot()
 
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
-        {true,                                 1,     0,       0,        0,        36,          20,        85,      16,   FREQUENCY_TIMER1,      0},
+        {true,                                 1,     0,       0,        0,        36,          10,        85,      16,   FREQUENCY_TIMER1,      0},
         {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -19,         8,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
         {true, 16.0f*70.0f/20.0f*(200.0f/360.0f),    72,     140,       48,         8,          48,       210,       2,   FREQUENCY_TIMER1,    250},
         {false,  1.0f/1.0f,                          26,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
@@ -126,9 +126,9 @@ void ApplicationArduino::initRobot()
     }
 
     // Define your 4 known exact corner centers here
-    Point c00 = {64,90,0,false};     // Row 0, Col 0
+    Point c00 = {68,90,0,false};     // Row 0, Col 0
     Point c07 = {-175,100,0,false};  // Row 0, Col 7
-    Point c70 = {64,345,0,false};    // Row 7, Col 0
+    Point c70 = {66,345,0,false};    // Row 7, Col 0
     Point c77 = {-180,348,0,false};  // Row 7, Col 7
 
     // Compute and print centers for all cells

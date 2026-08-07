@@ -1176,6 +1176,7 @@ bool ApplicationController::calculateSequencePromotePiece(int startCol, int star
     appendSequenceMove(m_startPoint, m_dropPieceBotPoint.location);    
     appendSequenceMove(m_promotePiecePoint.location, m_stopPoint); 
     m_chessBoard->updateDropZone(0, m_promotePiecePoint.rowID, m_promotePiecePoint.colID, ZONE_PLAYER);
+    m_chessBoard->updateDropZone('p', m_dropPieceBotPoint.rowID, m_dropPieceBotPoint.colID, ZONE_PLAYER);
 #ifdef DEBUG_COMMAND
     printf("promotePiecePoint [%c,%d,%d] (%d,%d)\r\n", promotePiece, m_promotePiecePoint.rowID, m_promotePiecePoint.colID, 
         (int)(m_promotePiecePoint.location.x * 10), (int)(m_promotePiecePoint.location.y * 10));
