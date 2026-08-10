@@ -48,7 +48,7 @@
 //        }
 //    }
 //}
-
+//bool showElevated = false;
 //// Function to update the projection render
 //void updateProjection() {
 //    if (clicked_points.size() < 4) {
@@ -172,7 +172,13 @@
 //    for(int idx : corner_indices) {
 //        cv::line(img_display, projected_ground_points[idx], projected_elevated_points[idx], cv::Scalar(0, 255, 255), 1);
 //    }
-
+//    if(!showElevated) {
+//        showElevated = true;
+//        for(int i = 0; i < 4; i++) {
+//            cv::Point2f elevatedPoint = projected_elevated_points[corner_indices[i]];
+//            std::cout << "elevatedPoint["<<i <<"] (" << elevatedPoint.x << ", " << elevatedPoint.y << ")\n";
+//        }
+//    }
 //    cv::imshow(window_name, img_display);
 //}
 
@@ -227,3 +233,4 @@
 
 //    return 0;
 //}
+////data-Bishop,data-Empty,data-EmptyTest,data-King,data-Knight,data-Pawn,data-Queen,data-Rook
