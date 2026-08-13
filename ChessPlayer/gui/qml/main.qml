@@ -38,7 +38,7 @@ ApplicationWindow {
                 stack.push(menuSelection)
             }
             Component.onCompleted: {
-                backend.initRobotCommunication();
+                masterBot.initRobotCommunication();
             }
         }
     }
@@ -112,7 +112,7 @@ ApplicationWindow {
             onItemSelected: {
                 stack.pop()
                 stack.push(sideSelection)
-                backend.setLevel(score)
+                masterBot.setEngineElo(score)
             }
             onExitPressed: {
                 stack.pop()
@@ -137,8 +137,8 @@ ApplicationWindow {
                                "player1Time": 600,
                                "player2Time": 600,
                            });
-                backend.setSide(side==="White"?0:1);
-                backend.resetGame()
+                masterBot.setPlayerColor(side==="White"?0:1);
+                masterBot.resetGame()
             }
         }
     }

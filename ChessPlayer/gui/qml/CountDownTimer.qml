@@ -20,13 +20,13 @@ Rectangle {
         if(chessboard.activeUserInput)
             chessboard.cancelUserSelection();
         else
-            backend.undoMove();
+            masterBot.undoMove();
     }
     Keys.onReturnPressed: {
         root.startGame()
         chessboard.updateUserSelection();
     }
-    Keys.onSpacePressed: backend.processNextMove()
+    Keys.onSpacePressed: masterBot.processNextMove()
     Keys.onLeftPressed: chessboard.updateUserInput(-1)
     Keys.onRightPressed: chessboard.updateUserInput(1)
     Keys.onUpPressed: chessboard.updateUserInput(-8)
@@ -70,7 +70,7 @@ Rectangle {
             // 1. Set the source to your QML file
             if(loaderDialogPromotion.item === null)
             loaderDialogPromotion.setSource("PromotionPieces.qml");
-            loaderDialogPromotion.item.side = backend.side === 0 ?"white":"black";
+            loaderDialogPromotion.item.side = masterBot.playerColor() === 0 ?"white":"black";
         } else {
             loaderDialogPromotion.source = ""; // Close it
             root.forceActiveFocus();
@@ -247,7 +247,7 @@ Rectangle {
                 gobackLevelSelection();
             } else {
                 console.log("resetGame");
-                backend.resetGame();
+                masterBot.resetGame();
                 root.resetGame();
                 root.forceActiveFocus();
             }
@@ -260,7 +260,7 @@ Rectangle {
                 gobackLevelSelection();
             } else if(nextStep === 1){
                 console.log("homing robot");
-                backend.homingRobot();
+                masterBot.homingRobot();
                 root.forceActiveFocus();
             }
         }
@@ -273,13 +273,13 @@ Rectangle {
         onConfirmNextStep: {
             loaderDialogEndgame.source = ""; // Close it
             console.log((nextStep === 0?"Confirm":"Reject")+" to play last FEN ");
-            backend.acceptPlayFENFromHistory(nextStep === 0);
+            masterBot.acceptPlayFENFromHistory(nextStep === 0);
         }
 
         onGobackNormal: {
             loaderDialogEndgame.source = ""; // Close it
             console.log("Reject to play last FEN ");
-            backend.acceptPlayFENFromHistory(false);
+            masterBot.acceptPlayFENFromHistory(false);
         }
     }
 
@@ -289,23 +289,23 @@ Rectangle {
 
         onCancelSelectPromote: {
             enablePromotionSelection(false);
-            backend.playInputCancelPromotion();
+            masterBot.playInputCancelPromotion();
         }
         onPromoteSelected: {
             enablePromotionSelection(false);
-            backend.playInputMove(chessboard.userInputIndexStart,
+            masterBot.playInputMove(chessboard.userInputIndexStart,
                                   chessboard.userInputIndexStop,
                                   promotePiece);
         }
     }
 
     Component.onCompleted: {
-        root.levelType = backend.levelType
-        root.levelScore = backend.levelScore
-        root.side =  backend.side
+        root.levelType = chessController.levelType
+        root.levelScore = chessController.levelScore
+        root.side =  chessController.side
     }
     Connections {
-        target: backend
+        target: masterBot
         onGameEnded: {
             console.log("Game end: "+endState);
             openGameResult(endState);
@@ -326,9 +326,9 @@ Rectangle {
         onBoardChanged: {
             console.log("===============Update chess board");
             chessboard.board = boardModel;
-            chessboard.playerColor = backend.chessController.playerColor
-            chessboard.selectedSquare = backend.chessController.selectedSquare
-            chessboard.checkedKingSquare = backend.chessController.checkedKingSquare
+            chessboard.playerColor = chessController.playerColor
+            chessboard.selectedSquare = chessController.selectedSquare
+            chessboard.checkedKingSquare = chessController.checkedKingSquare
         }
     }
 }

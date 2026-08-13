@@ -101,7 +101,7 @@ Item {
     }
 
     Connections {
-        target: backend
+        target: masterBot
         onCalibrationUploadProgress: function(direction, progress){
             root.show()
             root.progress = progress

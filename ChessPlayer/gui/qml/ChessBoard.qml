@@ -43,7 +43,7 @@ Item {
                 userInputIndexStop = userInputIndex;
             }
             if(userInputIndexStop != -1 && userInputIndexStart != -1) {
-                backend.playInputMove(userInputIndexStart,userInputIndexStop);
+                masterBot.playInputMove(userInputIndexStart,userInputIndexStop);
                 activeUserInput = false;
             }
             console.log("move from "+userInputIndexStart+" to "+userInputIndexStop)

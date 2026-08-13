@@ -45,7 +45,7 @@ ChessController::ChessController(QObject* parent)
     , m_status("Ready")
     , m_promotionPending(false)
     , m_checkedKingSquare(-1)
-    , m_engineDepth(3)
+    , m_engineElo(700)
     , m_playerColor(0)
 {
     MagicMoves::initmagicmoves();
@@ -99,9 +99,9 @@ int ChessController::checkedKingSquare() const
     return m_checkedKingSquare;
 }
 
-int ChessController::engineLevel() const
+int ChessController::engineElo() const
 {
-    return m_engineDepth;
+    return m_engineElo;
 }
 
 int ChessController::playerColor() const
@@ -109,13 +109,12 @@ int ChessController::playerColor() const
     return m_playerColor;
 }
 
-void ChessController::setEngineLevel(int level)
+void ChessController::setEngineElo(int elo)
 {
-    if (level < 1) level = 1;
-    if (level > 5) level = 5;
-    if (m_engineDepth == level) return;
-    m_engineDepth = level;
-    Q_EMIT engineLevelChanged();
+    if(m_engineElo != elo) {
+        m_engineElo = elo;
+        Q_EMIT engineEloChanged();
+    }
 }
 
 void ChessController::setPlayerColor(int color)
@@ -436,7 +435,7 @@ bool ChessController::moveByCoordinates(const QString& startSquare,
 QStringList ChessController::findBestMoveCoordinates() const
 {
     Search search(m_board);
-    search.negaMaxRoot(m_engineDepth);
+    search.negaMaxRoot(m_engineElo/700);
 
     const QString bestMoveText = QString::fromStdString(Utils::Move16ToShortString(search.myBestMove));
     if (bestMoveText.size() < 4)
@@ -572,11 +571,11 @@ void ChessController::clearSelection()
 
 void ChessController::playEngineMove()
 {
-    qDebug("ChessController::playEngineMove m_engineDepth[%d]",m_engineDepth);
+    qDebug("ChessController::playEngineMove m_engineDepth[%d]",m_engineElo/7);
     bool foundBestMove = false;
     Move chosenMove;
     Search search(m_board);
-    search.negaMaxRoot(m_engineDepth);
+    search.negaMaxRoot(m_engineElo/7);
     Move bestMove = search.myBestMove;
     qDebug("ChessController::playEngineMove bestmove %s",
            bestMove.toShortString().c_str());

@@ -32,7 +32,7 @@ FocusScope {
     }
 
     Component.onCompleted: {
-        var corners = backend.chessboardCorners();
+        var corners = masterBot.chessboardCorners();
         if(corners.length === 4) {
             root.points = corners;
         }
@@ -79,7 +79,7 @@ FocusScope {
         Keys.onPressed: (event) => {
             var step = 2;
             if (event.key === Qt.Key_Space) {
-                backend.updateCorners(root.points);
+                masterBot.updateCorners(root.points);
             }
             else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 isEditing = !isEditing; // Toggle mode

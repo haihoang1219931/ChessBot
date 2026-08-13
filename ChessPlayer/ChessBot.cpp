@@ -19,6 +19,7 @@
 #include "ChessBot.h"
 #include "chessAlgo/ChessController.h"
 #include "Move.hpp"
+
 // Platform-specific headers for directory scanning and creation
 #if defined(_WIN32)
     #include <windows.h>
@@ -36,7 +37,6 @@ ChessBot::ChessBot(QThread *parent) :
 {
     m_width = 1920;
     m_height = 1080;
-    m_side = 0;
     m_mutex = new QMutex;
     m_pauseCond = new QWaitCondition;
     m_chessController = new ChessController();
@@ -48,28 +48,9 @@ ChessBot::ChessBot(QThread *parent) :
     m_detectParams->canny_low = 14;
     m_detectParams->pieceMinPoints = 400;
     m_detectParams->pieceRoiPercent = 100;
-    m_detectParams->playerSide = m_side == 0?
+    m_detectParams->playerSide = m_chessController->playerColor() == 0?
                 "white":"black";
 #endif
-#if defined(_WIN32)
-    // 1. Check if engines exist on your OS
-    qDebug() << "Available TTS Engines:" << QTextToSpeech::availableEngines();
-
-    m_speech = new QTextToSpeech();
-    // Explicitly enforce the system language to kickstart SAPI
-    m_speech->setLocale(QLocale::system());
-    // 2. Print current engine state (Should be Ready)
-    qDebug() << "Current TTS Engine:" << m_speech->availableEngines();
-    qDebug() << "Initial State:" << m_speech->state();
-
-    // 3. Optional: Connect a debug log to trace status changes
-    connect(m_speech, &QTextToSpeech::stateChanged, [](QTextToSpeech::State state) {
-        qDebug() << "TTS State Changed to:" << state;
-    });
-#else
-    m_speech = new PiperStreamer();
-#endif
-    speakText("I'm chess robot. Nice to play");
     m_chessboardCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(8));
     m_dropzoneRightCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(2));
     m_dropzoneLeftCalib = QVector<QVector<QPoint>>(8, QVector<QPoint>(2));
@@ -155,24 +136,6 @@ bool ChessBot::readFrame(cv::Mat& outImg)
     return readResult;
 }
 #endif
-void ChessBot::connectCamera()
-{
-#ifdef IMAGE_PROCESS_MOVE
-    cap.open(0);
-    if (!cap.isOpened()) {
-        qDebug("Error: Could not open camera.");
-    }
-#endif
-}
-
-void ChessBot::disconnectCamera()
-{
-#ifdef IMAGE_PROCESS_MOVE
-    if(cap.isOpened()) {
-        cap.release();
-    }
-#endif
-}
 
 void ChessBot::updateCorners(QVariantList corners)
 {
@@ -214,7 +177,7 @@ void ChessBot::updateCalibrationData(int type, int row, int col, int x, int y)
 
 void ChessBot::run()
 {
-    qDebug("Dowork");
+    qDebug("ChessBot Dowork");
     m_stopped = false; // Reset flags
 
     // Create QSerialPort in worker thread to avoid threading issues
@@ -271,12 +234,13 @@ void ChessBot::playInputMove(int startUiIndex, int stopUiIndex, int promotePiece
         QString pieceTargetNotation = m_chessController->uiIndexToSquareNotation(stopUiIndex);
         Move chosenMove;
         if(m_chessController->moveByUiSquares(startUiIndex,stopUiIndex,chosenMove)) {
-            speakMove(fenBeforeMove,m_side,pieceType,pieceTargetNotation,chosenMove);
+            QString formattedMove = m_chessController->processRobotCommentary(fenBeforeMove,m_chessController->playerColor(),pieceType,pieceTargetNotation,chosenMove);
+            Q_EMIT newCommentAdded(formattedMove);
             m_mutex->lock();
             m_state = STATE_PLAY;
             m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
             m_mutex->unlock();
-            Q_EMIT playTurnChanged(m_side == Color::WHITE ? 1-m_side:m_side);
+            Q_EMIT playTurnChanged(m_chessController->playerColor() == Color::WHITE ? 1-m_chessController->playerColor():m_chessController->playerColor());
             togglePause(false);
             startService();
         } else {
@@ -288,7 +252,7 @@ void ChessBot::playInputMove(int startUiIndex, int stopUiIndex, int promotePiece
         }
     } else {
         QStringList listPromotions = {"q","r","n","b"};
-        m_chessController->choosePromotion(m_side == 0 ?listPromotions[promotePiece]:
+        m_chessController->choosePromotion(m_chessController->playerColor() == 0 ?listPromotions[promotePiece]:
                                                         listPromotions[promotePiece].toUpper());
         m_mutex->lock();
         m_state = STATE_PLAY;
@@ -314,7 +278,7 @@ void ChessBot::playLoop()
             Q_EMIT foundLastFEN();
             togglePause(true);
         } else {
-            if(m_side == 1) {
+            if(m_chessController->playerColor() == 1) {
                 m_statePlay = PLAY_CALCULATE_NEXT_MOVE_RESET;
             } else {
                 m_statePlay = PLAY_SETUP;
@@ -403,26 +367,26 @@ void ChessBot::playLoop()
         break;
     case PLAY_REQUEST_PROMOTE_PIECE: {
         qDebug("PLAY_REQUEST_PROMOTE_PIECE");
-        speakText("Choose your promotion piece");
+        Q_EMIT newCommentAdded("Choose your promotion piece");
         m_statePlay = PLAY_PROCESS_DONE;
     }
         break;
     case PLAY_INFORM_ERROR:{
         qDebug("Can not detect move");
-        speakText("Can not detect move");
+        Q_EMIT newCommentAdded("Can not detect move");
         Q_EMIT detectFailed();
         m_statePlay = PLAY_PROCESS_DONE;
     }
         break;
     case PLAY_INFORM_BOT_ERROR: {
         qDebug("Can not calculate best move");
-        speakText("Wait for my move");
+        Q_EMIT newCommentAdded("Wait for my move");
         m_statePlay = PLAY_PROCESS_DONE;
     }
         break;
     case PLAY_PROCESS_DONE: {
         qDebug("PLAY_PROCESS_DONE");
-        Q_EMIT playTurnChanged(m_side == Color::WHITE ? m_side:1-m_side);
+        Q_EMIT playTurnChanged(m_chessController->playerColor() == Color::WHITE ? m_chessController->playerColor():1-m_chessController->playerColor());
         playCheckEndGame();
         m_state = STATE_EXIT;
         togglePause(true);
@@ -485,9 +449,9 @@ bool ChessBot::playCheckDoubleMove()
 {
     QString gameState = m_chessController->buildResultText();
     if(gameState == "BLACK_CHECK") {
-        return m_side == 1;
+        return m_chessController->playerColor() == 1;
     } else if(gameState == "WHITE_CHECK") {
-        return m_side == 0;
+        return m_chessController->playerColor() == 0;
     }
     return false;
 }
@@ -514,7 +478,7 @@ bool ChessBot::canMoveStraight(int startRow, int startCol, int stopRow, int stop
            minRow,minCol,maxRow,maxCol);
     for(int row = minRow; row<= maxRow; row++) {
         for(int col = minCol; col <= maxCol; col++) {
-            QString pieceType = (m_side == Color::WHITE ? board[row*8+col]:board[(7-row)*8+(7-col)]);
+            QString pieceType = (m_chessController->playerColor() == Color::WHITE ? board[row*8+col]:board[(7-row)*8+(7-col)]);
             printf("%s ",pieceType != "" ? pieceType.toStdString().c_str():
                     "__");
             if((row == startRow && col == startCol) ||
@@ -537,24 +501,24 @@ bool ChessBot::playCheckEndGame()
     if(gameState != "") {
         if(gameState == "DRAW_STALEMATE" ||
                 gameState == "DRAW_PIECE") {
-            speakText("Game draw");
+            Q_EMIT newCommentAdded("Game draw");
             Q_EMIT gameEnded(0);
             return false;
         } else if(gameState == "WHITE_WIN") {
-            speakText(m_side == 0?"Check mate. You win":
+            Q_EMIT newCommentAdded(m_chessController->playerColor() == 0?"Check mate. You win":
                                   "Check mate. You lost");
-            Q_EMIT gameEnded(m_side == 0?1:2);
+            Q_EMIT gameEnded(m_chessController->playerColor() == 0?1:2);
             return false;
         } else if(gameState == "BLACK_WIN") {
-            speakText(m_side == 1?"Check mate. You win":
+            Q_EMIT newCommentAdded(m_chessController->playerColor() == 1?"Check mate. You win":
                                   "Check mate. You lost");
-            Q_EMIT gameEnded(m_side == 1?1:2);
+            Q_EMIT gameEnded(m_chessController->playerColor() == 1?1:2);
             return false;
         } else if(gameState == "BLACK_CHECK") {
-            speakText(m_side == 0?"Check mate":"Good checkmate");
+            Q_EMIT newCommentAdded(m_chessController->playerColor() == 0?"Check mate":"Good checkmate");
             return true;
         } else if(gameState == "WHITE_CHECK") {
-            speakText(m_side == 1?"Check mate":"Good checkmate");
+            Q_EMIT newCommentAdded(m_chessController->playerColor() == 1?"Check mate":"Good checkmate");
             return true;
         }
     } else {
@@ -626,12 +590,13 @@ uint8_t ChessBot::playDetectMove()
                 }
             }
         } else {
-            speakText("No invalid move found\r\n");
+            Q_EMIT newCommentAdded("No invalid move found\r\n");
         }
 
 #endif
     if(detectState == STATE_DONE_SUCCESS) {
-        speakMove(fenBeforeMove,m_side,choosenPiece, choosenPieceMoveNotation, choosenMove);
+        QString formattedMove = m_chessController->processRobotCommentary(fenBeforeMove,m_chessController->playerColor(),choosenPiece, choosenPieceMoveNotation, choosenMove);
+        Q_EMIT newCommentAdded(formattedMove);
     }
     return detectState;
 }
@@ -647,7 +612,7 @@ uint8_t ChessBot::playRandomMove()
         m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1],choosenMove);
         return STATE_DONE_SUCCESS;
     } else {
-        speakText("No invalid move found\r\n");
+        Q_EMIT newCommentAdded("No invalid move found\r\n");
         return STATE_DONE_FAIL;
     }
 }
@@ -702,9 +667,9 @@ uint8_t ChessBot::playCalculateNextMove()
 
     QPoint fromCoord, toCoord;    
     fromCoord = notationToCoord(from.toStdString(),
-                                                m_side != 0?"white":"black");
+                                                m_chessController->playerColor() != 0?"white":"black");
     toCoord = notationToCoord(to.toStdString(),
-                                                m_side != 0?"white":"black");
+                                                m_chessController->playerColor() != 0?"white":"black");
     qDebug("Bot move %s->%s",
            from.toStdString().c_str(),
            to.toStdString().c_str());
@@ -729,7 +694,7 @@ uint8_t ChessBot::playCalculateNextMove()
 
             if(m_chessController->botMove().isKingSideCastling())
             {
-                if(m_side == WHITE)
+                if(m_chessController->playerColor() == WHITE)
                 {
                     rookOrigin = SQ_H1;
                     rookDestination = SQ_F1;
@@ -744,7 +709,7 @@ uint8_t ChessBot::playCalculateNextMove()
             }
             else // QueenSideCastling
             {
-                if(m_side == WHITE)
+                if(m_chessController->playerColor() == WHITE)
                 {
                     rookOrigin = SQ_A1;
                     rookDestination = SQ_D1;
@@ -768,8 +733,8 @@ uint8_t ChessBot::playCalculateNextMove()
         {
             unsigned int promotedType = m_chessController->botMove().getPromotedPieceType();
             unsigned int capturedPieceType = m_chessController->botMove().getCapturedPieceType();
-            qDebug("Capture remove pawn color[%d]",m_side == 0?"White":"Black");
-            qDebug("Capture Add piece[%d] color[%d]",promotedType,m_side == 0?"White":"Black");
+            qDebug("Capture remove pawn color[%d]",m_chessController->playerColor() == 0?"White":"Black");
+            qDebug("Capture Add piece[%d] color[%d]",promotedType,m_chessController->playerColor() == 0?"White":"Black");
             char capturedPieceChar = '0';
             char promotePieceChar = 'q';
             if(m_chessController->botMove().isCapture())
@@ -805,7 +770,7 @@ uint8_t ChessBot::playCalculateNextMove()
         {
             if (m_chessController->botMove().isEnPassant()) // watch out ep capture is a capture
             {
-                qDebug("Capture remove pawn color[%d]",m_side != 0?"White":"Black");
+                qDebug("Capture remove pawn color[%d]",m_chessController->playerColor() != 0?"White":"Black");
                 sprintf(m_robotCommand,"pp%d%d%d%d%c%c%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
                         'p','0',
                         canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),PIECE_MOVE_ENPASSANT)?'-':'n');
@@ -814,7 +779,7 @@ uint8_t ChessBot::playCalculateNextMove()
             {
                 //remove the captured piece
                 unsigned int type(m_chessController->botMove().getCapturedPieceType());
-                qDebug("Capture remove captured piece[%d] color[%s]",type,m_side != 0?"White":"Black");
+                qDebug("Capture remove captured piece[%d] color[%s]",type,m_chessController->playerColor() != 0?"White":"Black");
                 sprintf(m_robotCommand,"a%d%d%d%d%c%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
                         'p',
                         canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),PIECE_MOVE_CAPTURE)?'-':'n');
@@ -1706,10 +1671,16 @@ void ChessBot::sendTestCommand(QString command)
     togglePause(false);
 }
 
-void ChessBot::executeCommand(QString command)
+bool ChessBot::executeCommand(QString command)
 {
     m_commandTest = command;
-    testRobot();
+    if(testRobot() == STATE_DONE_FAIL){
+        return false;
+    }
+    if(testCheckResult() == STATE_DONE_FAIL){
+        return false;
+    }
+    return true;
 }
 
 void ChessBot::homingRobot()
@@ -1743,7 +1714,7 @@ void ChessBot::processNextMove()
     m_statePlay = PLAY_INIT;
     m_mutex->unlock();
 //    m_statePlay = PLAY_INFORM_ERROR;
-    Q_EMIT playTurnChanged(m_side == Color::WHITE ? 1-m_side : m_side);
+    Q_EMIT playTurnChanged(m_chessController->playerColor() == Color::WHITE ? 1-m_chessController->playerColor() : m_chessController->playerColor());
     togglePause(false);
     startService();
 }
@@ -1751,39 +1722,6 @@ void ChessBot::processNextMove()
 void ChessBot::undoMove()
 {
     m_chessController->undoMove();
-}
-
-void ChessBot::setLevel(int level)
-{
-    qDebug("Set level: %d",level);
-    m_levelScore = level;
-    m_levelType = level/700;
-    m_chessController->setEngineLevel(m_levelType);
-}
-
-void ChessBot::setSide(int side)
-{
-    qDebug("Set side: %d",side);
-    m_side = side;
-    m_chessController->setPlayerColor(side);
-    m_detectParams->playerSide = m_side == 0?
-                "white":"black";
-    resetGame();
-}
-
-int ChessBot::levelType()
-{
-    return m_levelType;
-}
-
-int ChessBot::levelScore()
-{
-    return m_levelScore;
-}
-
-int ChessBot::side()
-{
-    return m_side;
 }
 
 QVariantList ChessBot::chessboardCorners() const {
@@ -1808,7 +1746,7 @@ QObject* ChessBot::chessControllerObject() const
 }
 
 void ChessBot::resetGame(){
-    qDebug("Reset game side[%d]",m_side);
+    qDebug("Reset game side[%d]",m_chessController->playerColor());
     if(m_state != STATE_EXIT) {
         qDebug("Previous move is not finished");
         return;
@@ -1820,6 +1758,18 @@ void ChessBot::resetGame(){
     m_mutex->unlock();
     togglePause(false);
     startService();
+}
+
+void ChessBot::setEngineElo(int score)
+{
+    m_chessController->setEngineElo(score);
+}
+
+void ChessBot::setPlayerColor(int color)
+{
+    m_chessController->setPlayerColor(color);
+    m_detectParams->playerSide = color == 0?
+                "white":"black";
 }
 
 bool ChessBot::detectArduinoPort(int baudRate)
@@ -1876,34 +1826,19 @@ bool ChessBot::detectArduinoPort(int baudRate)
     return false;
 }
 
-void ChessBot::speakText(const QString &text)
-{
-#if defined(_WIN32)
-    m_speech->say(text.trimmed());
-#else
-    m_speech->speak(text);
-#endif
-}
-
-void ChessBot::speakMove(const QString fen, const int color,
-                         QString pieceType, const QString pieceNotation, const Move &move)
-{
-    QString formattedMove = m_chessController->processRobotCommentary(fen,color, pieceType, pieceNotation, move);
-    speakText(formattedMove);
-}
-
 void ChessBot::acceptPlayFENFromHistory(bool accept)
 {
-    qDebug("Reset game side[%d]",m_side);
+    qDebug("Reset game side[%d]",m_chessController->playerColor());
     if(accept) {
         qDebug("Play last fen [%s]\r\n",m_lastGame.fen.c_str());
         m_chessController->newGame(QString::fromStdString(m_lastGame.fen));
-        m_side = m_lastGame.turn == "White"?Color::BLACK:Color::WHITE;
-        m_chessController->setPlayerColor(m_side);
-        m_detectParams->playerSide = m_side == 0?
+        m_chessController->setPlayerColor(m_lastGame.turn == "White"?Color::BLACK:Color::WHITE);
+#ifdef IMAGE_PROCESS_MOVE
+        m_detectParams->playerSide = m_chessController->playerColor() == 0?
                     "white":"black";
-        setLevel(700);
-        if(m_side == 0) {
+#endif
+        m_chessController->setEngineElo(700);
+        if(m_chessController->playerColor() == 0) {
             m_mutex->lock();
             m_state = STATE_PLAY;
             m_statePlay = PLAY_CALCULATE_NEXT_MOVE_RESET;
@@ -1919,7 +1854,7 @@ void ChessBot::acceptPlayFENFromHistory(bool accept)
             startService();
         }
     } else {
-        if(m_side == 1) {
+        if(m_chessController->playerColor() == 1) {
             m_mutex->lock();
             m_state = STATE_PLAY;
             m_statePlay = PLAY_CALCULATE_NEXT_MOVE_RESET;

@@ -53,7 +53,7 @@
 #include <QLoggingCategory>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
-#include "ChessBot.h"
+#include "MasterChessBot.h"
 #include "ChessController.h"
 int main(int argc, char *argv[])
 {
@@ -62,9 +62,9 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
     // Hide the cursor globally across the entire application
     QGuiApplication::setOverrideCursor(QCursor(Qt::BlankCursor));
-    ChessBot backend; // Instantiate your class
-    engine.rootContext()->setContextProperty("backend", &backend);
-    engine.rootContext()->setContextProperty("chessController", backend.chessController());
+    MasterChessBot masterBot; // Instantiate your class
+    engine.rootContext()->setContextProperty("masterBot", &masterBot);
+    engine.rootContext()->setContextProperty("chessController", masterBot.chessbot()->chessController());
     engine.load(QUrl(QStringLiteral("qrc:/qml/main.qml")));
     if (engine.rootObjects().isEmpty())
             return -1;

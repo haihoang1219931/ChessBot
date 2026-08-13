@@ -11,11 +11,6 @@
 #include <QVariantList>
 #include <QPoint>
 #include <QVector>
-#if defined(_WIN32)
-#include <QTextToSpeech>
-#else
-#include "voice/PiperStreamer.h"
-#endif
 
 #define CONFIGURE_CHESSBOARD_CALIB_FILE "calib_data.json"
 
@@ -105,45 +100,33 @@ struct GameInfo {
 
 class ChessBot : public QThread {
     Q_OBJECT
-    Q_PROPERTY(int levelType READ levelType NOTIFY levelTypeChanged)
-    Q_PROPERTY(int levelScore READ levelScore NOTIFY levelScoreChanged)
-    Q_PROPERTY(int side READ side NOTIFY sideChanged)
     Q_PROPERTY(QObject* chessController READ chessControllerObject CONSTANT)
 public:
     explicit ChessBot(QThread *parent = nullptr);
     virtual ~ChessBot();
-    int levelType();
-    int levelScore();
-    int side();
     QObject* chessControllerObject() const;
     ChessController* chessController();
-    Q_INVOKABLE QVariantList chessboardCorners() const;
-    Q_INVOKABLE QString getCalibrationJson() const;
-    Q_INVOKABLE bool saveCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
-    Q_INVOKABLE bool loadCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
-    Q_INVOKABLE void updateCorners(QVariantList corners);
-    Q_INVOKABLE void updateCalibrationData(int type, int row, int col, int x, int y);
-    Q_INVOKABLE void acceptPlayFENFromHistory(bool accept);
+    QVariantList chessboardCorners() const;
+    QString getCalibrationJson() const;
+    bool saveCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
+    bool loadCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
+    void updateCorners(QVariantList corners);
+    void updateCalibrationData(int type, int row, int col, int x, int y);
+    void acceptPlayFENFromHistory(bool accept);
 
-public Q_SLOTS:
     void run() override;
     void startService();
     void stopService();
     void togglePause(bool paused);
     void sendTestCommand(QString command);
-    void executeCommand(QString command);
+    bool executeCommand(QString command);
     void homingRobot();
     void initRobotCommunication();
     void processNextMove();
     void undoMove();
-    void setLevel(int level);
-    void setSide(int side);
     void resetGame();
-    void connectCamera();
-    void disconnectCamera();
-    void speakText(const QString &text);
-    void speakMove(const QString fen, const int color,
-                   const QString pieceType, const QString pieceNotation, const Move& move);
+    void setEngineElo(int score);
+    void setPlayerColor(int color);
     void playInputMove(int startIndex, int stopIndex, int promotePiece = -1);
     void playInputCancelPromotion();
 
@@ -152,13 +135,11 @@ Q_SIGNALS:
     void detectFailed();
     void playTurnChanged(int nextTurn);
     void gameEnded(int endState);
-    void sideChanged(int side);
-    void levelTypeChanged(int type);
-    void levelScoreChanged(int score);
     void calibrationUploadProgress(int direction, int progress);
     void calibrationUploadComplete(int direction, bool success);
     void showPromotionPieces();
     void foundLastFEN();
+    void newCommentAdded(QString text);
 
 private:
     void playLoop();
@@ -206,11 +187,6 @@ private:
     QMutex *m_mutex;
     QWaitCondition* m_pauseCond;
     ChessController* m_chessController;
-#if defined(_WIN32)
-    QTextToSpeech *m_speech;
-#else
-    PiperStreamer *m_speech;
-#endif
 #ifdef IMAGE_PROCESS_MOVE
     ChessImageProcessing* m_moveDetector;
     cv::VideoCapture cap;
@@ -225,12 +201,11 @@ private:
     int m_stateConfigure;
     int m_stateTest;
     int m_stateInit;
-    int m_levelType;
-    int m_levelScore;
-    int m_side;
     int m_width;
     int m_height;
+#ifdef IMAGE_PROCESS_MOVE
     MoveDetectParams* m_detectParams;
+#endif
     QString m_arduinoVersion;
     QVector<QPoint> m_chessboardConners; // 4 corners
     QVector<QVector<QPoint>> m_chessboardCalib;    // 8x8 chessboard

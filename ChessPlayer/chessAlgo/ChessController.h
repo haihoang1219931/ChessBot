@@ -17,12 +17,11 @@ class ChessController : public QObject
     Q_PROPERTY(QString status READ status WRITE setStatus NOTIFY statusChanged)
     Q_PROPERTY(bool promotionPending READ promotionPending NOTIFY promotionPendingChanged)
     Q_PROPERTY(int checkedKingSquare READ checkedKingSquare NOTIFY checkedKingSquareChanged)
-    Q_PROPERTY(int engineLevel READ engineLevel NOTIFY engineLevelChanged)
+    Q_PROPERTY(int engineElo READ engineElo NOTIFY engineEloChanged)
     Q_PROPERTY(int playerColor READ playerColor NOTIFY playerColorChanged)
 
 public:
     explicit ChessController(QObject* parent = nullptr);
-
     QStringList board() const;
     int selectedSquare() const;
     QString sideToMove() const;
@@ -31,7 +30,7 @@ public:
 //    std::vector<Move> moveHistory() const;
     bool promotionPending() const;
     int checkedKingSquare() const;
-    int engineLevel() const;
+    int engineElo() const;
     int playerColor() const;
     QString buildResultText() const;
     Move botMove() const;
@@ -60,7 +59,7 @@ public:
     Q_INVOKABLE bool isValidDestination(int uiIndex) const;
     Q_INVOKABLE void choosePromotion(const QString& pieceLetter);
     Q_INVOKABLE void cancelPromotion();
-    Q_INVOKABLE void setEngineLevel(int level);
+    Q_INVOKABLE void setEngineElo(int elo);
     Q_INVOKABLE void setPlayerColor(int color);
     Q_INVOKABLE void undoMove();
 
@@ -71,7 +70,7 @@ Q_SIGNALS:
     void statusChanged();
     void promotionPendingChanged();
     void checkedKingSquareChanged();
-    void engineLevelChanged();
+    void engineEloChanged();
     void playerColorChanged();
 
 private:
@@ -91,11 +90,10 @@ private:
     QSet<int> m_validDestinationUiSquares;
     QStringList m_boardModel;
     QString m_status;
-//    std::vector<Move> m_moveHistory;
     bool m_promotionPending;
     int m_checkedKingSquare;
     std::vector<Move> m_pendingPromotionMoves;
-    int m_engineDepth;
+    int m_engineElo;
     int m_playerColor; // 0 = White, 1 = Black
     Move m_botMove;
 };

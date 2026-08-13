@@ -66,7 +66,7 @@ FocusScope {
 
     function loadCalibrationData() {
         initializeCalibrationArrays();
-        var data = backend.getCalibrationJson() || "";
+        var data = masterBot.getCalibrationJson() || "";
         if (data !== "") {
             var jsonData = JSON.parse(data);
             
@@ -192,7 +192,7 @@ FocusScope {
         point.y += dy;
         popupX = point.x;
         popupY = point.y;
-        backend.updateCalibrationData(selectedZone,actualRow,actualCol,point.x,point.y);
+        masterBot.updateCalibrationData(selectedZone,actualRow,actualCol,point.x,point.y);
     }
 
     function isCellExcluded(excludedCellsArray, actualRow, actualCol) {
@@ -277,7 +277,7 @@ FocusScope {
 
     function abortCalibrationUpload() {
         // Send abort command to RobotController
-        backend.abortCalibrationUpload();
+        masterBot.abortCalibrationUpload();
         uploadProgressVisible = false;
         uploadAbortDialogVisible = false;
         // Return to parent panel
@@ -288,7 +288,7 @@ FocusScope {
         uploadProgress = 0.0;
         uploadProgressVisible = true;
         // Trigger the asynchronous upload process
-        backend.sendCalibrationCells();
+        masterBot.sendCalibrationCells();
     }
 
     function simulateUploadProgress() {
@@ -469,7 +469,7 @@ FocusScope {
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                     if (confirmButtonSelected === 0) {
-                        backend.saveCalibrationData();;
+                        masterBot.saveCalibrationData();;
                     }
                     confirmDialogVisible = false;
                     infoPopupVisible = false;
@@ -509,7 +509,7 @@ FocusScope {
                     infoPopupVisible = true;
                     highlightDirection = 0;
                     updatePopupValues();
-                    backend.sendTestCommand("tx"+popupX+"y"+popupY);
+                    masterBot.sendTestCommand("tx"+popupX+"y"+popupY);
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Escape) {
                     confirmDialogVisible = true;
@@ -814,7 +814,7 @@ FocusScope {
                 }
 
                 Connections {
-                    target: backend
+                    target: masterBot
                     onCalibrationUploadProgress: {
                         uploadProgress = progress;
                     }
@@ -879,7 +879,7 @@ FocusScope {
                                 anchors.fill: parent
                                 onClicked: {
                                     confirmButtonSelected = 0;
-                                    backend.saveCalibrationData();
+                                    masterBot.saveCalibrationData();
                                     confirmDialogVisible = false;
                                     root.exitPressed();
                                 }
