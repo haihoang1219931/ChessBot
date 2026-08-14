@@ -7,10 +7,11 @@ import QtQml 2.0
 ApplicationWindow {
     id: wroot
     visible: true
-    visibility: Window.FullScreen
+//    visibility: Window.FullScreen
     title: qsTr("ChessPlayer")
     color: "#050505"
-
+    width: 800
+    height: 480
     StackView {
         id: stack
         width: 800
@@ -112,7 +113,7 @@ ApplicationWindow {
             onItemSelected: {
                 stack.pop()
                 stack.push(sideSelection)
-                masterBot.setEngineElo(score)
+                masterBot.setEngineElo(rank,score)
             }
             onExitPressed: {
                 stack.pop()
@@ -154,5 +155,8 @@ ApplicationWindow {
                 stack.push(levelSelection)
             }
         }
+    }
+    Component.onCompleted: {
+        masterBot.startService();
     }
 }

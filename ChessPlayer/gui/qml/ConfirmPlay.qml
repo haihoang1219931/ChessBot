@@ -21,7 +21,7 @@ Rectangle {
         confirmNextStep(selection);
     }
     Keys.onEscapePressed: {
-        goback()
+        gobackNormal()
     }
 
     ColumnLayout {

@@ -5,29 +5,29 @@ MasterChessBot::MasterChessBot(QObject *parent) : QObject(parent)
 {
     m_workerChessbot = new ChessBot();
     m_workerAssistant = new AssistantController();
-#if defined(USE_SYSTEM_VOICE)
-    // 1. Check if engines exist on your OS
-    qDebug() << "Available TTS Engines:" << QTextToSpeech::availableEngines();
-
-    m_speech = new QTextToSpeech();
-    // Explicitly enforce the system language to kickstart SAPI
-    m_speech->setLocale(QLocale::system());
-    // 2. Print current engine state (Should be Ready)
-    qDebug() << "Current TTS Engine:" << m_speech->availableEngines();
-    qDebug() << "Initial State:" << m_speech->state();
-
-    // 3. Optional: Connect a debug log to trace status changes
-    connect(m_speech, &QTextToSpeech::stateChanged, [](QTextToSpeech::State state) {
-        qDebug() << "TTS State Changed to:" << state;
-    });
-#else
-    m_speech = new PiperStreamer();
-#endif
+    m_speech = new VoiceStreamer();
     handleNewComment("I'm chess robot. Nice to play");
-    connect(m_workerChessbot, &ChessBot::newCommentAdded,
-            this, &MasterChessBot::handleNewComment);
-    connect(m_workerAssistant, &AssistantController::responseTextChanged,
-            this, &MasterChessBot::handleNewComment);
+//    connect(m_workerChessbot, &ChessBot::newCommentAdded,
+//            this, &MasterChessBot::handleNewComment);
+//    connect(m_workerAssistant, &AssistantController::generationFinished,
+//            this, &MasterChessBot::handleNewComment);
+
+    connect(m_workerChessbot, &ChessBot::boardChanged,
+            this, &MasterChessBot::boardChanged);
+    connect(m_workerChessbot, &ChessBot::detectFailed,
+            this, &MasterChessBot::detectFailed);
+    connect(m_workerChessbot, &ChessBot::playTurnChanged,
+            this, &MasterChessBot::playTurnChanged);
+    connect(m_workerChessbot, &ChessBot::gameEnded,
+            this, &MasterChessBot::gameEnded);
+    connect(m_workerChessbot, &ChessBot::calibrationUploadProgress,
+            this, &MasterChessBot::calibrationUploadProgress);
+    connect(m_workerChessbot, &ChessBot::calibrationUploadComplete,
+            this, &MasterChessBot::calibrationUploadComplete);
+    connect(m_workerChessbot, &ChessBot::showPromotionPieces,
+            this, &MasterChessBot::showPromotionPieces);
+    connect(m_workerChessbot, &ChessBot::foundLastFEN,
+            this, &MasterChessBot::foundLastFEN);
 }
 
 ChessBot* MasterChessBot::chessbot()
@@ -85,9 +85,9 @@ void MasterChessBot::undoMove()
     m_workerChessbot->undoMove();
 }
 
-void MasterChessBot::setEngineElo(int score)
+void MasterChessBot::setEngineElo(QString level, int score)
 {
-    m_workerChessbot->setEngineElo(score);
+    m_workerChessbot->setEngineElo(level, score);
 }
 void MasterChessBot::setPlayerColor(int color)
 {
@@ -111,13 +111,13 @@ void MasterChessBot::playInputCancelPromotion()
 void MasterChessBot::startService()
 {
     m_workerChessbot->startService();
-    m_workerAssistant->startService();
+//    m_workerAssistant->startService();
 }
 
 void MasterChessBot::stopService()
 {
     m_workerChessbot->stopService();
-    m_workerAssistant->stopService();
+//    m_workerAssistant->stopService();
 }
 
 void MasterChessBot::sendTestCommand(QString command)
@@ -130,11 +130,22 @@ int MasterChessBot::playerColor()
     return m_workerChessbot->chessController()->playerColor();
 }
 
+QString MasterChessBot::getCalibrationJson() const
+{
+    return m_workerChessbot->getCalibrationJson();
+}
+
+QVariantList MasterChessBot::chessboardCorners() const
+{
+    return m_workerChessbot->chessboardCorners();
+}
+
+void MasterChessBot::stopGame(QString comment)
+{
+    m_workerChessbot->stopGame(comment);
+}
+
 void MasterChessBot::handleNewComment(const QString &text)
 {
-#if defined(USE_SYSTEM_VOICE)
-    m_speech->say(text.trimmed());
-#else
     m_speech->speak(text);
-#endif
 }

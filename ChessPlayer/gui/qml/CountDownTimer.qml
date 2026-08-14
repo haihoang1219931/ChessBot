@@ -17,22 +17,26 @@ Rectangle {
         }
     }
     Keys.onEscapePressed: {
-        if(chessboard.activeUserInput)
+        if(chessboard.activeUserInput) {
+            console.log("chessboard.cancelUserSelection()");
             chessboard.cancelUserSelection();
-        else
+        }
+        else {
+            console.log("masterBot.undoMove()");
             masterBot.undoMove();
+        }
     }
     Keys.onReturnPressed: {
         root.startGame()
-        chessboard.updateUserSelection();
+        if(!gameEnded) chessboard.updateUserSelection();
     }
     Keys.onSpacePressed: masterBot.processNextMove()
     Keys.onLeftPressed: chessboard.updateUserInput(-1)
     Keys.onRightPressed: chessboard.updateUserInput(1)
     Keys.onUpPressed: chessboard.updateUserInput(-8)
     Keys.onDownPressed: chessboard.updateUserInput(8)
-    property int levelType: 1
-    property int levelScore: 200
+    property string levelType: "Advanced"
+    property int levelScore: 700
     property int side: 0
     property int gameTurn: 0
     property string player1Name: "Bot"
@@ -40,6 +44,7 @@ Rectangle {
     property int playTime: 600
     property int player1Time: 600
     property int player2Time: 600
+    property bool gameEnded: false;
     function resetGame(){
         player1Time = playTime;
         player2Time = playTime;
@@ -63,6 +68,8 @@ Rectangle {
         if(loaderDialogEndgame.item === null)
         loaderDialogEndgame.setSource("GameResult.qml");
         loaderDialogEndgame.item.gameResult = result
+        gameEnded = true;
+        masterBot.stopGame(result === 2 ?"Player lost":"Player win");
     }
 
     function enablePromotionSelection(enable) {
@@ -112,7 +119,7 @@ Rectangle {
                 }
 
                 Text {
-                    text: "level "+levelType+" ("+levelScore+")"
+                    text: levelType+" ("+levelScore+")"
                     color: "white"
                     font.pixelSize: 24
                     font.weight: Font.DemiBold
@@ -245,11 +252,14 @@ Rectangle {
             if(nextStep === 1) {
                 console.log("gobackLevelSelection");
                 gobackLevelSelection();
+                masterBot.stopGame("Exit");
+                gameEnded = true;
             } else {
                 console.log("resetGame");
                 masterBot.resetGame();
                 root.resetGame();
                 root.forceActiveFocus();
+                gameEnded = true;
             }
         }
 
@@ -258,13 +268,14 @@ Rectangle {
             if(nextStep === 0) {
                 console.log("level selection");
                 gobackLevelSelection();
+                masterBot.stopGame("Exit");
+                gameEnded = true;
             } else if(nextStep === 1){
                 console.log("homing robot");
                 masterBot.homingRobot();
                 root.forceActiveFocus();
             }
         }
-
 
         onGoback: {
             loaderDialogEndgame.source = ""; // Close it
@@ -300,9 +311,9 @@ Rectangle {
     }
 
     Component.onCompleted: {
-        root.levelType = chessController.levelType
-        root.levelScore = chessController.levelScore
-        root.side =  chessController.side
+        root.levelType = chessController.engineLevel
+        root.levelScore = chessController.engineElo
+        root.side =  chessController.playerColor
     }
     Connections {
         target: masterBot
@@ -324,7 +335,6 @@ Rectangle {
             openConfirmPlayOption();
         }
         onBoardChanged: {
-            console.log("===============Update chess board");
             chessboard.board = boardModel;
             chessboard.playerColor = chessController.playerColor
             chessboard.selectedSquare = chessController.selectedSquare

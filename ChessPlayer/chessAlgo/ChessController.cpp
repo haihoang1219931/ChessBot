@@ -84,11 +84,6 @@ void ChessController::setStatus(QString status)
     }
 }
 
-//std::vector<Move> ChessController::moveHistory() const
-//{
-//    return m_moveHistory;
-//}
-
 bool ChessController::promotionPending() const
 {
     return m_promotionPending;
@@ -97,6 +92,11 @@ bool ChessController::promotionPending() const
 int ChessController::checkedKingSquare() const
 {
     return m_checkedKingSquare;
+}
+
+QString ChessController::engineLevel() const
+{
+    return m_engineLevel;
 }
 
 int ChessController::engineElo() const
@@ -109,11 +109,13 @@ int ChessController::playerColor() const
     return m_playerColor;
 }
 
-void ChessController::setEngineElo(int elo)
+void ChessController::setEngineElo(QString level, int elo)
 {
-    if(m_engineElo != elo) {
+    if(m_engineElo != elo || m_engineLevel != level) {
         m_engineElo = elo;
+        m_engineLevel = level;
         Q_EMIT engineEloChanged();
+        Q_EMIT engineLevelChanged();
     }
 }
 
@@ -142,7 +144,7 @@ const std::string whitePawnDoubleCapture = "3r1r2/4P3/8/k7/8/8/8/1K6 w - - 0 1";
 const std::string blackPrePromotion = "k7/8/8/8/8/8/2p5/4K3 w - - 0 1";
 const std::string blackCapturePromotion = "k7/8/8/8/8/8/1p6/2R1K3 w - - 0 1";
 const std::string crashMove = "r3k2r/p1p3pp/1p6/2K2p2/8/2N1n3/PP5P/1R6 w kq - 39 20";
-
+const std::string hangPromote = "rn6/ppp1kp1p/3r4/5p2/1PPb4/P1N4P/K4pbR/RN6 w - - 42 22";
 void ChessController::updateBoard()
 {
     refreshBoardModel();
@@ -158,20 +160,12 @@ void ChessController::updateBoard()
 
 void ChessController::newGame(QString lastMove)
 {
-//    for(int i=0; i< 1000; i++) {
-//        std::shared_ptr<Board> sp = std::shared_ptr<Board>(new Board("r2q1rk1/ppp2ppp/2n5/2P1pP2/4pB2/P6P/2P5/RN1QKBNR b KQ - 7 3"));
-//        Search search(sp);
-//        search.negaMaxRoot(1);
-//        Move move = search.myBestMove;
-//        printf("Best move is %s\r\n",move.toShortString().c_str());
-//    }
     printf("new game\r\n");
     if(lastMove != "")
         m_board = std::make_shared<Board>(lastMove.toStdString());
     else
         m_board = std::make_shared<Board>();
     globalTT.clearTT();
-//    m_moveHistory.clear();
     m_promotionPending = false;
     m_pendingPromotionMoves.clear();
     Q_EMIT promotionPendingChanged();
@@ -435,7 +429,7 @@ bool ChessController::moveByCoordinates(const QString& startSquare,
 QStringList ChessController::findBestMoveCoordinates() const
 {
     Search search(m_board);
-    search.negaMaxRoot(m_engineElo/700);
+    search.negaMaxRoot(m_engineElo/500);
 
     const QString bestMoveText = QString::fromStdString(Utils::Move16ToShortString(search.myBestMove));
     if (bestMoveText.size() < 4)
@@ -571,16 +565,20 @@ void ChessController::clearSelection()
 
 void ChessController::playEngineMove()
 {
-    qDebug("ChessController::playEngineMove m_engineDepth[%d]",m_engineElo/7);
+    qDebug("ChessController::playEngineMove m_engineDepth[%d]",m_engineElo/500);
     bool foundBestMove = false;
     Move chosenMove;
     Search search(m_board);
-    search.negaMaxRoot(m_engineElo/7);
+    search.negaMaxRoot(m_engineElo/500);
     Move bestMove = search.myBestMove;
     qDebug("ChessController::playEngineMove bestmove %s",
            bestMove.toShortString().c_str());
     if (tryFindLegalMove(bestMove.getOrigin(), bestMove.getDestination(), chosenMove)) {
         foundBestMove = true;
+    } else if(m_promotionPending) {
+        chosenMove = bestMove;
+        foundBestMove = true;
+        m_promotionPending = false;
     } else {
         MoveGen moveGen(m_board);
         std::vector<Move> moveList = moveGen.generateMoves();
@@ -642,6 +640,21 @@ QString ChessController::extractFEN()
     return QString::fromStdString(m_board->extractFen());
 }
 
+bool ChessController::isFENValid(std::string fenString)
+{
+    return m_board->isValidFEN(fenString);
+}
+
+bool ChessController::areFENPositionsEqualDefault(const std::string& fen)
+{
+    const std::string& fenCompare = m_board->extractFen();
+    // Extract the substring up to the first space for both FENs
+    std::string pos1 = fen.substr(0, fen.find(' '));
+    std::string pos2 = fenCompare.substr(0, fenCompare.find(' '));
+
+    // Directly compare the piece placement substrings
+    return pos1 == pos2;
+}
 bool ChessController::tryFindLegalMove(int originSquare, int destinationSquare, Move& outMove, QChar promotionSuffix)
 {
     MoveGen moveGen(m_board);

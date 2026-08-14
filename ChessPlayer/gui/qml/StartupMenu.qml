@@ -114,6 +114,10 @@ FocusScope {
                     root.enterItem(currentIndex)
                     console.log("Selected:", menuModel.get(currentIndex).name)
                 }
+                Keys.onSpacePressed: {
+                    root.enterItem(currentIndex)
+                    console.log("Selected:", menuModel.get(currentIndex).name)
+                }
             }
         }
     }

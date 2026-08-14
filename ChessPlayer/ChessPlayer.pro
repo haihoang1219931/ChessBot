@@ -7,7 +7,11 @@ CONFIG += use_chess_algo
 CONFIG += use_ai_voice
 CONFIG += use_ai_assistant
 CONFIG += use_image_processing
+CONFIG += use_system_voice
 #CONFIG += use_sanitize
+use_system_voice {
+    QT += axcontainer
+}
 use_sanitize {
 QMAKE_CXXFLAGS += -fsanitize=address -fno-omit-frame-pointer
 QMAKE_LFLAGS += -fsanitize=address
@@ -17,7 +21,7 @@ use_image_processing {
 #DEFINES += DEBUG_SHOW_IMAGE
 #DEFINES += DEBUG_WRITE_IMAGE
 #DEFINES += DEBUG_SIMPLE_MOVE
-DEFINES += IMAGE_PROCESS_MOVE
+#DEFINES += IMAGE_PROCESS_MOVE
 unix:!macx: INCLUDEPATH += /usr/local/include/opencv4
 unix:!macx: DEPENDPATH += /usr/local/include/opencv4
 unix:!macx: LIBS += -L/usr/local/lib/  \
@@ -98,10 +102,10 @@ HEADERS += \
 
 use_ai_voice {
 SOURCES += \
-    voice/PiperStreamer.cpp
+    voice/VoiceStreamer.cpp
 
 HEADERS += \
-    voice/PiperStreamer.h
+    voice/VoiceStreamer.h
 }
 
 use_ai_assistant {

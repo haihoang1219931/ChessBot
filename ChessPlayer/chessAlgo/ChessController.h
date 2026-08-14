@@ -17,6 +17,7 @@ class ChessController : public QObject
     Q_PROPERTY(QString status READ status WRITE setStatus NOTIFY statusChanged)
     Q_PROPERTY(bool promotionPending READ promotionPending NOTIFY promotionPendingChanged)
     Q_PROPERTY(int checkedKingSquare READ checkedKingSquare NOTIFY checkedKingSquareChanged)
+    Q_PROPERTY(QString engineLevel READ engineLevel NOTIFY engineLevelChanged)
     Q_PROPERTY(int engineElo READ engineElo NOTIFY engineEloChanged)
     Q_PROPERTY(int playerColor READ playerColor NOTIFY playerColorChanged)
 
@@ -27,9 +28,9 @@ public:
     QString sideToMove() const;
     QString status() const;
     void setStatus(QString status);
-//    std::vector<Move> moveHistory() const;
     bool promotionPending() const;
     int checkedKingSquare() const;
+    QString engineLevel() const;
     int engineElo() const;
     int playerColor() const;
     QString buildResultText() const;
@@ -37,6 +38,8 @@ public:
     void playEngineMove();
     QString pieceType(QString square);
     QString extractFEN();
+    bool isFENValid(std::string fenString);
+    bool areFENPositionsEqualDefault(const std::string& fen);
     QString processRobotCommentary(const QString fen, const int color,
                                    const QString pieceType, const QString pieceNotation, Move playerMove);
     bool isValidMoveByCoordinates(const QString& startSquare, const QString& stopSquare, Move& chosenMove,
@@ -59,7 +62,7 @@ public:
     Q_INVOKABLE bool isValidDestination(int uiIndex) const;
     Q_INVOKABLE void choosePromotion(const QString& pieceLetter);
     Q_INVOKABLE void cancelPromotion();
-    Q_INVOKABLE void setEngineElo(int elo);
+    Q_INVOKABLE void setEngineElo(QString level, int elo);
     Q_INVOKABLE void setPlayerColor(int color);
     Q_INVOKABLE void undoMove();
 
@@ -70,6 +73,7 @@ Q_SIGNALS:
     void statusChanged();
     void promotionPendingChanged();
     void checkedKingSquareChanged();
+    void engineLevelChanged();
     void engineEloChanged();
     void playerColorChanged();
 
@@ -93,6 +97,7 @@ private:
     bool m_promotionPending;
     int m_checkedKingSquare;
     std::vector<Move> m_pendingPromotionMoves;
+    QString m_engineLevel;
     int m_engineElo;
     int m_playerColor; // 0 = White, 1 = Black
     Move m_botMove;

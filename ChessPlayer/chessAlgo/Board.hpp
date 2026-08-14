@@ -203,7 +203,64 @@ public:
 	{
 		return Tables::ATTACK_TABLE[Piece::KING][square];
 	};
+    bool isValidFEN(const std::string& fen) {
+        std::stringstream ss(fen);
+        std::string placement, active_color, castling, ep_square;
+        std::string halfmove, fullmove;
 
+        ss >> placement >> active_color >> castling >> ep_square >> halfmove >> fullmove;
+        if (placement.empty() || active_color.empty() || castling.empty() ||
+            ep_square.empty() || halfmove.empty() || fullmove.empty()) {
+            return false;
+        }
+
+        // 1. Validate Piece Placement
+        int ranks = 1;
+        int file_count = 0;
+        for (char c : placement) {
+            if (c == '/') {
+                if (file_count != 8) return false;
+                ranks++;
+                file_count = 0;
+            } else if (std::isdigit(c)) {
+                int val = c - '0';
+                if (val < 1 || val > 8) return false;
+                file_count += val;
+            } else {
+                if (std::string("prbnkqPRBNKQ").find(c) == std::string::npos) return false;
+                file_count++;
+            }
+        }
+        if (ranks != 8 || file_count != 8) return false;
+
+        // 2. Validate Active Color
+        if (active_color != "w" && active_color != "b") return false;
+
+        // 3. Validate Castling Rights
+        if (castling != "-") {
+            if (castling.length() > 4) return false;
+            for (char c : castling) {
+                if (std::string("KQkq").find(c) == std::string::npos) return false;
+            }
+        }
+
+        // 4. Validate En Passant Square
+        if (ep_square != "-") {
+            if (ep_square.length() != 2) return false;
+            if (ep_square[0] < 'a' || ep_square[0] > 'h') return false;
+            if (ep_square[1] != '3' && ep_square[1] != '6') return false;
+        }
+
+        // 5. Validate Halfmove Clock & Fullmove Number
+        auto is_number = [](const std::string& s) {
+            for (char c : s) if (!std::isdigit(c)) return false;
+            return !s.empty();
+        };
+        if (!is_number(halfmove) || !is_number(fullmove)) return false;
+        if (std::stoi(fullmove) < 1) return false;
+
+        return true;
+    }
     std::string extractFen() {
         std::stringstream fen;
         printf("1. Piece Placement\r\n");

@@ -57,6 +57,7 @@ typedef enum{
     PLAY_INFORM_ERROR,
     PLAY_INFORM_BOT_ERROR,
     PLAY_REQUEST_PROMOTE_PIECE,
+    PLAY_ENDGAME_TIMEOUT,
     PLAY_PROCESS_DONE,
 } STATE_PLAY_PHASE;
 
@@ -119,16 +120,17 @@ public:
     void stopService();
     void togglePause(bool paused);
     void sendTestCommand(QString command);
-    bool executeCommand(QString command);
+    int executeCommand(QString command);
     void homingRobot();
     void initRobotCommunication();
     void processNextMove();
     void undoMove();
     void resetGame();
-    void setEngineElo(int score);
+    void setEngineElo(QString level, int score);
     void setPlayerColor(int color);
     void playInputMove(int startIndex, int stopIndex, int promotePiece = -1);
     void playInputCancelPromotion();
+    void stopGame(QString comment);
 
 Q_SIGNALS:
     void boardChanged(QStringList boardModel);
@@ -218,6 +220,7 @@ private:
     bool m_validCalibFileFound;
     char m_robotCommand[32];
     GameInfo m_lastGame;
+    QString m_timeoutComment;
 };
 
 #endif // CHESSBOT_H

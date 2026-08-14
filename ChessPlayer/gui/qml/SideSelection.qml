@@ -37,6 +37,7 @@ FocusScope {
                     iconText: "\u2654" // White King Unicode
                     KeyNavigation.right: blackItem
                     Keys.onReturnPressed: root.sideConfirmed("White")
+                    Keys.onSpacePressed: root.sideConfirmed("White")
                     Keys.onEscapePressed: root.goback()
                     isSelected: activeFocus
                 }
@@ -47,6 +48,7 @@ FocusScope {
                     iconText: "\u265A" // Black King Unicode
                     KeyNavigation.right: whiteItem
                     Keys.onReturnPressed: root.sideConfirmed("Black")
+                    Keys.onSpacePressed: root.sideConfirmed("Black")
                     Keys.onEscapePressed: root.goback()
                     isSelected: activeFocus
                 }

@@ -42,6 +42,14 @@ FocusScope {
                 model: root.rankData
                 focus: true // Default focus child
                 KeyNavigation.right: scoreList
+                Keys.onReturnPressed: (event) => {
+                    scoreList.forceActiveFocus();
+                    event.accepted = true;
+                }
+                Keys.onSpacePressed: (event) => {
+                    scoreList.forceActiveFocus();
+                    event.accepted = true;
+                }
                 Keys.onEscapePressed: {
                     root.exitPressed()
                 }
@@ -96,8 +104,11 @@ FocusScope {
                 clip: true
 
                 Keys.onReturnPressed: root.itemSelected(root.rankData[rankList.currentIndex].name, model[currentIndex])
-                Keys.onEnterPressed: root.itemSelected(root.rankData[rankList.currentIndex].name, model[currentIndex])
-
+                Keys.onSpacePressed: root.itemSelected(root.rankData[rankList.currentIndex].name, model[currentIndex])
+                Keys.onEscapePressed: (event) => {
+                    rankList.forceActiveFocus();
+                    event.accepted = true;
+                }
                 delegate: Item {
                     width: scoreList.width; height: 70
                     readonly property bool isSelected: ListView.isCurrentItem && scoreList.activeFocus

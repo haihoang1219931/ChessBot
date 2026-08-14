@@ -108,6 +108,7 @@ Item {
             root.direction = direction
         }
         onCalibrationUploadComplete: function(direction, success) {
+            console.log("onCalibrationUploadComplete")
             root.finished = true
             root.success = success
             if (success) root.progress = 100

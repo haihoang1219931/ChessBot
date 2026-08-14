@@ -1,11 +1,17 @@
-#include "PiperStreamer.h"
+#include "VoiceStreamer.h"
 #include <QThread>
 #include <QDebug>
 #include <QAudioDeviceInfo> // Qt5 Specific Audio Device Engine
 
-PiperStreamer::PiperStreamer(QObject *parent)
-    : QObject(parent), m_piperProcess(new QProcess(this)), m_audioOutput(nullptr) {
-
+VoiceStreamer::VoiceStreamer(QObject *parent)
+    : QObject(parent), m_audioOutput(nullptr) {
+#if defined(USE_SYSTEM_VOICE)
+    m_voice = new QAxObject("SAPI.SpVoice");
+    m_stream = new QAxObject("SAPI.SpMemoryStream");
+    m_voice->setProperty("AudioOutputStream", m_stream->asVariant());
+#else
+    m_piperProcess = new QProcess(this);
+#endif
     // 1. Check for Default Output Audio Hardware in Qt5
     QAudioDeviceInfo defaultDevice = QAudioDeviceInfo::defaultOutputDevice();
     if (defaultDevice.isNull()) {
@@ -30,12 +36,14 @@ PiperStreamer::PiperStreamer(QObject *parent)
 
     // 3. Initialize Audio Output Engine
     m_audioOutput = new QAudioOutput(defaultDevice, format, this);
-    connect(m_audioOutput, &QAudioOutput::stateChanged, this, &PiperStreamer::handleAudioStateChanged);
+    connect(m_audioOutput, &QAudioOutput::stateChanged, this, &VoiceStreamer::handleAudioStateChanged);
 
     // 4. Bind our continuous byte memory device arrays
     m_audioBufferDevice.setBuffer(&m_rawAudioData);
     m_audioBufferDevice.open(QIODevice::ReadWrite);
+#if defined(USE_SYSTEM_VOICE)
 
+#else
     // 5. Setup Piper Standalone System Process Engine
     // NOTE: If you are running on Windows, change "./piper" to "piper.exe"
     QString program = "piper";
@@ -47,35 +55,41 @@ PiperStreamer::PiperStreamer(QObject *parent)
     m_piperProcess->setArguments(arguments);
     m_piperProcess->setProcessChannelMode(QProcess::SeparateChannels);
 
-    connect(m_piperProcess, &QProcess::readyReadStandardOutput, this, &PiperStreamer::handleReadyRead);
-    connect(m_piperProcess, &QProcess::readyReadStandardError, this, [this]() {
+    connect(m_piperProcess, &QProcess::readyReadStandardOutput,
+            this, &VoiceStreamer::handleReadyRead);
+    connect(m_piperProcess, &QProcess::readyReadStandardError,
+            this, [this]() {
         qWarning() << "⚠️ Piper Process Output Log:" << m_piperProcess->readAllStandardError();
     });
-    connect(m_piperProcess, &QProcess::errorOccurred, this, &PiperStreamer::handleProcessError);
+    connect(m_piperProcess, &QProcess::errorOccurred,
+            this, &VoiceStreamer::handleProcessError);
 
     m_piperProcess->start();
     if (!m_piperProcess->waitForStarted()) {
         qCritical() << "❌ CRITICAL: Could not execute Piper. Confirm directory setup permissions.";
         return;
     }
-
+#endif
     // 6. Connect the continuous buffer stream output up to your speaker channels
     m_audioOutput->start(&m_audioBufferDevice);
     qDebug() << "🚀 Qt5 Piper Worker Engine initialized and waiting.";
 }
 
-PiperStreamer::~PiperStreamer() {
+VoiceStreamer::~VoiceStreamer() {
+#if defined(USE_SYSTEM_VOICE)
+#else
     if (m_piperProcess->state() == QProcess::Running) {
         m_piperProcess->kill();
         m_piperProcess->waitForFinished();
     }
+#endif
     if (m_audioOutput) {
         m_audioOutput->stop();
     }
 }
 
 // 1. Rename or update your existing speak function to wrap safely
-void PiperStreamer::speak(const QString &text) {
+void VoiceStreamer::speak(const QString &text) {
     // This check determines if the caller is on a different thread than this object
     if (thread() != QThread::currentThread()) {
         // Safe cross-thread invocation via Qt MetaObject System
@@ -89,12 +103,15 @@ void PiperStreamer::speak(const QString &text) {
 }
 
 // 2. Add the actual execution slot that interacts with the QProcess socket
-void PiperStreamer::requestSpeech(const QString &text) {
+void VoiceStreamer::requestSpeech(const QString &text) {
+#if defined(USE_SYSTEM_VOICE)
+#else
     if (m_piperProcess->state() != QProcess::Running) {
         qWarning() << "❌ Speech Aborted: Engine background thread is unresponsive.";
         return;
     }
 
+#endif
     QString cleanText = text.trimmed();
     if (!cleanText.isEmpty()) {
         if (m_audioOutput->state() == QAudio::IdleState) {
@@ -103,23 +120,42 @@ void PiperStreamer::requestSpeech(const QString &text) {
             m_audioBufferDevice.seek(0);
             m_audioOutput->start(&m_audioBufferDevice);
         }
+#if defined(USE_SYSTEM_VOICE)
+        // Speak asynchronously into the memory stream
+        // 1 = SPF_ASYNC flag
+        m_voice->dynamicCall("Speak(QString, uint)", text, 1);
+        m_voice->dynamicCall("WaitUntilDone(int)", -1); // Wait indefinitely until complete
 
+        // Pull raw data out of the stream buffer
+        QVariant streamData = m_stream->dynamicCall("GetData()");
+
+        m_pcmChunk = streamData.toByteArray();
+        startSpeech();
+#else
         qDebug() << "🗣️ Thread-Safe write to Piper process socket:" << cleanText;
         m_piperProcess->write((cleanText + "\n").toUtf8());
+#endif
     }
 }
-void PiperStreamer::handleReadyRead() {
-    QByteArray pcmChunk = m_piperProcess->readAllStandardOutput();
-    if (pcmChunk.isEmpty()) return;
+void VoiceStreamer::handleReadyRead() {
+#if defined(USE_SYSTEM_VOICE)
 
-    qDebug() << "🎵 Appending bytes to Qt5 Buffer Array. Volume Size:" << pcmChunk.size();
+#else
+    m_pcmChunk = m_piperProcess->readAllStandardOutput();
+    if (pcmChunk.isEmpty()) return;
+#endif
+    startSpeech();
+}
+
+void VoiceStreamer::startSpeech() {
+    qDebug() << "🎵 Appending bytes to Qt5 Buffer Array. Volume Size:" << m_pcmChunk.size();
 
     // Preserve the hardware's active playback coordinate position
     qint64 currentPlayPos = m_audioBufferDevice.pos();
 
     // Seek to the tail of the data vector, append, and restore play head pointer
     m_audioBufferDevice.seek(m_rawAudioData.size());
-    m_audioBufferDevice.write(pcmChunk);
+    m_audioBufferDevice.write(m_pcmChunk);
     m_audioBufferDevice.seek(currentPlayPos);
 
     // If Qt5 sound went idle due to buffer starving under slow CPU load, force wake up channel paths
@@ -130,11 +166,11 @@ void PiperStreamer::handleReadyRead() {
     }
 }
 
-void PiperStreamer::handleAudioStateChanged(QAudio::State newState) {
+void VoiceStreamer::handleAudioStateChanged(QAudio::State newState) {
     // Tracking this allows you to debug internal channel disruptions easily
     qDebug() << "🎛️ Audio Hardware Engine State change notification:" << newState;
 }
 
-void PiperStreamer::handleProcessError(QProcess::ProcessError error) {
+void VoiceStreamer::handleProcessError(QProcess::ProcessError error) {
     qCritical() << "❌ Backend process execution fault thrown:" << error;
 }

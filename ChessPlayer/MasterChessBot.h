@@ -4,12 +4,7 @@
 #include <QObject>
 #include <ChessBot.h>
 #include <assistant/AssistantController.h>
-#define USE_SYSTEM_VOICE
-#if defined(USE_SYSTEM_VOICE)
-#include <QTextToSpeech>
-#else
-#include "voice/PiperStreamer.h"
-#endif
+#include "voice/VoiceStreamer.h"
 
 class MasterChessBot : public QObject
 {
@@ -29,7 +24,7 @@ public:
     Q_INVOKABLE void initRobotCommunication();
     Q_INVOKABLE void processNextMove();
     Q_INVOKABLE void undoMove();
-    Q_INVOKABLE void setEngineElo(int score);
+    Q_INVOKABLE void setEngineElo(QString level, int score);
     Q_INVOKABLE void setPlayerColor(int color);
     Q_INVOKABLE void resetGame();
     Q_INVOKABLE void playInputMove(int startIndex, int stopIndex, int promotePiece = -1);
@@ -38,6 +33,9 @@ public:
     Q_INVOKABLE void stopService();
     Q_INVOKABLE void sendTestCommand(QString command);
     Q_INVOKABLE int playerColor();
+    Q_INVOKABLE QString getCalibrationJson() const;
+    Q_INVOKABLE QVariantList chessboardCorners() const;
+    Q_INVOKABLE void stopGame(QString comment);
 
 public Q_SLOTS:
     void handleNewComment(const QString &text);
@@ -54,11 +52,7 @@ Q_SIGNALS:
 private:
     ChessBot* m_workerChessbot;
     AssistantController* m_workerAssistant;
-#if defined(USE_SYSTEM_VOICE)
-    QTextToSpeech *m_speech;
-#else
-    PiperStreamer *m_speech;
-#endif
+    VoiceStreamer *m_speech;
 };
 
 #endif // MASTERCHESSBOT_H
