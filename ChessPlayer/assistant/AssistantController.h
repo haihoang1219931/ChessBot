@@ -3,64 +3,12 @@
 #include <QObject>
 #include <QString>
 #include <QThread>
-#include <QAudioInput>
-#include <QIODevice>
-#include <QByteArray>
 #include <QVector>
 #include <vector>
 #include <string>
 
-#include "llama.h"
-#include "whisper.h"
-
-// Private data structure for message history
-struct ChatMessage {
-    std::string role;
-    std::string content;
-};
-
-// ============================================================================
-// 1. BACKGROUND AUDIO & MODEL WORKER
-// ============================================================================
-class PrivateAudioModelWorker : public QObject {
-    Q_OBJECT
-public:
-    PrivateAudioModelWorker() = default;
-    ~PrivateAudioModelWorker();
-
-public slots:
-    void initService();
-    void handleManualPrompt(const QString &prompt);
-
-private slots:
-    void processIncomingAudio();
-
-signals:
-    void isListeningChanged(bool listening);
-    void isThinkingChanged(bool thinking);
-    void tokenGenerated(const QString &text);
-    void generationFinished(const QString &finalText);
-
-private:
-    void initializeLlama();
-    void initializeWhisper();
-    void initializeAudio();
-    void handleSpeechFinished();
-    void runLlamaInference(const QString &prompt);
-
-    QAudioInput* m_audioInput = nullptr;
-    QIODevice* m_audioIOStream = nullptr;
-    QByteArray m_accumulatedPcmData;
-    bool m_isSpeaking = false;
-    int m_consecutiveSilenceSamples = 0;
-
-    llama_model* m_model = nullptr;
-    llama_context* m_ctx = nullptr;
-    struct whisper_context* m_whisperCtx = nullptr;
-    whisper_full_params m_whisperParams;
-    std::vector<ChatMessage> m_conversationHistory;
-    int m_pastTokensCount = 0;
-};
+#include "LLMWorker.h"
+#include "AudioModelWorker.h"
 
 // ============================================================================
 // 2. MAIN FRONT-FACING QML CONTROLLER
@@ -90,8 +38,10 @@ Q_SIGNALS:
     void generationFinished(const QString &finalText);
 
 private:
-    PrivateAudioModelWorker* d_worker = nullptr;
-    QThread* m_workerThread = nullptr;
+    AudioModelWorker* m_audioWorker = nullptr;
+    QThread* m_audioThread = nullptr;
+    LLMWorker* m_llmWorker;
+    QThread* m_llmThread= nullptr;
 
     bool m_isListening = false;
     bool m_isThinking = false;

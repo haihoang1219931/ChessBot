@@ -1,5 +1,5 @@
 TEMPLATE = app
-QT += core gui qml quick texttospeech concurrent multimedia
+QT += core gui qml quick axcontainer multimedia
 CONFIG += c++11 console
 
 TARGET = ChessVoiceAssistant
@@ -62,10 +62,21 @@ win32 {
 
 # 5. Application Files
 HEADERS += \
-    assistant/AssistantWorker.h
+    assistant/AssistantController.h \
+    assistant/AudioModelWorker.h \
+    assistant/LLMWorker.h
+#    voice/VoiceStreamer.h \
+#    assistant/PipelineController.h \
+#    assistant/StreamingAudioWorker.h
+
 
 SOURCES += \
     main_Assistant.cpp \
-    assistant\AssistantController.cpp
+    assistant/AssistantController.cpp \
+#    voice/VoiceStreamer.cpp \
+#    assistant/PipelineController.cpp \
+#    assistant/StreamingAudioWorker.cpp \
+    assistant/AudioModelWorker.cpp \
+    assistant/LLMWorker.cpp
 
 RESOURCES += qml_Assistant.qrc

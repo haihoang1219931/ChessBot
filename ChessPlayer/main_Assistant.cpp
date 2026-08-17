@@ -2,6 +2,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include "assistant/AssistantController.h"
+#include "voice/VoiceStreamer.h"
 
 int main(int argc, char *argv[])
 {
