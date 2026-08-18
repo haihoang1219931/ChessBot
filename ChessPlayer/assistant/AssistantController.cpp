@@ -18,9 +18,15 @@ AssistantController::AssistantController(QObject *parent) : QObject(parent) {
         m_llmWorker->handleSpeech(pcmData);
     });
 
+    connect(m_llmWorker, &LLMWorker::tokenGenerated, this, [this](QString text) {
+        m_responseText = text;
+        Q_EMIT responseTextChanged(m_responseText);
+    });
     connect(m_llmWorker, &LLMWorker::generationFinished, this, [this](QString text) {
         qDebug("AssistantController handleResponse");
         m_responseText = text;
+        m_isThinking = false;
+        Q_EMIT isThinkingChanged();
         Q_EMIT responseTextChanged(m_responseText);
     });
 
@@ -47,6 +53,7 @@ void AssistantController::stopService() {
         m_audioThread->quit();
         m_audioThread->wait();
     }
+    m_llmWorker->stop();
     if (m_llmThread && m_llmThread->isRunning()) {
         m_llmThread->quit();
         m_llmThread->wait();
@@ -55,12 +62,8 @@ void AssistantController::stopService() {
 
 void AssistantController::generateResponse(const QString &prompt) {
     if (m_isThinking || prompt.isEmpty()) return;
-
     m_isThinking = true;
     Q_EMIT isThinkingChanged();
-
-    QMetaObject::invokeMethod(m_audioWorker, [this, prompt]() {
-        m_audioWorker->handleManualPrompt(prompt);
-    }, Qt::QueuedConnection);
+    m_llmWorker->handlePrompt(prompt);
 }
 

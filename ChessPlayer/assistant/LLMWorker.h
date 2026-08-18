@@ -17,13 +17,16 @@ struct ChatMessage {
 
 enum LLM_STATE {
     LLM_INIT,
+    LLM_WAITING,
     LLM_TRANSCRIBE,
     LLM_PROCESSING,
     LLM_PROCESSING_DONE,
+    LLM_PROCESSING_EXIT,
 };
 
 enum LLM_RESULT {
     LLM_PENDING,
+    LLM_DONE_INTERRUPT,
     LLM_DONE_SUCCESS,
     LLM_DONE_FAILED,
 };
@@ -34,8 +37,10 @@ class LLMWorker : public QObject {
 public:
     explicit LLMWorker(QObject *parent = nullptr);
     ~LLMWorker();
+    void stop();
     void togglePause(bool paused);
-
+    int handlePrompt(const QString& prompt);
+    void requestInterruption() ;
 public Q_SLOTS:
     void doWork();
     void handleSpeech(const QByteArray& pcmData);
@@ -61,8 +66,9 @@ private:
     QByteArray m_pcmData;
     QString m_prompt;
     int m_pastTokensCount = 0;
-
+    QAtomicInt m_interrupted; // Thread-safe atomic flag
     int m_state;
+    int m_nextState;
 };
 
 #endif // LLMWORKER_H
