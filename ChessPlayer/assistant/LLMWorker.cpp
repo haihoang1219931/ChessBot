@@ -64,8 +64,8 @@ void LLMWorker::doWork() {
     m_state = LLM_INIT;
     m_nextState = LLM_INIT;
     while(!m_stopped){
-        qDebug("LLMWorker doWork m_state[%d] m_nextState[%d]",
-               m_state,m_nextState);
+//        qDebug("LLMWorker doWork m_state[%d] m_nextState[%d]",
+//               m_state,m_nextState);
         // Check for Stop
         m_mutex->lock();
         if(m_pause)
@@ -96,7 +96,7 @@ void LLMWorker::doWork() {
             int llamaResult = runLlamaInference();
             if(llamaResult == LLM_DONE_SUCCESS) {
                 m_state = LLM_WAITING;
-            } else if(llamaResult) {
+            } else if(llamaResult == LLM_DONE_FAILED) {
                 m_state = LLM_WAITING;
             }
         }

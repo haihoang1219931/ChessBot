@@ -51,9 +51,9 @@ ApplicationWindow {
                 anchors.fill: parent
                 clip: true
 
-                TextArea {
+                TextField {
+                    id: txtAssistant
                     text: assistant.responseText
-                    textFormat: Text.PlainText
                     wrapMode: Text.Wrap
                     color: "#ffffff"
                     font.pointSize: 13
@@ -140,6 +140,15 @@ ApplicationWindow {
                 background: Rectangle {
                     color: !actionButton.enabled ? "#444444" : (actionButton.down ? "#1976D2" : "#2196F3")
                     radius: 6
+                }
+            }
+            Button {
+                id: testButton
+                text: "Test Voice"
+                Layout.fillWidth: true
+                Layout.preferredHeight: 45
+                onClicked: {
+                    assistant.testVoice(txtAssistant.text);
                 }
             }
         }

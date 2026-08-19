@@ -7,6 +7,7 @@
 #include <vector>
 #include <string>
 
+#include "AudioOutputWorker.h"
 #include "LLMWorker.h"
 #include "AudioModelWorker.h"
 
@@ -26,6 +27,7 @@ public:
     Q_INVOKABLE void startService();
     Q_INVOKABLE void stopService();
     Q_INVOKABLE void generateResponse(const QString &prompt);
+    Q_INVOKABLE void testVoice(QString text);
 
     bool isListening() const { return m_isListening; }
     QString responseText() const { return m_responseText; }
@@ -42,6 +44,8 @@ private:
     QThread* m_audioThread = nullptr;
     LLMWorker* m_llmWorker;
     QThread* m_llmThread= nullptr;
+    AudioOutputWorker* m_voiceWorker;
+    QThread* m_voiceThread= nullptr;
 
     bool m_isListening = false;
     bool m_isThinking = false;

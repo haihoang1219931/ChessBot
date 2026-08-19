@@ -1,5 +1,5 @@
 TEMPLATE = app
-QT += core gui qml quick axcontainer multimedia
+QT += core gui qml quick axcontainer texttospeech multimedia
 CONFIG += c++11 console
 
 TARGET = ChessVoiceAssistant
@@ -45,7 +45,8 @@ INCLUDEPATH += $$WHISPER_DIR/include \
 
 # Add the core execution files so Qt compiles them natively from source code
 SOURCES += \
-    $$WHISPER_DIR/src/whisper.cpp
+    $$WHISPER_DIR/src/whisper.cpp \
+    assistant/AudioOutputWorker.cpp
 
 win32 {
     # Add WHISPER_VERSION to your existing DEFINES block
@@ -64,7 +65,9 @@ win32 {
 HEADERS += \
     assistant/AssistantController.h \
     assistant/AudioModelWorker.h \
-    assistant/LLMWorker.h
+    assistant/AudioOutputWorker.h \
+    assistant/LLMWorker.h \
+    assistant/TTSEngines.h
 #    voice/VoiceStreamer.h \
 #    assistant/PipelineController.h \
 #    assistant/StreamingAudioWorker.h
