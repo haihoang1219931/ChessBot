@@ -21,16 +21,16 @@ AssistantController::AssistantController(QObject *parent) : QObject(parent) {
     });
     connect(m_audioWorker, &AudioModelWorker::speechFinished, this, [this](const QByteArray& pcmData) {
         qDebug("AssistantController handleSpeech");
-//        m_llmWorker->handleSpeech(pcmData);
+        m_llmWorker->handleSpeech(pcmData);
     });
 
     connect(m_llmWorker, &LLMWorker::tokenGenerated, this, [this](QString text) {
         m_responseText += text;
-        Q_EMIT responseTextChanged(m_responseText);
         m_voiceWorker->handleToken(text);
+        Q_EMIT responseTextChanged(m_responseText);
     });
     connect(m_llmWorker, &LLMWorker::generationFinished, this, [this](QString text) {
-        qDebug("AssistantController handleResponse");
+        qDebug("AssistantController handle llmFinish");
         m_responseText = text;
         m_isThinking = false;
         Q_EMIT isThinkingChanged();
@@ -38,31 +38,35 @@ AssistantController::AssistantController(QObject *parent) : QObject(parent) {
         m_responseText = "";
     });
 
+    connect(m_voiceWorker, &AudioOutputWorker::voiceStarted, this, [this]() {
+        qDebug("AssistantController pause listening");
+        m_audioWorker->togglePause(true);
+    });
+
+    connect(m_voiceWorker, &AudioOutputWorker::voiceFinished, this, [this]() {
+        qDebug("AssistantController return listening");
+        m_audioWorker->togglePause(false);
+    });
+
     connect(m_llmThread, &QThread::started, m_llmWorker, &LLMWorker::doWork);
-    connect(m_audioThread, &QThread::finished, m_audioWorker, &QObject::deleteLater);
     connect(m_voiceThread, &QThread::started, m_voiceWorker, &AudioOutputWorker::doWork);
+
+    connect(m_audioThread, &QThread::finished, m_audioWorker, &QObject::deleteLater);
 }
 
 AssistantController::~AssistantController() {
     stopService();
 }
 
-void AssistantController::testVoice(QString text) {
-    m_voiceWorker->clearQueue();
-    QStringList tokens = text.split(" ");
-    for(QString tmpToken: tokens)
-    m_voiceWorker->handleToken(tmpToken+" ");
-}
-
 void AssistantController::startService() {
-    if (!m_audioThread->isRunning()) {
-        m_audioThread->start();
+    if (!m_voiceThread->isRunning()) {
+        m_voiceThread->start();
     }
     if (!m_llmThread->isRunning()) {
         m_llmThread->start();
     }
-    if (!m_voiceThread->isRunning()) {
-        m_voiceThread->start();
+    if (!m_audioThread->isRunning()) {
+        m_audioThread->start();
     }
 }
 
@@ -81,6 +85,24 @@ void AssistantController::stopService() {
         m_voiceThread->quit();
         m_voiceThread->wait();
     }
+}
+
+void AssistantController::singleVoice(QString text) {
+    qDebug("AssistantController singleVoice [%s]",text.toStdString().c_str());
+    m_audioWorker->togglePause(true);
+    m_voiceWorker->clearQueue();
+    QStringList tokens = text.split(" ");
+    for(QString tmpToken: tokens)
+        m_voiceWorker->handleToken(tmpToken+" ");
+    m_voiceWorker->handleToken(".");
+}
+
+void AssistantController::analyzeChessMove(QString fen, QString playColor, QString move) {
+    m_audioWorker->togglePause(true);
+    if (m_isThinking || fen.isEmpty() || playColor.isEmpty() || move.isEmpty()) return;
+    m_isThinking = true;
+    Q_EMIT isThinkingChanged();
+    m_llmWorker->analyzeChessMove(fen,playColor,move);
 }
 
 void AssistantController::generateResponse(const QString &prompt) {

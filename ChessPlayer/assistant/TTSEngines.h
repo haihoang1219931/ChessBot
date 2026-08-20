@@ -6,36 +6,41 @@
 #include <QList>
 #include <QTextToSpeech>
 #include <QEventLoop>
+#include <QTimer>
 #include <QDebug>
+#include <QThread>
 
 // Strategy B: High-Performance Local Piper TTS Engine
 class PiperTTSEngine: public QObject {
 private:
     QTextToSpeech *m_tts;
 public:
-    PiperTTSEngine(QObject *parent = nullptr) { m_tts = new QTextToSpeech(this); }
+    PiperTTSEngine(QObject *parent = nullptr) {
+        m_tts = new QTextToSpeech(this); }
     ~PiperTTSEngine() { /* Release Piper resources */ }
 
     bool isPCMGenerator()  { return false; } // Piper returns raw audio byte frames
 
     void speakDirect(const QString &text)  {
         if (text.isEmpty()) return;
+        int sleepTime = text.split(" ").size();
+        qDebug("PiperTTSEngine speakDirect m_tts sleep[%d] state[%d] [%s]",
+               sleepTime,
+               m_tts->state(),
+               text.toStdString().c_str());
 
-        // 1. Trigger the speech engine asynchronously
         m_tts->say(text);
-
-        // 2. Create a local event loop on the stack
-        QEventLoop loop;
-
-        // 3. Connect the state change signal to exit the loop when Ready
-        QObject::connect(m_tts, &QTextToSpeech::stateChanged, [&loop](QTextToSpeech::State state) {
-            if (state == QTextToSpeech::Ready) {
-                loop.quit(); // Exit the local loop safely
-            }
-        });
-
-        // 4. Block here until loop.quit() is called
-        loop.exec();
+        int countTime = 0;
+        int lastState = m_tts->state();
+        while(countTime < sleepTime) {
+            int state = m_tts->state();
+            if(lastState == QTextToSpeech::Speaking &&
+                   state == QTextToSpeech::Ready) break;
+            lastState = state;
+            QThread::msleep(500);
+            countTime++;
+        }
+        qDebug("PiperTTSEngine speakDirect done");
     }
 
     QList<QByteArray> generatePCM(const QString &text) {

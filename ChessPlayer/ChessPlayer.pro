@@ -1,16 +1,15 @@
 TEMPLATE = app
 CONFIG += c++11 console
 
-QT += core gui qml quick serialport texttospeech multimedia
+QT += core gui qml quick serialport multimedia
 
 CONFIG += use_chess_algo
-CONFIG += use_ai_voice
 CONFIG += use_ai_assistant
 CONFIG += use_image_processing
 CONFIG += use_system_voice
 #CONFIG += use_sanitize
 use_system_voice {
-    QT += axcontainer
+    QT += texttospeech
 }
 use_sanitize {
 QMAKE_CXXFLAGS += -fsanitize=address -fno-omit-frame-pointer
@@ -100,14 +99,6 @@ HEADERS += \
     chessAlgo/Utils.hpp
 }
 
-use_ai_voice {
-SOURCES += \
-    voice/VoiceStreamer.cpp
-
-HEADERS += \
-    voice/VoiceStreamer.h
-}
-
 use_ai_assistant {
     win32 {
         # 1. Update these paths to match where your repositories live on your disk
@@ -161,10 +152,17 @@ SOURCES += \
     $$WHISPER_DIR/src/whisper.cpp
 
 SOURCES += \
-    assistant/AssistantController.cpp
+    assistant/AssistantController.cpp \
+    assistant/AudioModelWorker.cpp \
+    assistant/AudioOutputWorker.cpp \
+    assistant/LLMWorker.cpp
 
 HEADERS += \
-    assistant/AssistantController.h
+    assistant/AssistantController.h \
+    assistant/AudioModelWorker.h \
+    assistant/AudioOutputWorker.h \
+    assistant/LLMWorker.h \
+    assistant/TTSEngines.h
 }
 
 SOURCES += \

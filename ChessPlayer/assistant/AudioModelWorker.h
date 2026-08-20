@@ -16,6 +16,7 @@ public:
 public Q_SLOTS:
     void initService();
     void handleManualPrompt(const QString &prompt);
+    void togglePause(bool pause);
 
 private Q_SLOTS:
     void processIncomingAudio();
@@ -29,7 +30,6 @@ Q_SIGNALS:
 
 private:
     void initializeAudio();
-
     QAudioInput* m_audioInput = nullptr;
     QIODevice* m_audioIOStream = nullptr;
     QByteArray m_accumulatedPcmData;

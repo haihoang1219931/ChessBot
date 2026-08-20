@@ -27,7 +27,10 @@ public:
     Q_INVOKABLE void startService();
     Q_INVOKABLE void stopService();
     Q_INVOKABLE void generateResponse(const QString &prompt);
-    Q_INVOKABLE void testVoice(QString text);
+
+public Q_SLOTS:
+    Q_INVOKABLE void singleVoice(QString text);
+    Q_INVOKABLE void analyzeChessMove(QString fen, QString playColor, QString move);
 
     bool isListening() const { return m_isListening; }
     QString responseText() const { return m_responseText; }
@@ -42,10 +45,10 @@ Q_SIGNALS:
 private:
     AudioModelWorker* m_audioWorker = nullptr;
     QThread* m_audioThread = nullptr;
-    LLMWorker* m_llmWorker;
-    QThread* m_llmThread= nullptr;
-    AudioOutputWorker* m_voiceWorker;
-    QThread* m_voiceThread= nullptr;
+    LLMWorker* m_llmWorker = nullptr;
+    QThread* m_llmThread = nullptr;
+    AudioOutputWorker* m_voiceWorker = nullptr;;
+    QThread* m_voiceThread = nullptr;
 
     bool m_isListening = false;
     bool m_isThinking = false;

@@ -1,6 +1,6 @@
 #include <QDebug>
 #include "LLMWorker.h"
-
+// Model: https://huggingface.co/msj121/chessgpt-base-v1-Q4_K_M-GGUF/blob/main/chessgpt-base-v1-q4_k_m.gguf
 LLMWorker::LLMWorker(QObject *parent)
     : QObject(parent)
 {
@@ -18,9 +18,20 @@ LLMWorker::~LLMWorker() {
     if (m_whisperCtx) whisper_free(m_whisperCtx);
 }
 
+void dummy_llama_log_callback(ggml_log_level level, const char * text, void * user_data) {
+    (void)level;     // Unused
+    (void)text;      // Unused
+    (void)user_data; // Unused
+}
+void dummy_whisper_log_callback(ggml_log_level level, const char * text, void * user_data) {
+    (void)level;
+    (void)text;
+    (void)user_data;
+}
 void LLMWorker::initializeLlama() {
+    llama_log_set(dummy_llama_log_callback, nullptr);
     llama_backend_init();
-    m_model = llama_load_model_from_file(".\\qwen2.5-1.5b-instruct-q4_k_m.gguf", llama_model_default_params());
+    m_model = llama_load_model_from_file(".\\chessgpt-base-v1-q4_k_m.gguf", llama_model_default_params());
     if (!m_model) { qWarning() << "Failed to find Llama GGUF model path."; return; }
 
     llama_context_params ctx_params = llama_context_default_params();
@@ -30,6 +41,7 @@ void LLMWorker::initializeLlama() {
 }
 
 void LLMWorker::initializeWhisper() {
+    whisper_log_set(dummy_whisper_log_callback, nullptr);
     m_whisperCtx = whisper_init_from_file("ggml-base.en.bin");
     if (!m_whisperCtx) { qWarning() << "Failed to find Whisper BIN model path."; return; }
     m_whisperParams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
@@ -64,8 +76,6 @@ void LLMWorker::doWork() {
     m_state = LLM_INIT;
     m_nextState = LLM_INIT;
     while(!m_stopped){
-//        qDebug("LLMWorker doWork m_state[%d] m_nextState[%d]",
-//               m_state,m_nextState);
         // Check for Stop
         m_mutex->lock();
         if(m_pause)
@@ -128,12 +138,72 @@ void LLMWorker::handleSpeech(const QByteArray& pcmData) {
     }
 }
 
+QString LLMWorker::generatePromptChat(const QString& userPrompt) {
+    // 1. CHAT HISTORY MANAGEMENT
+    // Push the new user turn into your structural tracking history vector
+    m_conversationHistory.push_back({"user", userPrompt});
+
+    // Safety Sliding Door: Limit history to the last 8 turns so the 0.5B model doesn't drop in intelligence
+    while (m_conversationHistory.size() > 3) {
+        m_conversationHistory.erase(m_conversationHistory.begin());
+    }
+    // 2. FULL GENERAL-PURPOSE PROMPT CONSTRUCTION
+    QString systemContent =
+        "You are Pikachu, a futuristic AI assistant, created by Mr Hai."
+        "Adhere strictly to these rules:\n"
+        "- If you do not know the answer to a question, say 'I don't know' instead of making up facts.\n"
+        "- Keep your responses brief, concise, and focused on the core answer.\n"
+        "- Do not repeat yourself or loop the same sentence structural phrases."
+            ;
+
+    // Anchor the system instructions at the top of the context block
+    QString fullPrompt = "<|im_start|>system\n" + systemContent + "<|im_end|>\n";
+
+    // Append previous back-and-forth conversational steps sequentially
+    for (const auto& msg : m_conversationHistory) {
+        fullPrompt += "<|im_start|>" + msg.role + "\n" + msg.content + "<|im_end|>\n";
+    }
+
+    // Open the final structural lane for Qwen to generate text
+    fullPrompt += "<|im_start|>assistant\n";
+    return fullPrompt;
+}
+
+QString LLMWorker::generatePromptChess(QString fen, QString playColor, QString move) {
+    QString fullPrompt = "<|im_start|>system\n"
+         "You are an expert chess grandmaster. Analyze the given move based on the FEN board state. "
+         "Explain the strategic intent, tactical implications, and whether it is a standard book move.\n"
+         "<|im_end|>\n"
+         "<|im_start|>user\n"
+         "FEN State: " + fen + "\n"
+         "Color: " + playColor + "\n"
+         "Move played: " + move + "\n"
+         "Provide one sentence, maximum 10 words analysis on this move.<|im_end|>\n"
+         "<|im_start|>assistant\n";
+    return fullPrompt;
+}
+
 int LLMWorker::handlePrompt(const QString& prompt) {
     qDebug("LLMWorker handlePrompt");
 //    requestInterruption();
     togglePause(true);
     m_mutex->lock();
-    m_prompt = prompt;
+    m_userPrompt = prompt;
+    m_fullPrompt = generatePromptChat(prompt);
+    m_nextState = LLM_PROCESSING;
+    if(m_state == LLM_WAITING) m_state = m_nextState;
+    m_mutex->unlock();
+    togglePause(false);
+    return 0;
+}
+
+int LLMWorker::analyzeChessMove(QString fen, QString playColor, QString move) {
+    qDebug("LLMWorker analyzeChessMove");
+//    requestInterruption();
+    togglePause(true);
+    m_mutex->lock();
+    m_userPrompt =
+    m_fullPrompt = generatePromptChess(fen, playColor, move);
     m_nextState = LLM_PROCESSING;
     if(m_state == LLM_WAITING) m_state = m_nextState;
     m_mutex->unlock();
@@ -169,9 +239,10 @@ int LLMWorker::transcribeAudio() {
         QString parsedPrompt = QString::fromStdString(textResult).trimmed();
         qDebug() << "Whisper Transcribed:" << parsedPrompt;
         if (!parsedPrompt.isEmpty() && parsedPrompt.length() >=1 &&
-                !parsedPrompt.contains("[BLANK_AUDIO]") &&
+                !parsedPrompt.contains("[") &&
+                !parsedPrompt.contains("]") &&
                 !parsedPrompt.contains("*")) {
-            m_prompt = parsedPrompt;
+            m_userPrompt = parsedPrompt;
             nextState = LLM_DONE_SUCCESS;
         } else {
             nextState = LLM_DONE_FAILED;
@@ -185,40 +256,8 @@ int LLMWorker::transcribeAudio() {
 int LLMWorker::runLlamaInference() {
     int nextState = LLM_PENDING;
     Q_EMIT tokenGenerated("");
-
-    // --- Modern Stream Token Loop ---
-    QString simulatedOutput = "Answer to: " + m_prompt + "\nThis unified file approach runs beautifully.";
-    QStringList chunks = simulatedOutput.split(" ");
-    QString currentResponse = "";
-
-    // 1. CHAT HISTORY MANAGEMENT
-    // Push the new user turn into your structural tracking history vector
-    m_conversationHistory.push_back({"user", m_prompt.toStdString()});
-
-    // Safety Sliding Door: Limit history to the last 8 turns so the 0.5B model doesn't drop in intelligence
-    while (m_conversationHistory.size() > 8) {
-        m_conversationHistory.erase(m_conversationHistory.begin());
-    }
-
-    // 2. FULL GENERAL-PURPOSE PROMPT CONSTRUCTION
-    std::string system_content =
-        "You are Pikachu, a futuristic AI assistant, created by Mr Hai."
-        "Adhere strictly to these rules:\n"
-        "- If you do not know the answer to a question, say 'I don't know' instead of making up facts.\n"
-        "- Keep your responses brief, concise, and focused on the core answer.\n"
-        "- Do not repeat yourself or loop the same sentence structural phrases."
-            ;
-
-    // Anchor the system instructions at the top of the context block
-    std::string full_prompt = "<|im_start|>system\n" + system_content + "<|im_end|>\n";
-
-    // Append previous back-and-forth conversational steps sequentially
-    for (const auto& msg : m_conversationHistory) {
-        full_prompt += "<|im_start|>" + msg.role + "\n" + msg.content + "<|im_end|>\n";
-    }
-
-    // Open the final structural lane for Qwen to generate text
-    full_prompt += "<|im_start|>assistant\n";
+    m_fullPrompt = generatePromptChat(m_userPrompt);
+    if(m_userPrompt.isEmpty() || m_fullPrompt.isEmpty()) return LLM_DONE_FAILED;
 
     // 3. Get Vocabulary Pointer
     const struct llama_vocab* vocab = llama_model_get_vocab(m_model);
@@ -229,8 +268,9 @@ int LLMWorker::runLlamaInference() {
 
     // 4. Tokenize the entire consolidated clean prompt window
     std::vector<llama_token> tokens;
-    tokens.resize(full_prompt.size() + 4);
-    int n_tokens = llama_tokenize(vocab, full_prompt.c_str(), full_prompt.size(),
+    tokens.resize(m_fullPrompt.size() + 4);
+    int n_tokens = llama_tokenize(vocab, m_fullPrompt.toStdString().c_str(),
+                                  m_fullPrompt.size(),
                                   tokens.data(), tokens.size(), true, true);
     tokens.resize(n_tokens);
 
@@ -282,21 +322,18 @@ int LLMWorker::runLlamaInference() {
     // Using a non-zero integer or a timestamp (like time(NULL)) ensures natural phrasing distribution.
     llama_sampler_chain_add(smpl, llama_sampler_init_dist(1234));
 
-    std::string final_output = "";
-    int max_new_tokens = 150;
+    QString final_output = "";
+    int max_new_tokens = 30;
     nextState = LLM_DONE_SUCCESS;
     // 7. Generation Loop (Token by Token generation)
     for (int i = 0; i < max_new_tokens; i++) {
         if (m_interrupted.loadAcquire() == 1) {
             final_output += "... [Interrupted by User]";
-            emit tokenGenerated("... [Interrupted]");
-            printf("Interrupted by user\r\n");
+            Q_EMIT tokenGenerated("... [Interrupted]");
             nextState = LLM_DONE_INTERRUPT;
             m_interrupted.storeRelease(0);
             break; // Break the execution loop instantly
         }
-//        printf("lm.");
-//        QThread::msleep(1000);
         llama_token curr_token = llama_sampler_sample(smpl, m_ctx, -1);
 
         // Break instantly if model hits an end-of-generation structural barrier
@@ -321,10 +358,11 @@ int LLMWorker::runLlamaInference() {
                 break;
             }
 
-            final_output += piece;
+            final_output += QString::fromStdString(piece);
+#ifdef DEBUG_LLM
             qDebug() << "Response[" <<i << "]: "<< QString::fromStdString(piece);
-
-            Q_EMIT tokenGenerated(QString::fromStdString(final_output));
+#endif
+            Q_EMIT tokenGenerated(QString::fromStdString(piece));
         }
 
         // SAFE GENERATION COUNTER ALIGNMENT
@@ -345,11 +383,10 @@ int LLMWorker::runLlamaInference() {
 
     // 8. Push the completed assistant response into the conversation vector map history
     m_conversationHistory.push_back({"assistant", final_output});
-    currentResponse = QString::fromStdString(final_output);
     // Clean up memory structures natively
     llama_sampler_free(smpl);
     llama_batch_free(batch);
 
-    Q_EMIT generationFinished(currentResponse);
+    Q_EMIT generationFinished(final_output);
     return nextState;
 }

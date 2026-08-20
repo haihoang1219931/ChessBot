@@ -1,7 +1,7 @@
 #include "AudioOutputWorker.h"
 #include <QDebug>
 #include <QThread>
-
+#define DEBUG_AUDIO_OUTPUT
 // Sure! Pokémon are characters from the world of video games and anime. They're a type of fictional creatures with different abilities, powers or types that can be traded between players in various online adventures known as POKeMON games and the anime. They are designed to appeal both children and adults, focusing on fun gameplay mechanics while also incorporating elements of art design that have become iconic over time. I hope this helps! Let me know if you need more information.
 AudioOutputWorker::AudioOutputWorker(QObject *parent)
     : QObject(parent), m_stopped(false), m_audioOutput(nullptr), m_audioDevice(nullptr)
@@ -38,7 +38,7 @@ AudioOutputWorker::AudioOutputWorker(QObject *parent)
 AudioOutputWorker::~AudioOutputWorker()
 {
     stopWorker();
-    delete m_currentEngine;
+    m_currentEngine->deleteLater();
 }
 
 void AudioOutputWorker::stop() {
@@ -102,12 +102,15 @@ void AudioOutputWorker::handleToken(const QString &token)
 {
     if (token.isEmpty()) return;
     m_sentenceBuffer.append(token);
+
     // Clause boundary checks for clean phrasing pipeline mechanics
     if (m_sentenceBuffer.contains('.') || m_sentenceBuffer.contains(',') ||
         m_sentenceBuffer.contains('?') || m_sentenceBuffer.contains('!') ||
         m_sentenceBuffer.contains('\n')) {
-        qDebug("AudioOutputWorker::handleToken m_sentenceBuffer %s",
+#ifdef DEBUG_AUDIO_OUTPUT
+        qDebug("AudioOutputWorker::handleToken voice[%s]",
                m_sentenceBuffer.toStdString().c_str());
+#endif
         m_mutex->lock();
         m_textQueue.enqueue(m_sentenceBuffer);
         m_sentenceBuffer = "";
@@ -116,24 +119,18 @@ void AudioOutputWorker::handleToken(const QString &token)
         m_mutex->unlock();
         togglePause(false);
     }
-//    m_mutex->lock();
-//    m_textQueue.enqueue("1 ");
-//    m_textQueue.enqueue("2 ");
-//    m_textQueue.enqueue("3 ");
-//    m_nextState = AUDIOOUTPUT_PROCESSING;
-//    m_state = m_nextState;
-//    m_mutex->unlock();
-//    togglePause(false);
 }
 
 void AudioOutputWorker::doWork() {
     qDebug("AudioOutputWorker Dowork");
     m_stopped = false; // Reset flags
-    m_state = AUDIOOUTPUT_INIT;
-    m_nextState = AUDIOOUTPUT_INIT;
+    m_sentenceBuffer = "Greetings, my friend. Let us play a match.";
+    m_textQueue.enqueue(m_sentenceBuffer);
+    m_sentenceBuffer = "";
+    m_nextState = AUDIOOUTPUT_PROCESSING;
+    m_state = m_nextState;
+    QThread::sleep(5);
     while(!m_stopped){
-//        qDebug("AudioOutputWorker doWork m_state[%d] m_nextState[%d]",
-//               m_state,m_nextState);
         // Check for Stop
         m_mutex->lock();
         if(m_pause)
@@ -173,13 +170,21 @@ int AudioOutputWorker::processAudioLoop()
     QString textToSpeak;
     int nextState = AUDIOOUTPUT_PENDING;
     if(m_textQueue.size() == 0) {
-        QThread::msleep(8);
+        if(!m_emitVoiceStop) {
+            Q_EMIT voiceFinished();
+            m_emitVoiceStop = true;
+        } else {
+            QThread::msleep(8);
+        }
         return nextState;
     }
+    m_emitVoiceStop = false;
+    Q_EMIT voiceStarted();
     textToSpeak = m_textQueue.dequeue();
+#ifdef DEBUG_AUDIO_OUTPUT
     qDebug("AudioOutputWorker::processAudioLoop [%s]",
            textToSpeak.toStdString().c_str());
-
+#endif
     // Branching Execution via Polymorphic Strategy Calls
     if (!m_currentEngine->isPCMGenerator()) {
         // Path A: System native text engine (Runs asynchronous non-blocking OS threads)
@@ -191,14 +196,18 @@ int AudioOutputWorker::processAudioLoop()
             appendAndPlayPCM(pcmChunk);
         }
     }
+#ifdef DEBUG_AUDIO_OUTPUT
     qDebug("AudioOutputWorker::processAudioLoop [%s] done",
            textToSpeak.toStdString().c_str());
+#endif
     return nextState;
 }
 
 void AudioOutputWorker::appendAndPlayPCM(const QByteArray &newPcmData) {
     if (newPcmData.isEmpty()) return;
+#ifdef DEBUG_AUDIO_OUTPUT
     qDebug("appendAndPlayPCM %d bytes",newPcmData.size());
+#endif
     // 2. Track where the speaker was previously reading
     if (m_audioOutput->state() == QAudio::ActiveState) {
         m_readPosition = m_buffer.pos();

@@ -55,7 +55,8 @@ typedef enum{
     PLAY_EXECUTE_NEXT_MOVE,
     PLAY_INFORM_RESULT,
     PLAY_INFORM_ERROR,
-    PLAY_INFORM_BOT_ERROR,
+    PLAY_INFORM_ERROR_CALCULATE_NEXT_MOVE,
+    PLAY_INFORM_ERROR_EXECUTE_NEXT_MOVE,
     PLAY_REQUEST_PROMOTE_PIECE,
     PLAY_ENDGAME_TIMEOUT,
     PLAY_PROCESS_DONE,
@@ -142,6 +143,7 @@ Q_SIGNALS:
     void showPromotionPieces();
     void foundLastFEN();
     void newCommentAdded(QString text);
+    void newMoveAdded(QString fen, QString playColor, QString move);
 
 private:
     void playLoop();

@@ -5,14 +5,15 @@
 #include <QObject>
 #include <QString>
 #include <QMutex>
+#include <QVector>
 #include <QWaitCondition>
 
 #include "llama.h"
 #include "whisper.h"
 
 struct ChatMessage {
-    std::string role;
-    std::string content;
+    QString role;
+    QString content;
 };
 
 enum LLM_STATE {
@@ -39,6 +40,7 @@ public:
     void stop();
     void togglePause(bool paused);
     int handlePrompt(const QString& prompt);
+    int analyzeChessMove(QString fen, QString playColor, QString move);
     void requestInterruption() ;
 public Q_SLOTS:
     void doWork();
@@ -57,13 +59,16 @@ private:
     void initializeWhisper();
     int runLlamaInference();
     int transcribeAudio();
+    QString generatePromptChat(const QString& userPrompt);
+    QString generatePromptChess(QString fen, QString playColor, QString move);
     llama_model* m_model = nullptr;
     llama_context* m_ctx = nullptr;
     struct whisper_context* m_whisperCtx = nullptr;
     whisper_full_params m_whisperParams;
-    std::vector<ChatMessage> m_conversationHistory;
+    QVector<ChatMessage> m_conversationHistory;
     QByteArray m_pcmData;
-    QString m_prompt;
+    QString m_userPrompt;
+    QString m_fullPrompt;
     int m_pastTokensCount = 0;
     QAtomicInt m_interrupted; // Thread-safe atomic flag
     int m_state;

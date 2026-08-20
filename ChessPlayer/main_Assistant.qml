@@ -148,7 +148,7 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 45
                 onClicked: {
-                    assistant.testVoice(txtAssistant.text);
+                    assistant.singleVoice(txtAssistant.text);
                 }
             }
         }

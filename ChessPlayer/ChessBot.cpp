@@ -231,11 +231,15 @@ void ChessBot::playInputMove(int startUiIndex, int stopUiIndex, int promotePiece
     if(promotePiece < 0) {
         QString fenBeforeMove = m_chessController->extractFEN();
         QString pieceType = m_chessController->uiIndexToPieceType(startUiIndex);
+        QString pieceCurrentNotation = m_chessController->uiIndexToSquareNotation(startUiIndex);
         QString pieceTargetNotation = m_chessController->uiIndexToSquareNotation(stopUiIndex);
         Move chosenMove;
         if(m_chessController->moveByUiSquares(startUiIndex,stopUiIndex,chosenMove)) {
-            QString formattedMove = m_chessController->processRobotCommentary(fenBeforeMove,m_chessController->playerColor(),pieceType,pieceTargetNotation,chosenMove);
-            Q_EMIT newCommentAdded(formattedMove);
+            QString formattedMove = pieceType + " "+
+                    pieceCurrentNotation + " to "+ pieceTargetNotation;
+            Q_EMIT newMoveAdded(fenBeforeMove,
+                                   m_chessController->playerColor() == Color::WHITE?"White":"Black",
+                                   formattedMove);
             m_mutex->lock();
             m_state = STATE_PLAY;
             m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
@@ -357,7 +361,7 @@ void ChessBot::playLoop()
         if(playCalculateNextMove() == STATE_DONE_SUCCESS){
             m_statePlay = PLAY_EXECUTE_NEXT_MOVE;
         } else {
-            m_statePlay = PLAY_INFORM_BOT_ERROR;
+            m_statePlay = PLAY_INFORM_ERROR_CALCULATE_NEXT_MOVE;
         }
     }
         break;
@@ -366,7 +370,7 @@ void ChessBot::playLoop()
         if(playExecuteNextMove()== STATE_DONE_SUCCESS){
             m_statePlay = PLAY_INFORM_RESULT;
         } else {
-            m_statePlay = PLAY_INFORM_ERROR;
+            m_statePlay = PLAY_INFORM_ERROR_EXECUTE_NEXT_MOVE;
         }
     }
         break;
@@ -398,9 +402,15 @@ void ChessBot::playLoop()
         m_statePlay = PLAY_PROCESS_DONE;
     }
         break;
-    case PLAY_INFORM_BOT_ERROR: {
+    case PLAY_INFORM_ERROR_CALCULATE_NEXT_MOVE: {
         qDebug("Can not calculate best move");
-        Q_EMIT newCommentAdded("Wait for my move");
+        Q_EMIT newCommentAdded("Can not calculate best move");
+        m_statePlay = PLAY_PROCESS_DONE;
+    }
+        break;
+    case PLAY_INFORM_ERROR_EXECUTE_NEXT_MOVE: {
+        qDebug("Execute move error");
+        Q_EMIT newCommentAdded("Execute move error");
         m_statePlay = PLAY_PROCESS_DONE;
     }
         break;
@@ -601,6 +611,11 @@ uint8_t ChessBot::playDetectMove()
             choosenPieceMoveNotation = to;
             if(m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1],choosenMove)) {
                 detectState = STATE_DONE_SUCCESS;
+                QString formattedMove = choosenPiece + " "+
+                        from + " to "+ to;
+                Q_EMIT newMoveAdded(fenBeforeMove,
+                                    m_chessController->playerColor() == Color::WHITE?"White":"Black",
+                                    formattedMove);
                 break;
             } else {
                 if(m_chessController->status() == "CHOOSE_PROMOTION_PIECE") {
@@ -614,10 +629,6 @@ uint8_t ChessBot::playDetectMove()
         }
 
 #endif
-    if(detectState == STATE_DONE_SUCCESS) {
-        QString formattedMove = m_chessController->processRobotCommentary(fenBeforeMove,m_chessController->playerColor(),choosenPiece, choosenPieceMoveNotation, choosenMove);
-        Q_EMIT newCommentAdded(formattedMove);
-    }
     return detectState;
 }
 

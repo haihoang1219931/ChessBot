@@ -5,13 +5,10 @@ MasterChessBot::MasterChessBot(QObject *parent) : QObject(parent)
 {
     m_workerChessbot = new ChessBot();
     m_workerAssistant = new AssistantController();
-    m_speech = new VoiceStreamer();
-    handleNewComment("I'm chess robot. Nice to play");
-//    connect(m_workerChessbot, &ChessBot::newCommentAdded,
-//            this, &MasterChessBot::handleNewComment);
-//    connect(m_workerAssistant, &AssistantController::generationFinished,
-//            this, &MasterChessBot::handleNewComment);
-
+    connect(m_workerChessbot, &ChessBot::newCommentAdded,
+            m_workerAssistant, &AssistantController::singleVoice);
+    connect(m_workerChessbot, &ChessBot::newMoveAdded,
+            m_workerAssistant, &AssistantController::analyzeChessMove);
     connect(m_workerChessbot, &ChessBot::boardChanged,
             this, &MasterChessBot::boardChanged);
     connect(m_workerChessbot, &ChessBot::detectFailed,
@@ -111,13 +108,13 @@ void MasterChessBot::playInputCancelPromotion()
 void MasterChessBot::startService()
 {
     m_workerChessbot->startService();
-//    m_workerAssistant->startService();
+    m_workerAssistant->startService();
 }
 
 void MasterChessBot::stopService()
 {
     m_workerChessbot->stopService();
-//    m_workerAssistant->stopService();
+    m_workerAssistant->stopService();
 }
 
 void MasterChessBot::sendTestCommand(QString command)
@@ -143,9 +140,4 @@ QVariantList MasterChessBot::chessboardCorners() const
 void MasterChessBot::stopGame(QString comment)
 {
     m_workerChessbot->stopGame(comment);
-}
-
-void MasterChessBot::handleNewComment(const QString &text)
-{
-    m_speech->speak(text);
 }

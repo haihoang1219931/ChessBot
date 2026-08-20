@@ -2,9 +2,8 @@
 #define MASTERCHESSBOT_H
 
 #include <QObject>
-#include <ChessBot.h>
-#include <assistant/AssistantController.h>
-#include "voice/VoiceStreamer.h"
+#include "ChessBot.h"
+#include "assistant/AssistantController.h"
 
 class MasterChessBot : public QObject
 {
@@ -37,9 +36,6 @@ public:
     Q_INVOKABLE QVariantList chessboardCorners() const;
     Q_INVOKABLE void stopGame(QString comment);
 
-public Q_SLOTS:
-    void handleNewComment(const QString &text);
-
 Q_SIGNALS:
     void boardChanged(QStringList boardModel);
     void detectFailed();
@@ -52,7 +48,6 @@ Q_SIGNALS:
 private:
     ChessBot* m_workerChessbot;
     AssistantController* m_workerAssistant;
-    VoiceStreamer *m_speech;
 };
 
 #endif // MASTERCHESSBOT_H

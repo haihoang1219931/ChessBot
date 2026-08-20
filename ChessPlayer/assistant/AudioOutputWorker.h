@@ -47,6 +47,10 @@ public Q_SLOTS:
     void clearQueue();
     void doWork();
 
+Q_SIGNALS:
+    void voiceStarted();
+    void voiceFinished();
+
 private:
     int processAudioLoop();
     void appendAndPlayPCM(const QByteArray &newPcmData);
@@ -72,6 +76,7 @@ private:
     QAtomicInt m_interrupted; // Thread-safe atomic flag
     int m_state;
     int m_nextState;
+    bool m_emitVoiceStop;
 };
 
 #endif // AUDIOOUTPUTWORKER_H

@@ -45,8 +45,7 @@ INCLUDEPATH += $$WHISPER_DIR/include \
 
 # Add the core execution files so Qt compiles them natively from source code
 SOURCES += \
-    $$WHISPER_DIR/src/whisper.cpp \
-    assistant/AudioOutputWorker.cpp
+    $$WHISPER_DIR/src/whisper.cpp
 
 win32 {
     # Add WHISPER_VERSION to your existing DEFINES block
@@ -68,18 +67,12 @@ HEADERS += \
     assistant/AudioOutputWorker.h \
     assistant/LLMWorker.h \
     assistant/TTSEngines.h
-#    voice/VoiceStreamer.h \
-#    assistant/PipelineController.h \
-#    assistant/StreamingAudioWorker.h
-
 
 SOURCES += \
     main_Assistant.cpp \
     assistant/AssistantController.cpp \
-#    voice/VoiceStreamer.cpp \
-#    assistant/PipelineController.cpp \
-#    assistant/StreamingAudioWorker.cpp \
     assistant/AudioModelWorker.cpp \
+    assistant/AudioOutputWorker.cpp \
     assistant/LLMWorker.cpp
 
 RESOURCES += qml_Assistant.qrc
