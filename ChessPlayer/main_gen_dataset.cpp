@@ -5,16 +5,34 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <direct.h> // For _mkdir and _access
-#include <io.h>     // For _access flags
 // Platform conditional inclusions
 #ifdef _WIN32
     #include <windows.h>
+    #include <direct.h> // For _mkdir and _access
+    #include <io.h>     // For _access flags
 #else
     #include <dirent.h>
     #include <sys/types.h>
+    #include <sys/stat.h>
+    #include <unistd.h>
+    #define _access access
+    #define _mkdir(path) mkdir(path, 0777)
 #endif
 
+/* command
+➜  build git:(add_robot_init_sequence_from_app) ✗ ./ChessImageProcessing 4 4 16
+create folder: gen-Pawn
+➜  build git:(add_robot_init_sequence_from_app) ✗ ./ChessImageProcessing 0 4 4
+create folder: gen-Bishop
+➜  build git:(add_robot_init_sequence_from_app) ✗ ./ChessImageProcessing 2 4 4
+create folder: gen-King
+➜  build git:(add_robot_init_sequence_from_app) ✗ ./ChessImageProcessing 5 4 4
+create folder: gen-Queen
+➜  build git:(add_robot_init_sequence_from_app) ✗ ./ChessImageProcessing 3 4 2
+create folder: gen-Knight
+➜  build git:(add_robot_init_sequence_from_app) ✗ ./ChessImageProcessing 6 4 1
+create folder: gen-Rook
+*/
 #include <opencv2/opencv.hpp>
 const int WARP_SIZE = 1920;
 // Define piece types matching your folders
@@ -22,13 +40,13 @@ enum PieceType { BISHOP, EMPTY, KING, KNIGHT, PAWN, QUEEN, ROOK };
 
 std::string getFolderName(PieceType piece, bool genFolder = false) {
     switch (piece) {
-    case BISHOP: return genFolder?"gen-Bishop":"data-Bishop";
-    case EMPTY:  return genFolder?"gen-Empty":"data-Empty";
-    case KING:   return genFolder?"gen-King":"data-King";
-    case KNIGHT: return genFolder?"gen-Knight":"data-Knight";
-    case PAWN:   return genFolder?"gen-Pawn":"data-Pawn";
-    case QUEEN:  return genFolder?"gen-Queen":"data-Queen";
-    case ROOK:   return genFolder?"gen-Rook":"data-Rook";
+    case BISHOP: return genFolder?"gen-Bishop":"data-Bishop-extra";
+    case EMPTY:  return genFolder?"gen-Empty":"data-Empty-extra";
+    case KING:   return genFolder?"gen-King":"data-King-extra";
+    case KNIGHT: return genFolder?"gen-Knight":"data-Knight-extra";
+    case PAWN:   return genFolder?"gen-Pawn":"data-Pawn-extra";
+    case QUEEN:  return genFolder?"gen-Queen":"data-Queen-extra";
+    case ROOK:   return genFolder?"gen-Rook":"data-Rook-extra";
     }
     return "data-Empty";
 }
@@ -136,7 +154,7 @@ int parseIndexFromFullPath(const std::string& fullPath) {
     return -1; // Return error code if parsing fails
 }
 
-void generateDataFromSingleImage(PieceType currentPiece, std::string imagePath) {
+void generateDataFromSingleImage(PieceType currentPiece, std::string imagePath, int numSample, int numPieces) {
     // 1. Load your source frame
     cv::Mat srcImage = cv::imread(imagePath);
     if (srcImage.empty()) {
@@ -168,52 +186,88 @@ void generateDataFromSingleImage(PieceType currentPiece, std::string imagePath) 
 //    cv::waitKey(0);
     int cellSize = WARP_SIZE / 8;
     int imageIndex = parseIndexFromFullPath(imagePath);
-    int row = (imageIndex - 1) / 8;
-    int step = (imageIndex - 1) % 8;
-    bool isEvenRow = row%2==0;
-    int col = isEvenRow ? (7 - step) : step;
     if(imageIndex < 0) return;
-    // Stretch the bounding box upwards to swallow full tall piece outlines
-    int cropX = col * cellSize;
-    int cropY = row * cellSize;
-    int cropW = cellSize;
-    int cropH = cellSize;
+    std::vector<cv::Point> listCell;
+    if(numPieces<=8) {
+        int row = (imageIndex - 1) / numSample / (8/numPieces);
+        int step = (((imageIndex - 1) / numSample) % (8/numPieces)) * numPieces;
+        bool isEvenRow = row%2==0;
+        int col = isEvenRow ? (7 - step) : step;
+        for(int i=0; i< numPieces; i++) {
+            int cellCol = isEvenRow?col-i:col+i;
+            int cellRow = row;
+            listCell.push_back(cv::Point(cellCol,cellRow));
+        }
+    } else {
+        int startRow = ((imageIndex - 1) / numSample) % (64/numPieces);
+        for(int i=0;i<numPieces; i++) {
+            int cellRow = startRow * (numPieces/8) + i / 8;
+            int cellCol = i % 8;
+            listCell.push_back(cv::Point(cellCol,cellRow));
+        }
+    }
 
-    // Safe image-canvas bound clamping checks
-    if (cropX < 0) cropX = 0;
-    if (cropY < 0) cropY = 0;
-    if (cropX + cropW > warpedBoard.cols) cropW = warpedBoard.cols - cropX;
-    if (cropY + cropH > warpedBoard.rows) cropH = warpedBoard.rows - cropY;
+    for(cv::Point cell: listCell) {
+#ifdef DEBUG_ROI
+        printf("row[%d] col[%d]\r\n",cell.y,cell.x);
+#endif
+        // Stretch the bounding box upwards to swallow full tall piece outlines
+        int cropX = cell.x * cellSize;
+        int cropY = cell.y * cellSize;
+        int cropW = cellSize;
+        int cropH = cellSize;
 
-    cv::Rect tallCellROI(cropX, cropY, cropW, cropH);
-    cv::Mat croppedCell = warpedBoard(tallCellROI);
+        // Safe image-canvas bound clamping checks
+        if (cropX < 0) cropX = 0;
+        if (cropY < 0) cropY = 0;
+        if (cropX + cropW > warpedBoard.cols) cropW = warpedBoard.cols - cropX;
+        if (cropY + cropH > warpedBoard.rows) cropH = warpedBoard.rows - cropY;
 
-    // Shape standardizer step for incoming CNN processing structures
-    cv::Mat standardizedInput;
-    cv::resize(croppedCell, standardizedInput, cv::Size(WARP_SIZE/8, WARP_SIZE/8));
+        cv::Rect tallCellROI(cropX, cropY, cropW, cropH);
+#ifdef DEBUG_ROI
+        cv::rectangle(warpedBoard,tallCellROI,cv::Scalar(0,255,255),2);
+#endif
+        cv::Mat croppedCell = warpedBoard(tallCellROI);
 
-    // Find target folder mapping parameters
-    std::string targetFolder = getFolderName(currentPiece,true);
+        // Shape standardizer step for incoming CNN processing structures
+        cv::Mat standardizedInput;
+        cv::resize(croppedCell, standardizedInput, cv::Size(WARP_SIZE/8, WARP_SIZE/8));
 
-    int fileIndex = getNextFileIndex(targetFolder);
-    std::stringstream pathStream;
-    pathStream << targetFolder << "/" << fileIndex << ".jpg";
-    // Write output file
-    cv::imwrite(pathStream.str(), standardizedInput);
+        // Find target folder mapping parameters
+        std::string targetFolder = getFolderName(currentPiece,true);
+
+        int fileIndex = getNextFileIndex(targetFolder);
+        std::stringstream pathStream;
+        pathStream << targetFolder << "/" << fileIndex << ".jpg";
+        // Write output file
+        cv::imwrite(pathStream.str(), standardizedInput);
+    }
+#ifdef DEBUG_ROI
+    cv::Mat scaledWarped;
+    cv::resize(warpedBoard,scaledWarped,cv::Size(WARP_SIZE/3,WARP_SIZE/3),0,0, cv::INTER_NEAREST);
+    cv::imshow("scaledWarped",scaledWarped);
+    cv::waitKey();
+#endif
 }
 
 int main(int argc, char** argv) {
-//    int pieceType = BISHOP;
-    for(int pieceType = BISHOP; pieceType <= ROOK; pieceType++)
-    {
-        std::string dataFolder = getFolderName((PieceType)pieceType);
-        std::string genFolder = getFolderName((PieceType)pieceType,true);
-        createFolderTree(genFolder);
-        std::cout << "create folder: " << genFolder << std::endl;
-        std::vector<std::string> listFile = getFileList(dataFolder);
-        for(std::string filePath : listFile) {
-            generateDataFromSingleImage((PieceType)pieceType,filePath);
-        }
+#ifdef DEBUG_ROI
+    int numSample = atoi(argv[2]);
+    int numPieces = atoi(argv[3]);
+    int pieceType = atoi(argv[1]);
+    generateDataFromSingleImage((PieceType)pieceType,argv[4],numSample,numPieces);
+#else
+    int numSample = atoi(argv[2]);
+    int numPieces = atoi(argv[3]);
+    int pieceType = atoi(argv[1]);
+    std::string dataFolder = getFolderName((PieceType)pieceType);
+    std::string genFolder = getFolderName((PieceType)pieceType,true);
+    createFolderTree(genFolder);
+    std::cout << "create folder: " << genFolder << std::endl;
+    std::vector<std::string> listFile = getFileList(dataFolder);
+    for(std::string filePath : listFile) {
+        generateDataFromSingleImage((PieceType)pieceType,filePath,numSample,numPieces);
     }
+#endif
     return 0;
 }
