@@ -1,16 +1,7 @@
 #include "ChessImageProcessing.h"
 #include <set>
 #include <algorithm>
-const int WARP_SIZE = 640;
-const int MIN_BINARY_POINT = 600;
-typedef enum {
-    DETECT_MOVE_PHASE1_BINARY,
-    DETECT_MOVE_PHASE2_SUBSTRACTION,
-    DETECT_MOVE_PHASE3_CLASSIFICATION,
-    DETECT_MOVE_VERIFY_RESULT,
-    DETECT_MOVE_DONE_SUCCESS,
-    DETECT_MOVE_DONE_FAIL,
-} CHESSBOARD_DETECT_STATE;
+
 ChessImageProcessing::ChessImageProcessing()
 {
     m_sourceConnected = false;
@@ -19,6 +10,12 @@ ChessImageProcessing::ChessImageProcessing()
     m_chessBoardBox = 60;
     m_chessBoardSize = m_chessBoardRow * m_chessBoardBox;
     m_transformMaxtrixValid = false;
+}
+
+void ChessImageProcessing::setDnnNet(char* source, const std::vector<std::string>& dnnClassNames)
+{
+    m_dnnNet = cv::dnn::readNetFromONNX(source);
+    m_dnnClassNames = dnnClassNames;
 }
 
 static void printMatrix(const std::string & name,
@@ -53,7 +50,7 @@ void ChessImageProcessing::setCorners(float topLeftX, float topLeftY,
     corners.push_back(cv::Point2f(topRightX, topRightY));
     corners.push_back(cv::Point2f(bottomRightX, bottomRightY));
     corners.push_back(cv::Point2f(bottomLeftX, bottomLeftY));
-    m_transformMatrix = getPerspectiveTransform(corners, std::vector<cv::Point2f>{{0,0},{WARP_SIZE,0},{WARP_SIZE,WARP_SIZE},{0,WARP_SIZE}});
+    m_transformMatrix = getPerspectiveTransform(corners, std::vector<cv::Point2f>{{0,0},{WARP_SMALL_SIZE,0},{WARP_SMALL_SIZE,WARP_SMALL_SIZE},{0,WARP_SMALL_SIZE}});
     m_transformMaxtrixValid = true;
 }
 cv::Mat ChessImageProcessing::getTranformMatrix() {
@@ -136,8 +133,8 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& 
     std::vector<std::vector<int>> matColorMap1(8, std::vector<int>(8, 0));
     std::vector<std::vector<int>> matColorMap2(8, std::vector<int>(8, 0));
     // warp image before calculation (also keep color warped images for color-matching)
-    cv::warpPerspective(img_start, warped1, m_transformMatrix, cv::Size(WARP_SIZE, WARP_SIZE));
-    cv::warpPerspective(img_end, warped2, m_transformMatrix, cv::Size(WARP_SIZE, WARP_SIZE));
+    cv::warpPerspective(img_start, warped1, m_transformMatrix, cv::Size(WARP_SMALL_SIZE, WARP_SMALL_SIZE));
+    cv::warpPerspective(img_end, warped2, m_transformMatrix, cv::Size(WARP_SMALL_SIZE, WARP_SMALL_SIZE));
 
     cv::cvtColor(warped1, gray1, cv::COLOR_BGR2GRAY);
     cv::cvtColor(warped2, gray2, cv::COLOR_BGR2GRAY);
@@ -546,8 +543,8 @@ std::vector < std::vector < int >> ChessImageProcessing::cellColorFilterToMatrix
     cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);
     cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
 
-    const int cellW = WARP_SIZE / 8;
-    const int cellH = WARP_SIZE / 8;
+    const int cellW = WARP_SMALL_SIZE / 8;
+    const int cellH = WARP_SMALL_SIZE / 8;
     const int roiW = cv::max(2, (cellW * roiPercent) / 100);
     const int roiH = cv::max(2, (cellH * roiPercent) / 100);
 
@@ -1250,4 +1247,115 @@ bool ChessImageProcessing::isCastleMove(const cv::Mat& warpedGray1, const cv::Ma
     cv::imwrite("castle_diff_counts.jpg",vis);
 #endif
     return foundCastle;
+}
+
+ClassificationResult ChessImageProcessing::classifyImage(const cv::Mat& input_mat) {
+    ClassificationResult result{"",0};
+    if (input_mat.empty()) {
+        std::cerr << "Error: Provided input cv::Mat is empty.\n";
+        return result;
+    }
+
+    // 1. Setup preprocessing parameters
+    cv::Size target_size(240, 240);
+    double scale_factor = 1.0 / 255.0; // Scale pixels to [0.0, 1.0]
+
+    // PyTorch ImageNet mean values multiplied by 255.0 because blobFromImage
+    // subtracts the raw mean *before* multiplying by the scalefactor.
+    cv::Scalar mean(0.485 * 255.0, 0.456 * 255.0, 0.406 * 255.0);
+
+    // PyTorch ImageNet standard deviation values
+    cv::Scalar std_dev(0.229, 0.224, 0.225);
+
+    // 2. Generate the 4D input blob
+    cv::Mat blob;
+    cv::dnn::blobFromImage(
+        input_mat,
+        blob,
+        scale_factor,
+        target_size,
+        mean,
+        true,  // swapRB = true (Converts BGR to RGB)
+        false  // crop = false
+    );
+
+    // 3. Manually divide by standard deviation (OpenCV DNN doesn't do this automatically)
+    cv::divide(blob, std_dev, blob);
+
+    // 4. Run inference pass
+    m_dnnNet.setInput(blob);
+    cv::Mat outputs = m_dnnNet.forward(); // Output shape: [1, num_classes]
+
+    // 5. Post-processing: Apply manual Softmax to the row vector
+    float* data_ptr = outputs.ptr<float>(0);
+    int num_classes = outputs.cols;
+
+    std::vector<float> raw_scores(data_ptr, data_ptr + num_classes);
+    std::vector<float> exp_scores(num_classes);
+
+    float max_score = *std::max_element(raw_scores.begin(), raw_scores.end());
+    float sum_exp = 0.0f;
+
+    for (int i = 0; i < num_classes; ++i) {
+        exp_scores[i] = std::exp(raw_scores[i] - max_score); // Stable Softmax implementation
+        sum_exp += exp_scores[i];
+    }
+
+    // 6. Find the highest probability index
+    int predicted_idx = 0;
+    float max_prob = 0.0f;
+    for (int i = 0; i < num_classes; ++i) {
+        float prob = exp_scores[i] / sum_exp;
+        if (prob > max_prob) {
+            max_prob = prob;
+            predicted_idx = i;
+        }
+    }
+#ifdef DEBUG_CLASSIFICATION
+    // 7. Print Results
+    std::cout << "Prediction Result: " << class_names[predicted_idx] << "\n";
+    std::cout << "Confidence Level: " << std::fixed << std::setprecision(2) << (max_prob * 100.0f) << "%\n";
+#endif
+    result.className = m_dnnClassNames[predicted_idx];
+    result.probability = max_prob * 100.0f;
+    return result;
+}
+
+void ChessImageProcessing::classsifyChessBoardImage(cv::Mat& warpedBoard) {
+        int cellSize = WARP_SIZE / 8;
+    printf("classsifyChessBoardImage:\r\n");
+    for(int row = 0; row < 8; row ++) {
+        for(int col = 0; col < 8; col ++) {
+            // Stretch the bounding box upwards to swallow full tall piece outlines
+            int cropX = col * cellSize;
+            int cropY = row * cellSize;
+            int cropW = cellSize;
+            int cropH = cellSize;
+
+            // Safe image-canvas bound clamping checks
+            if (cropX < 0) cropX = 0;
+            if (cropY < 0) cropY = 0;
+            if (cropX + cropW > warpedBoard.cols) cropW = warpedBoard.cols - cropX;
+            if (cropY + cropH > warpedBoard.rows) cropH = warpedBoard.rows - cropY;
+
+            cv::Rect tallCellROI(cropX, cropY, cropW, cropH);
+            cv::Mat croppedCell = warpedBoard(tallCellROI);
+            ClassificationResult piece = classifyImage(croppedCell);
+#ifdef DEBUG_ROI
+            cv::rectangle(warpedBoard,tallCellROI,cv::Scalar(0,255,255),2);
+            cv::putText(warpedBoard,piece.className + ":" +std::to_string((int)piece.probability),
+                        cv::Point(cropX + 20,cropY+ 60),
+                         cv::FONT_HERSHEY_SIMPLEX, 2, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+
+#endif
+            printf("%s ",piece.className.c_str());
+        }
+        printf("\r\n");
+    }
+#ifdef DEBUG_ROI
+    cv::Mat scaledWarped;
+    cv::resize(warpedBoard,scaledWarped,cv::Size(WARP_SMALL_SIZE,WARP_SMALL_SIZE),0,0, cv::INTER_NEAREST);
+    cv::imshow("classification",scaledWarped);
+    cv::waitKey();
+#endif
 }

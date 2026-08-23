@@ -6,6 +6,7 @@ CONFIG -= qt
 CONFIG += use_image_processing
 use_image_processing {
 DEFINES += DEBUG_SHOW_IMAGE
+DEFINES += DEBUG_ROI
 unix:!macx: INCLUDEPATH += /usr/local/include/opencv4
 unix:!macx: DEPENDPATH += /usr/local/include/opencv4
 unix:!macx: LIBS += -L/usr/local/lib/  \

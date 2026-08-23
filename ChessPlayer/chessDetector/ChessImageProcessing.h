@@ -10,12 +10,27 @@
 #include <opencv2/features2d/features2d.hpp>
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/calib3d/calib3d.hpp"
+#include <opencv2/dnn.hpp>
 #include <iostream>
 #include <vector>
 #include <map>
 #include <math.h>
 #include <sys/time.h> // for clock_gettime()
 #include <unistd.h> // for usleep()
+
+const int WARP_SIZE = 1920;
+const int WARP_SMALL_SIZE = 640;
+const int MIN_BINARY_POINT = 600;
+
+typedef enum {
+    DETECT_MOVE_PHASE1_BINARY,
+    DETECT_MOVE_PHASE2_SUBSTRACTION,
+    DETECT_MOVE_PHASE3_CLASSIFICATION,
+    DETECT_MOVE_VERIFY_RESULT,
+    DETECT_MOVE_DONE_SUCCESS,
+    DETECT_MOVE_DONE_FAIL,
+} CHESSBOARD_DETECT_STATE;
+
 // Parameters container for detection (expandable)
 struct MoveDetectParams {
     int threshold = 500;         // general threshold (unused currently)
@@ -28,10 +43,17 @@ struct MoveDetectParams {
     int numLoopCheckPiece = 5;  // Color threshold
     std::string playerSide = "white";
 };
+
+typedef struct {
+    std::string className;
+    float probability;
+} ClassificationResult;
+
 class ChessImageProcessing
 {
 public:
     ChessImageProcessing();
+    void setDnnNet(char* source, const std::vector<std::string>& dnnClassNames);
     void connectSource(char* source);
     cv::Mat getNewImageSide();
     bool detectSide(cv::Mat image);
@@ -71,6 +93,8 @@ public:
                                                   int roiPercent, int minWhitePercent, int maxBlackPercent,
                                                   std::string name);
     bool detectMovePhase3Classification();
+    ClassificationResult classifyImage(const cv::Mat& input_mat);
+    void classsifyChessBoardImage(cv::Mat& warpedBoard);
     std::string coordToNotation(cv::Point pt, const std::string& playerSide);
     cv::Point notationToCoord(const std::string& notation, const std::string& playerSide);
     bool getCenterOfWhitePixels(const cv::Mat& binary_img, cv::Point& center);
@@ -116,6 +140,8 @@ private:
     cv::Mat m_transformMatrix;
     bool m_transformMaxtrixValid;
     int m_detectState;
+    cv::dnn::Net m_dnnNet;
+    std::vector<std::string> m_dnnClassNames;
 };
 
 #endif // CHESSIMAGEPROCESSING_H
