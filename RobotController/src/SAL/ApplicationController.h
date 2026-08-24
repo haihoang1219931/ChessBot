@@ -43,23 +43,30 @@ public:
     void goToCalibPosition();
     void gotoPosition(float x, float y, float upAngleInDegree);
     bool executeSequence(MOVE_TYPE moveType,
-                         int startCol, int startRow,
-                         int stopCol, int stopRow,
-                         char attackPiece = 0, char promotePiece = 0, bool straightMove = false);
+                         uint8_t startRow, uint8_t startCol, uint8_t stopRow, uint8_t stopCol, bool straightMove = false,
+                         uint8_t dropCaptureSide = 255, uint8_t dropCaptureRow = 255, uint8_t dropCaptureCol = 255,
+                         uint8_t promoteSide = 255, uint8_t promoteRow = 255, uint8_t promoteCol = 255,
+                         uint8_t dropPawnPromoteSide = 255, uint8_t dropPawnToPromoteRow = 255, uint8_t dropPawnToPromoteCol = 255);
     void sendCalibrationProgress();
-    bool calculateSequenceMoveStraight(int startCol, int startRow,int stopCol, int stopRow);
-    bool calculateSequenceMove(int startCol, int startRow, int upAngleInDegree, bool isCapture);
-    bool calculateSequenceMoveTest(int targetCol, int targetRow);
-    bool calculateSequenceMoveNormal(int startCol, int startRow,
-                         int stopCol, int stopRow, bool straightMove = false);
-    bool calculateSequenceAttack(int startCol, int startRow,
-                         int stopCol, int stopRow, char attackPiece, bool straightMove = false);
-    bool calculateSequencePastPawn(int startCol, int startRow,
-                         int stopCol, int stopRow, bool straightMove = false);
-    bool calculateSequencePromotePiece(int startCol, int startRow,
-                         int stopCol, int stopRow, char attackPiece, char promotePiece, bool straightMove = false);
-    bool calculateSequenceCastle(int kingCol, int kingRow,
-                                 int rookCol, int rookRow, bool straightMove = false);
+    bool calculateSequenceMoveStraight(uint8_t startRow, uint8_t startCol, uint8_t stopRow, uint8_t stopCol);
+    bool calculateSequenceMove(uint8_t startRow, uint8_t startCol, int upAngleInDegree, bool isCapture);
+    bool calculateSequenceMoveTest(uint8_t targetRow, uint8_t targetCol);
+    bool calculateSequenceMoveNormal(uint8_t startRow, uint8_t startCol,
+                         uint8_t stopRow, uint8_t stopCol, bool straightMove);
+    bool calculateSequenceAttack(uint8_t startRow, uint8_t startCol,
+                         uint8_t stopRow, uint8_t stopCol,
+                         bool straightMove,
+                         uint8_t dropCaptureSide, uint8_t dropCaptureRow, uint8_t dropCaptureCol);
+    bool calculateSequencePastPawn(uint8_t startRow, uint8_t startCol,
+                         uint8_t stopRow, uint8_t stopCol, bool straightMove,
+                         uint8_t dropCaptureSide, uint8_t dropCaptureRow, uint8_t dropCaptureCol);
+    bool calculateSequencePromotePiece(uint8_t startRow, uint8_t startCol,
+                         uint8_t stopRow, uint8_t stopCol,
+                         uint8_t promoteSide, uint8_t promoteRow, uint8_t promoteCol,
+                         uint8_t dropPawnPromoteSide, uint8_t dropPawnToPromoteRow, uint8_t dropPawnToPromoteCol,
+                         uint8_t dropCaptureSide = 255, uint8_t dropCaptureRow = 255, uint8_t dropCaptureCol = 255);
+    bool calculateSequenceCastle(uint8_t kingRow, uint8_t kingCol,
+                                 uint8_t rookRow, uint8_t rookCol, bool straightMove);
     void calculatePolygonEdgeA2345(float upAngleInDegree, float* edge, float* angleA2A2345);
     void calculateJoints(float xPos, float yPos, float upAngleInDegree, int* jointSteps);
     Point calibPos();
@@ -95,9 +102,9 @@ public:
     Command m_sequenceCommand[MAX_MOVE_SEQUENCE];
     Command m_nextPoint;
     char m_commandRead[64];
-    DropPoint m_promotePiecePoint;
-    DropPoint m_dropCapturePoint;
-    DropPoint m_dropPieceBotPoint;
+    Point m_promotePiecePoint;
+    Point m_dropCapturePoint;
+    Point m_dropPieceBotPoint;
     Point m_startPoint;
     Point m_stopPoint;
     Point m_pawnPoint;

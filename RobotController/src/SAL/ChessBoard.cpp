@@ -8,8 +8,6 @@ ChessBoard::ChessBoard(float x, float y, float rect, float dropZoneSpace):
     m_chessBoardRect(rect),
     m_dropZoneSpace(dropZoneSpace)
 {
-    resetDropZoneMap();
-
     for(int rowId = 0; rowId < 8; rowId ++){
         for(int colId = 0; colId < 2; colId ++){
             m_cellCalibsDropZonePlayer[rowId][colId].calibbed = false;
@@ -63,30 +61,7 @@ void ChessBoard::setChessBoardSideSpace(float value)
     m_chessBoardSideSpace = value;
 }
 
-DropPoint ChessBoard::getFreeDropPoint(ZONE_TYPE zone, uint8_t promotePiece)
-{
-    DropPoint freePoint;
-    bool foundDropPoint = false;
-    for(int rowId = 0; rowId < 8; rowId ++){
-        for(int colId = 0; colId < 2; colId ++){
-            if(zone == ZONE_PLAYER?
-                    m_dropZoneMapPlayer[rowId][colId] == promotePiece:
-                    m_dropZoneMapBot[rowId][colId] == 0) {
-                freePoint.location = convertDropPoint(rowId,colId, zone);
-                freePoint.rowID = rowId;
-                freePoint.colID = colId;
-                freePoint.zoneType = zone;
-                freePoint.valid = true;
-                foundDropPoint = true;
-                break;
-            }
-        }
-        if(foundDropPoint) break;
-    }
-    return freePoint;
-}
-
-Point ChessBoard::convertPoint(int row, int col)
+Point ChessBoard::convertChessBoardPoint(int row, int col)
 {
     int centerCol = 0;
     int centerRow = 0;
@@ -132,44 +107,6 @@ Point ChessBoard::convertDropPoint(int row, int col, ZONE_TYPE zone) {
            (int)convertValue.x,(int)convertValue.y);
 #endif
            return convertValue;
-}
-
-void ChessBoard::updateDropZone(uint8_t piece, int row, int col, ZONE_TYPE zone)
-{
-    if(zone == ZONE_PLAYER) {
-        m_dropZoneMapPlayer[row][col] = piece;
-    } else {
-        m_dropZoneMapBot[row][col] = piece;
-    }
-}
-
-void ChessBoard::resetDropZoneMap()
-{
-    for(int rowId = 0; rowId < 8; rowId++) {
-        for(int colId = 0; colId < 2; colId++) {
-            m_dropZoneMapPlayer[rowId][colId] = 0;
-            m_dropZoneMapBot[rowId][colId] = 0;
-        }
-    }
-    m_dropZoneMapPlayer[0][0] = 'q';
-    m_dropZoneMapPlayer[1][0] = 'r';
-    m_dropZoneMapPlayer[2][0] = 'n';
-    m_dropZoneMapPlayer[3][0] = 'b';
-}
-
-void ChessBoard::moveGuestPieceOut(uint8_t piece) {
-    for(int rowId = 0; rowId < 8; rowId ++){
-        for(int colId = 0; colId < 8; colId ++){
-            if(m_dropZoneMapPlayer[rowId][colId] == 0) {
-                m_dropZoneMapPlayer[rowId][colId] = piece;
-                break;
-            }
-        }
-    }
-}
-
-void ChessBoard::promotePiece(uint8_t piece) {
-
 }
 
 void ChessBoard::setCalibChessBoardPoint(int row, int col, Point point) {

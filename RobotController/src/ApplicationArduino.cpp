@@ -117,7 +117,7 @@ void ApplicationArduino::initRobot()
         {true, 16.0f*70.0f/20.0f*(200.0f/360.0f),    72,     140,       48,         8,          48,       210,       2,   FREQUENCY_TIMER1,    250},
         {false,  1.0f/1.0f,                          26,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
         {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       6,   FREQUENCY_TIMER1,      0},
-        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -36,        36,         -36,         0,       6,   FREQUENCY_TIMER1,    100}
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -32,        36,         -36,         0,       6,   FREQUENCY_TIMER1,    100}
     };
 
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
@@ -127,9 +127,9 @@ void ApplicationArduino::initRobot()
 
     // Define your 4 known exact corner centers here
     Point c00 = {68,90,0,false};     // Row 0, Col 0
-    Point c07 = {-175,100,0,false};  // Row 0, Col 7
-    Point c70 = {66,345,0,false};    // Row 7, Col 0
-    Point c77 = {-180,348,0,false};  // Row 7, Col 7
+    Point c07 = {-174,105,0,false};  // Row 0, Col 7
+    Point c70 = {75,343,0,false};    // Row 7, Col 0
+    Point c77 = {-168,357,0,false};  // Row 7, Col 7
 
     // Compute and print centers for all cells
     for (int r = 0; r < 8; r++) {
