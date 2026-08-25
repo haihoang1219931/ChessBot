@@ -350,9 +350,7 @@ void ChessBot::playLoop()
         break;
     case PLAY_CALCULATE_NEXT_MOVE_RESET: {
         qDebug("PLAY_CALCULATE_NEXT_MOVE_RESET");
-#ifdef IMAGE_PROCESS_MOVE
-        executeCommand("rs");
-#endif
+        resetDropZoneMap(m_chessController->playerColor());
         m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
     }
         break;
@@ -762,58 +760,111 @@ uint8_t ChessBot::playCalculateNextMove()
         }
         else if (m_chessController->botMove().isPromotion())
         {
-            unsigned int promotedType = m_chessController->botMove().getPromotedPieceType();
-            unsigned int capturedPieceType = m_chessController->botMove().getCapturedPieceType();
+            char pawnPromoteChar = m_chessController->playerColor() == Color::WHITE?'p':'P';
+            char promotePieceChar = pieceName(m_chessController->botMove().getPromotedPieceType(),
+                                              1 - m_chessController->playerColor());
             qDebug("Capture remove pawn color[%s]",m_chessController->playerColor() == 0?"White":"Black");
-            qDebug("Capture Add piece[%d] color[%s]",promotedType,m_chessController->playerColor() == 0?"White":"Black");
-            char capturedPieceChar = '0';
-            char promotePieceChar = 'q';
-            if(m_chessController->botMove().isCapture())
-            {
-                switch (capturedPieceType) {
-                    case 0: capturedPieceChar = 'p';
-                        break;
-                    case 1: capturedPieceChar = 'n';
-                        break;
-                    case 2: capturedPieceChar = 'b';
-                        break;
-                    case 3: capturedPieceChar = 'r';
-                        break;
-                    case 4: capturedPieceChar = 'q';
-                        break;
+            qDebug("Capture Add piece[%c] color[%s]",promotePieceChar,m_chessController->playerColor() == 0?"White":"Black");
+            DropPoint dropCapturePoint, dropPawnPromotePoint, piecePromotePoint;
+            dropCapturePoint.rowID = 0;
+            dropCapturePoint.colID = 0;
+            dropCapturePoint.zoneType = ZONE_BOT;
+            bool isPromotionWithCapture = fromCoord.x() != toCoord.x();
+            if(isPromotionWithCapture) {
+                // Capture
+                char capturedPieceChar = pieceName(m_chessController->botMove().getCapturedPieceType(),
+                                                   m_chessController->playerColor());
+                if(!getFreeDropPoint(dropCapturePoint)) {
+                    qDebug("No space to drop captured piece");
+                    return STATE_DONE_FAIL;
+                } else {
+                    updateDropZone(capturedPieceChar,
+                                   dropCapturePoint.rowID,
+                                   dropCapturePoint.colID,
+                                   dropCapturePoint.zoneType);
                 }
             }
-            switch (promotedType) {
-                case 1: promotePieceChar = 'n';
-                    break;
-                case 2: promotePieceChar = 'b';
-                    break;
-                case 3: promotePieceChar = 'r';
-                    break;
-                case 4: promotePieceChar = 'q';
-                    break;
+            if(!getFreeDropPoint(piecePromotePoint,promotePieceChar)) {
+                qDebug("Not found promote piece");
+                return STATE_DONE_FAIL;
+            } else {
+                updateDropZone(0,
+                               piecePromotePoint.rowID,
+                               piecePromotePoint.colID,
+                               piecePromotePoint.zoneType);
             }
-
-            sprintf(m_robotCommand,"pm%d%d%d%d%c%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
-                    capturedPieceChar,promotePieceChar);
+            if(!getFreeDropPoint(dropPawnPromotePoint)) {
+                qDebug("No space to drop pawn");
+                return STATE_DONE_FAIL;
+            } else {
+                updateDropZone(pawnPromoteChar,
+                               dropPawnPromotePoint.rowID,
+                               dropPawnPromotePoint.colID,
+                               dropPawnPromotePoint.zoneType);
+            }
+            sprintf(m_robotCommand,"pm%d%d"
+                                   "%d%d"
+                                   "%c%d%d"
+                                   "%c%d%d"
+                                   "%c%d%d",
+                    fromCoord.y(),fromCoord.x(),
+                    toCoord.y(),toCoord.x(),
+                    dropCapturePoint.zoneType==ZONE_BOT?'b':'p',dropCapturePoint.rowID,dropCapturePoint.colID,
+                    piecePromotePoint.zoneType==ZONE_BOT?'b':'p',piecePromotePoint.rowID,piecePromotePoint.colID,
+                    dropPawnPromotePoint.zoneType==ZONE_BOT?'b':'p',dropPawnPromotePoint.rowID,dropPawnPromotePoint.colID);
         }
         else
         {
             if (m_chessController->botMove().isEnPassant()) // watch out ep capture is a capture
             {
                 qDebug("Capture remove pawn color[%d]",m_chessController->playerColor() != 0?"White":"Black");
-                sprintf(m_robotCommand,"pp%d%d%d%d%c%c%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
-                        'p','0',
-                        canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),PIECE_MOVE_ENPASSANT)?'-':'n');
+                DropPoint dropPoint;
+                char capturePiece = m_chessController->playerColor() == Color::WHITE ? 'P':'p';
+                if(getFreeDropPoint(dropPoint)) {
+                    sprintf(m_robotCommand,"pp%d%d"
+                                           "%d%d%c"
+                                           "%c%d%d",
+                            fromCoord.y(),fromCoord.x(),
+                            toCoord.y(),toCoord.x(),
+                            canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),PIECE_MOVE_CAPTURE)?'-':'n',
+                            dropPoint.zoneType == 0 ? 'b':'p',
+                            dropPoint.rowID,dropPoint.colID
+                        );
+                    updateDropZone(capturePiece,
+                                   dropPoint.rowID,
+                                   dropPoint.colID,
+                                   dropPoint.zoneType);
+                } else {
+                    qDebug("No space to drop piece");
+                    return STATE_DONE_FAIL;
+                }
             }
             else //Move is capture
             {
                 //remove the captured piece
-                unsigned int type(m_chessController->botMove().getCapturedPieceType());
-                qDebug("Capture remove captured piece[%d] color[%s]",type,m_chessController->playerColor() != 0?"White":"Black");
-                sprintf(m_robotCommand,"a%d%d%d%d%c%c",fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),
-                        'p',
-                        canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),PIECE_MOVE_CAPTURE)?'-':'n');
+                char capturePiece = pieceName(m_chessController->botMove().getCapturedPieceType(),
+                                              m_chessController->playerColor());
+                qDebug("Capture remove captured piece[%c] color[%s]",
+                       capturePiece,m_chessController->playerColor() != 0?"White":"Black");
+                DropPoint dropPoint;
+                if(getFreeDropPoint(dropPoint)) {
+                    sprintf(m_robotCommand,"a%d%d"
+                                           "%d%d%c"
+                                           "%c%d%d",
+                            fromCoord.y(),fromCoord.x(),
+                            toCoord.y(),toCoord.x(),
+                            canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),PIECE_MOVE_CAPTURE)?'-':'n',
+                            dropPoint.zoneType == ZONE_BOT ? 'b':'p',
+                            dropPoint.rowID,dropPoint.colID
+                        );
+                    updateDropZone(capturePiece,
+                                   dropPoint.rowID,
+                                   dropPoint.colID,
+                                   dropPoint.zoneType);
+                } else {
+                    qDebug("No space to drop piece");
+                    return STATE_DONE_FAIL;
+                }
             }
         }
     }
@@ -1717,6 +1768,7 @@ QObject* ChessBot::chessControllerObject() const
 void ChessBot::resetGame(){
     qDebug("Reset game side[%d] m_state[%d]",m_chessController->playerColor(),m_state);
     m_chessController->newGame();
+    resetDropZoneMap(m_chessController->playerColor());
     m_mutex->lock();
     m_state = STATE_PLAY;
     m_statePlay = PLAY_CHECK_LOG;
@@ -2064,3 +2116,65 @@ void ChessBot::processAndSaveFailures(const cv::Mat& imageBefore, const cv::Mat&
     qDebug("Saved:%s and %s", pathBefore.c_str(),pathAfter.c_str());
 }
 #endif
+
+bool ChessBot::getFreeDropPoint(DropPoint& result, uint8_t promotePiece)
+{
+    bool foundDropPoint = false;
+    for(int zone = 0; zone <2; zone++){
+        for(int rowId = 0; rowId < 8; rowId ++){
+            for(int colId = 0; colId < 2; colId ++){
+                if(zone == ZONE_PLAYER?
+                        m_dropZoneMapPlayer[rowId][colId] == promotePiece:
+                        m_dropZoneMapBot[rowId][colId] == 0) {
+                    result.rowID = rowId;
+                    result.colID = colId;
+                    result.zoneType = (ZONE_TYPE)zone;
+                    foundDropPoint = true;
+                    break;
+                }
+            }
+            if(foundDropPoint) break;
+        }
+    }
+    return foundDropPoint;
+}
+
+void ChessBot::resetDropZoneMap(int playerColor)
+{
+    for(int rowId = 0; rowId < 8; rowId++) {
+        for(int colId = 0; colId < 2; colId++) {
+            m_dropZoneMapPlayer[rowId][colId] = 0;
+            m_dropZoneMapBot[rowId][colId] = 0;
+        }
+    }
+    m_dropZoneMapPlayer[0][0] = playerColor == Color::WHITE?'Q':'q';
+    m_dropZoneMapPlayer[1][0] = playerColor == Color::WHITE?'R':'r';
+    m_dropZoneMapPlayer[2][0] = playerColor == Color::WHITE?'N':'n';
+    m_dropZoneMapPlayer[3][0] = playerColor == Color::WHITE?'B':'b';
+}
+
+void ChessBot::updateDropZone(uint8_t piece, int row, int col, ZONE_TYPE zone)
+{
+    if(zone == ZONE_PLAYER) {
+        m_dropZoneMapPlayer[row][col] = piece;
+    } else {
+        m_dropZoneMapBot[row][col] = piece;
+    }
+}
+char ChessBot::pieceName(int piece, int color)
+{
+    char pieceChar = '0';
+    switch (piece) {
+        case 0: pieceChar = color == Color::WHITE?'P':'p';
+            break;
+        case 1: pieceChar = color == Color::WHITE?'N':'n';
+            break;
+        case 2: pieceChar = color == Color::WHITE?'B':'b';
+            break;
+        case 3: pieceChar = color == Color::WHITE?'R':'r';
+            break;
+        case 4: pieceChar = color == Color::WHITE?'Q':'q';
+            break;
+    }
+    return pieceChar;
+}

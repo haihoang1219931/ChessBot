@@ -1191,8 +1191,8 @@ bool ApplicationController::calculateSequencePromotePiece(uint8_t startRow, uint
             dropCaptureSide == 'b'? ZONE_BOT:ZONE_PLAYER);
         appendSequenceMove(m_stopPoint, m_dropCapturePoint);
     }
-    appendSequenceMove(m_startPoint, m_dropPieceBotPoint);
     appendSequenceMove(m_promotePiecePoint, m_stopPoint);
+    appendSequenceMove(m_startPoint, m_dropPieceBotPoint);
     return true;
 }
 
