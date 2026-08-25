@@ -18,8 +18,14 @@
 #include <sys/time.h> // for clock_gettime()
 #include <unistd.h> // for usleep()
 
-const int WARP_SIZE = 1920;
-const int WARP_SMALL_SIZE = 640;
+const int NUM_COL = 14;
+const int NUM_ROW = 8;
+const int CELL_SIZE = 240;
+const int WARP_WIDTH = CELL_SIZE*NUM_COL;
+const int WARP_HEIGHT = CELL_SIZE*NUM_ROW;
+const int CELL_SMALL_SIZE = 80;
+const int WARP_SMALL_WIDTH = CELL_SMALL_SIZE*NUM_COL;
+const int WARP_SMALL_HEIGHT = CELL_SMALL_SIZE*NUM_ROW;
 const int MIN_BINARY_POINT = 600;
 
 typedef enum {

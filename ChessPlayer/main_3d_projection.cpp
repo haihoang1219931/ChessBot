@@ -36,17 +36,18 @@ void onMouse(int event, int x, int y, int flags, void* userdata) {
     }
 }
 
-// Helper function to draw a 9x9 grid layout onto the image frame
+// Updated helper function to handle custom grid row and column configurations
 void drawGrid(cv::Mat& output_img, const std::vector<cv::Point2f>& points, cv::Scalar color, int thickness) {
-    int grid_size = 9;
-    for (int i = 0; i < grid_size; ++i) {
-        for (int j = 0; j < grid_size; ++j) {
-            int current_idx = i * grid_size + j;
-            if (j < grid_size - 1) {
+    int rows = 9;
+    int cols = 15;
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            int current_idx = i * cols + j;
+            if (j < cols - 1) {
                 cv::line(output_img, points[current_idx], points[current_idx + 1], color, thickness);
             }
-            if (i < grid_size - 1) {
-                cv::line(output_img, points[current_idx], points[current_idx + grid_size], color, thickness);
+            if (i < rows - 1) {
+                cv::line(output_img, points[current_idx], points[current_idx + cols], color, thickness);
             }
         }
     }
@@ -77,21 +78,31 @@ void updateProjection() {
     std::vector<cv::Point3f> ground_object_points;
     std::vector<cv::Point3f> elevated_object_points;
 
-    for (int i = 0; i <= 8; ++i) {
-        for (int j = 0; j <= 8; ++j) {
-            float x_coord = j * 0.2f - 0.8f; // Centered at origin O
-            float y_coord = i * 0.2f - 0.8f;
+    int total_rows = 9;    // 8 board squares = 9 grid lines
+    int total_columns = 15; // 14 board squares = 15 grid lines
+    float square_size = 0.2f;
+
+    for (int i = 0; i < total_rows; ++i) {
+        for (int j = 0; j < total_columns; ++j) {
+            // Center the grid's X and Y coordinates around the local origin
+            float x_coord = j * square_size - ((total_columns - 1) * square_size / 2.0f);
+            float y_coord = i * square_size - ((total_rows - 1) * square_size / 2.0f);
+
             ground_object_points.push_back(cv::Point3f(x_coord, y_coord, 0.0f));
             elevated_object_points.push_back(cv::Point3f(x_coord, y_coord, piece_height));
         }
     }
 
-    // 3. Define the 4 corner ground 3D points corresponding to your 4 clicks
+    // 3. Define the 4 corner ground 3D points matching your 4 user mouse clicks
+    // Winding Order: Top-Left -> Top-Right -> Bottom-Right -> Bottom-Left
+    float half_width = (total_columns - 1) * square_size / 2.0f;  // 14 * 0.2 / 2 = 1.4
+    float half_height = (total_rows - 1) * square_size / 2.0f;    //  8 * 0.2 / 2 = 0.8
+
     std::vector<cv::Point3f> board_corners_3d = {
-        cv::Point3f(-0.8f, -0.8f, 0.0f),
-        cv::Point3f( 0.8f, -0.8f, 0.0f),
-        cv::Point3f( 0.8f,  0.8f, 0.0f),
-        cv::Point3f(-0.8f,  0.8f, 0.0f)
+        cv::Point3f(-half_width, -half_height, 0.0f), // Top-Left
+        cv::Point3f( half_width, -half_height, 0.0f), // Top-Right
+        cv::Point3f( half_width,  half_height, 0.0f), // Bottom-Right
+        cv::Point3f(-half_width,  half_height, 0.0f)  // Bottom-Left
     };
 
     // 4. Construct camera intrinsics matrix based on FOV
@@ -171,10 +182,13 @@ void updateProjection() {
     drawGrid(img_display, projected_ground_points, cv::Scalar(0, 255, 0), 1);
     drawGrid(img_display, projected_elevated_points, cv::Scalar(255, 120, 0), 1);
 
-    int corner_indices[] = {0, 8, 80, 72};
+    // Dynamic corners based on the 9x15 structural layout
+    // Top-Left: 0, Top-Right: 14, Bottom-Right: (9*15)-1 = 134, Bottom-Left: 9*15 - 15 = 120
+    int corner_indices[] = {0, total_columns - 1, (total_rows * total_columns) - 1, (total_rows * total_columns) - total_columns};
     for(int idx : corner_indices) {
         cv::line(img_display, projected_ground_points[idx], projected_elevated_points[idx], cv::Scalar(0, 255, 255), 1);
     }
+
     if(!showElevated) {
         showElevated = true;
         for(int i = 0; i < 4; i++) {
@@ -187,9 +201,9 @@ void updateProjection() {
     // 0. Classification
     std::vector<cv::Point2f> dstCorners {
         cv::Point2f(0, 0),
-        cv::Point2f(WARP_SIZE - 1, 0),
-        cv::Point2f(WARP_SIZE - 1, WARP_SIZE - 1),
-        cv::Point2f(0, WARP_SIZE - 1)
+        cv::Point2f(WARP_WIDTH - 1, 0),
+        cv::Point2f(WARP_WIDTH - 1, WARP_HEIGHT - 1),
+        cv::Point2f(0, WARP_HEIGHT - 1)
     };
     std::vector<cv::Point2f> srcCorners;
     float scaleFactor = 3.0f;
@@ -202,7 +216,7 @@ void updateProjection() {
     }
     cv::Mat homographyMatrix = cv::getPerspectiveTransform(srcCorners, dstCorners);
     cv::Mat warpedBoard;
-    cv::warpPerspective(img_input, warpedBoard, homographyMatrix, cv::Size(WARP_SIZE, WARP_SIZE));
+    cv::warpPerspective(img_input, warpedBoard, homographyMatrix, cv::Size(WARP_WIDTH, WARP_HEIGHT));
     chessDetector.classsifyChessBoardImage(warpedBoard);
 }
 

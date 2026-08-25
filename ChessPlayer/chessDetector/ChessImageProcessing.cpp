@@ -50,7 +50,7 @@ void ChessImageProcessing::setCorners(float topLeftX, float topLeftY,
     corners.push_back(cv::Point2f(topRightX, topRightY));
     corners.push_back(cv::Point2f(bottomRightX, bottomRightY));
     corners.push_back(cv::Point2f(bottomLeftX, bottomLeftY));
-    m_transformMatrix = getPerspectiveTransform(corners, std::vector<cv::Point2f>{{0,0},{WARP_SMALL_SIZE,0},{WARP_SMALL_SIZE,WARP_SMALL_SIZE},{0,WARP_SMALL_SIZE}});
+    m_transformMatrix = getPerspectiveTransform(corners, std::vector<cv::Point2f>{{0,0},{WARP_SMALL_WIDTH,0},{WARP_SMALL_WIDTH,WARP_SMALL_HEIGHT},{0,WARP_SMALL_HEIGHT}});
     m_transformMaxtrixValid = true;
 }
 cv::Mat ChessImageProcessing::getTranformMatrix() {
@@ -133,8 +133,8 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves(const cv::Mat& 
     std::vector<std::vector<int>> matColorMap1(8, std::vector<int>(8, 0));
     std::vector<std::vector<int>> matColorMap2(8, std::vector<int>(8, 0));
     // warp image before calculation (also keep color warped images for color-matching)
-    cv::warpPerspective(img_start, warped1, m_transformMatrix, cv::Size(WARP_SMALL_SIZE, WARP_SMALL_SIZE));
-    cv::warpPerspective(img_end, warped2, m_transformMatrix, cv::Size(WARP_SMALL_SIZE, WARP_SMALL_SIZE));
+    cv::warpPerspective(img_start, warped1, m_transformMatrix, cv::Size(WARP_SMALL_WIDTH, WARP_SMALL_HEIGHT));
+    cv::warpPerspective(img_end, warped2, m_transformMatrix, cv::Size(WARP_SMALL_WIDTH, WARP_SMALL_HEIGHT));
 
     cv::cvtColor(warped1, gray1, cv::COLOR_BGR2GRAY);
     cv::cvtColor(warped2, gray2, cv::COLOR_BGR2GRAY);
@@ -543,8 +543,8 @@ std::vector < std::vector < int >> ChessImageProcessing::cellColorFilterToMatrix
     cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);
     cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
 
-    const int cellW = WARP_SMALL_SIZE / 8;
-    const int cellH = WARP_SMALL_SIZE / 8;
+    const int cellW = CELL_SMALL_SIZE;
+    const int cellH = CELL_SMALL_SIZE;
     const int roiW = cv::max(2, (cellW * roiPercent) / 100);
     const int roiH = cv::max(2, (cellH * roiPercent) / 100);
 
@@ -1322,10 +1322,10 @@ ClassificationResult ChessImageProcessing::classifyImage(const cv::Mat& input_ma
 }
 
 void ChessImageProcessing::classsifyChessBoardImage(cv::Mat& warpedBoard) {
-        int cellSize = WARP_SIZE / 8;
+    int cellSize = CELL_SIZE;
     printf("classsifyChessBoardImage:\r\n");
-    for(int row = 0; row < 8; row ++) {
-        for(int col = 0; col < 8; col ++) {
+    for(int row = 0; row < NUM_ROW; row ++) {
+        for(int col = 0; col < NUM_COL; col ++) {
             // Stretch the bounding box upwards to swallow full tall piece outlines
             int cropX = col * cellSize;
             int cropY = row * cellSize;
@@ -1354,7 +1354,7 @@ void ChessImageProcessing::classsifyChessBoardImage(cv::Mat& warpedBoard) {
     }
 #ifdef DEBUG_ROI
     cv::Mat scaledWarped;
-    cv::resize(warpedBoard,scaledWarped,cv::Size(WARP_SMALL_SIZE,WARP_SMALL_SIZE),0,0, cv::INTER_NEAREST);
+    cv::resize(warpedBoard,scaledWarped,cv::Size(WARP_SMALL_WIDTH,WARP_SMALL_HEIGHT),0,0, cv::INTER_NEAREST);
     cv::imshow("classification",scaledWarped);
     cv::waitKey();
 #endif
