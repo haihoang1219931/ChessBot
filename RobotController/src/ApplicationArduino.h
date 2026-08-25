@@ -38,7 +38,7 @@ public:
   void resetPulse(int motorID) override;
   uint8_t executePulseStepper2Wires(uint8_t statePulse, uint32_t countPulse, uint32_t numWaitPulse, volatile uint8_t* portRegister, int bit);
   void initHardwareTimer(int timerID, float samplerate = 40000.0f);
-  Point calculateCellCenter(int row, int col, Point c00, Point c70, Point c77, Point c07);
+
 private:
   va_list m_args;
   char m_buffer[256];    

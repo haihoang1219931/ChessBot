@@ -498,7 +498,7 @@ void ApplicationController::executeCommand(char* command) {
     }else if(command[0] == 'p' && strlen(command)>=10 && command[1] == 'p') {
         m_comCommandID ++;
         if (executeSequence(MOVE_PASTPAWN, command[2]-'0',command[3]-'0',
-                command[4],command[5]-'0',command[6] == '-',
+                command[4]-'0',command[5]-'0',command[6] == '-',
                 command[7],command[8]-'0',command[9]-'0')) {
             this->printf("[%s] Past pawn confirmed\r\n", command);
         } else {
@@ -935,11 +935,11 @@ void ApplicationController::gotoPosition(float x, float y, float upAngleInDegree
 }
 bool ApplicationController::executeSequence(
         MOVE_TYPE moveType,
-        uint8_t startCol, uint8_t startRow,
-        uint8_t stopCol, uint8_t stopRow, bool straightMove,
-        uint8_t dropCaptureSide, uint8_t dropCaptureCol, uint8_t dropCaptureRow,
-        uint8_t promoteSide, uint8_t promoteCol, uint8_t promoteRow,
-        uint8_t dropPawnPromoteSide, uint8_t dropPawnToPromoteCol, uint8_t dropPawnToPromoteRow) {
+        uint8_t startRow, uint8_t startCol,
+        uint8_t stopRow, uint8_t stopCol, bool straightMove,
+        uint8_t dropCaptureSide, uint8_t dropCaptureRow, uint8_t dropCaptureCol,
+        uint8_t promoteSide, uint8_t promoteRow, uint8_t promoteCol,
+        uint8_t dropPawnPromoteSide, uint8_t dropPawnToPromoteRow, uint8_t dropPawnToPromoteCol) {
     bool executeInitResult = false;
 #ifdef DEBUG_COMMAND
     this->printf("Go to Pos [%d,%d] to [%d,%d] \r\n",
@@ -974,7 +974,7 @@ bool ApplicationController::executeSequence(
     case MOVE_PASTPAWN:
         executeInitResult = calculateSequencePastPawn(startRow, startCol, 
             stopRow, stopCol, straightMove,
-            dropPawnPromoteSide, dropPawnToPromoteRow, dropPawnToPromoteCol);
+            dropCaptureSide , dropCaptureRow, dropCaptureCol);
         if (executeInitResult) {
             setMachineState(MACHINE_EXECUTE_COMMAND);
         }
@@ -990,7 +990,8 @@ bool ApplicationController::executeSequence(
         executeInitResult = calculateSequencePromotePiece(startRow, startCol, 
             stopRow, stopCol, 
             promoteSide, promoteRow, promoteCol, 
-            dropPawnPromoteSide, dropPawnToPromoteRow, dropPawnToPromoteCol);
+            dropPawnPromoteSide, dropPawnToPromoteRow, dropPawnToPromoteCol,
+            dropCaptureSide, dropCaptureRow, dropCaptureCol);
         if (executeInitResult) {
             setMachineState(MACHINE_EXECUTE_COMMAND);
         }
@@ -1133,6 +1134,8 @@ bool ApplicationController::calculateSequencePastPawn(uint8_t startRow, uint8_t 
     // Check for valid coordinates
     if (startCol > 7 || startRow > 7 ||
         stopCol > 7 || stopRow > 7 ||
+        stopRow - startRow != 1 ||
+        abs(stopCol - startCol)!= 1 ||
         dropCaptureRow > 7 || dropCaptureCol > 1) {
         return false;
     }
@@ -1155,8 +1158,19 @@ bool ApplicationController::calculateSequencePromotePiece(uint8_t startRow, uint
                          uint8_t dropPawnPromoteSide, uint8_t dropPawnToPromoteRow, uint8_t dropPawnToPromoteCol,
                          uint8_t dropCaptureSide, uint8_t dropCaptureRow, uint8_t dropCaptureCol)
 {
+    ::printf("startRow[%d]\r\n",startRow);
+    ::printf("startCol[%d]\r\n",startCol);
+    ::printf("stopRow[%d]\r\n",stopRow);
+    ::printf("stopCol[%d]\r\n",stopCol);
+    ::printf("promoteRow[%d]\r\n",promoteRow);
+    ::printf("promoteCol[%d]\r\n",promoteCol);
+    ::printf("dropPawnToPromoteRow[%d]\r\n",dropPawnToPromoteRow);
+    ::printf("dropPawnToPromoteCol[%d]\r\n",dropPawnToPromoteCol);
+    ::printf("dropCaptureRow[%d]\r\n",dropCaptureRow);
+    ::printf("dropCaptureCol[%d]\r\n",dropCaptureCol);
     if(startCol > 7 || stopCol > 7 ||
-       startRow > 7 || stopRow > 7 ||
+       startRow != 6 || stopRow != 7 ||
+       abs(startCol-stopCol)>1 ||
        promoteRow > 7 || promoteCol > 1 ||
        dropPawnToPromoteRow > 7 || dropPawnToPromoteCol > 1 ||
        dropCaptureRow > 7 || dropCaptureCol > 1) {
@@ -1263,5 +1277,27 @@ void ApplicationController::initSequenceMove(int numberOfJoints) {
 void ApplicationController::executeSmoothMotionLoop(int motorID)
 {
     m_robot->executeSmoothMotion(motorID);
+}
+
+
+Point ApplicationController::calculateCellCenter(int row, int col, Point c00, Point c70, Point c77, Point c07) {
+    Point center;
+
+    // Normalize coordinates to a 0.0 to 1.0 range
+    float u = (float)row / 7.0;
+    float v = (float)col / 7.0;
+
+    // Bilinear interpolation formula
+    center.x = (1.0 - u) * (1.0 - v) * c00.x +
+               u * (1.0 - v) * c70.x +
+               u * v * c77.x +
+               (1.0 - u) * v * c07.x;
+
+    center.y = (1.0 - u) * (1.0 - v) * c00.y +
+               u * (1.0 - v) * c70.y +
+               u * v * c77.y +
+               (1.0 - u) * v * c07.y;
+
+    return center;
 }
 

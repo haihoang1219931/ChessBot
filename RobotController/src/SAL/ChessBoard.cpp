@@ -6,7 +6,8 @@ ChessBoard::ChessBoard(float x, float y, float rect, float dropZoneSpace):
     m_chessBoardPosX(x),
     m_chessBoardPosY(y),
     m_chessBoardRect(rect),
-    m_dropZoneSpace(dropZoneSpace)
+    m_dropZoneSpace(dropZoneSpace),
+    m_chessBoardSideSpace(0)
 {
     for(int rowId = 0; rowId < 8; rowId ++){
         for(int colId = 0; colId < 2; colId ++){

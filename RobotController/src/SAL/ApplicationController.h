@@ -77,6 +77,7 @@ public:
     void appendSequenceMove(Point start, Point stop, bool straightMove = false);
     void initSequenceMove(int numberOfJoints);
     void executeSmoothMotionLoop(int motorID);
+    Point calculateCellCenter(int row, int col, Point c00, Point c70, Point c77, Point c07);
     virtual void initRobot() = 0;
     virtual void specificPlatformGohome(int motorID = MAX_MOTOR, bool stopOtherStepper = true) = 0;
     virtual void hardwareStop(int motorID = MAX_MOTOR) = 0;

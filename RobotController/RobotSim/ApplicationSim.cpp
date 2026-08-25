@@ -35,7 +35,7 @@ void ApplicationSim::initRobot()
 
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
-        {true,  100.0f*(20.0f/360.0f),                0,      10,        0,        15,           0,       250,      15,   FREQUENCY_TIMER1,      0},
+        {true,  1,                0,      10,        0,        15,           0,       250,      15,   FREQUENCY_TIMER1,      0},
         {true,  1,   255,       0,      -15,        18,         -15,       150,       6,   FREQUENCY_TIMER1,    350},
         {true,  1, 80.27,     140,       50,        64,          50,       210,      12,   FREQUENCY_TIMER1,     75},
         {false,  1.0f/1.0f,                       25.57,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
@@ -47,47 +47,6 @@ void ApplicationSim::initRobot()
         m_robot->setMotorParam(motor,armPrams[motor]);
         m_robot->updateInitAngle(motor,armPrams[motor].initAngle);
     }
-    Point c00 = m_chessBoard->convertDropPoint(0,0,ZONE_PLAYER);
-    printf("c00 x(%.2f) y(%.2f)\r\n",c00.x,c00.y);
-    Point c07 = m_chessBoard->convertDropPoint(0,0,ZONE_BOT);
-    printf("c07 x(%.2f) y(%.2f)\r\n",c07.x,c07.y);
-    Point c77 = m_chessBoard->convertPoint(7,7);
-    printf("c77 x(%.2f) y(%.2f)\r\n",c77.x,c77.y);
-    /**
-     * CB r[7] c[7] x[1395] y[3325]
-        simulateReceivedCommand:[tx1395y3325]
-        [tx1395y3325] Pos confirmed
-        simulateReceivedCommand:[ts0]
-        [ts0] TS confirmed
-        TS x[3489] y[1313] m[1][787] m[2][262] m[5][892]
-     */
-//    Point targetPosition;
-//    targetPosition.x = 316.4;
-//    targetPosition.y = 163.4;
-//    int jointSteps[MAX_MOTOR];
-//    jointSteps[MOTOR_CAPTURE] = m_robot->homeAngle(MOTOR_CAPTURE);
-//    jointSteps[MOTOR_ARM3] = m_robot->homeAngle(MOTOR_ARM3);
-//    jointSteps[MOTOR_ARM4] = m_robot->homeAngle(MOTOR_ARM4);
-//    calculateJoints(targetPosition.x, targetPosition.y, -45, jointSteps);
-//    this->printf("calculateJoints x[%d] y[%d] m[1][%d] m[2][%d] m[5][%d]\r\n",
-//        (int)(targetPosition.x),
-//        (int)(targetPosition.y),
-//        jointSteps[MOTOR_ARM1],
-//        jointSteps[MOTOR_ARM2],
-//        jointSteps[MOTOR_ARM5]
-//    );
-//    m_robot->m_motorParamList[MOTOR_ARM1].currentStep = jointSteps[MOTOR_ARM1];
-//    m_robot->m_motorParamList[MOTOR_ARM2].currentStep = jointSteps[MOTOR_ARM2];
-//    m_robot->m_motorParamList[MOTOR_ARM5].currentStep = jointSteps[MOTOR_ARM5];
-//    Point currentPosition = currentPos();
-//    this->printf("TS x[%d] y[%d] m[1][%d] m[2][%d] m[5][%d]\r\n",
-//        (int)(currentPosition.x*10.0f),
-//        (int)(currentPosition.y*10.0f),
-//        m_robot->currentStep(1),
-//        m_robot->currentStep(2),
-//        m_robot->currentStep(5)
-//    );
-
 }
 
 void ApplicationSim::specificPlatformGohome(int motorID, bool stopOtherStepper)
