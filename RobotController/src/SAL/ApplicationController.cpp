@@ -1108,8 +1108,9 @@ bool ApplicationController::calculateSequenceAttack(uint8_t startRow, uint8_t st
                      uint8_t dropCaptureSide, uint8_t dropCaptureRow, uint8_t dropCaptureCol)
 {
     // Check for valid coordinates
-    if (startCol < 0 || startCol > 7 || startRow < 0 || startRow > 7 ||
-        stopCol < 0 || stopCol > 7 || stopRow < 0 || stopRow > 7) {
+    if (startCol > 7 || startRow > 7 ||
+        stopCol > 7 || stopRow > 7 ||
+        dropCaptureRow > 7 || dropCaptureCol > 1) {
         return false;
     }
     m_dropCapturePoint = m_chessBoard->convertDropPoint(dropCaptureRow, dropCaptureCol, 
@@ -1130,8 +1131,9 @@ bool ApplicationController::calculateSequencePastPawn(uint8_t startRow, uint8_t 
                      uint8_t dropCaptureSide, uint8_t dropCaptureRow, uint8_t dropCaptureCol)
 {
     // Check for valid coordinates
-    if (startCol < 0 || startCol > 7 || startRow < 0 || startRow > 7 ||
-        stopCol < 0 || stopCol > 7 || stopRow < 0 || stopRow > 7) {
+    if (startCol > 7 || startRow > 7 ||
+        stopCol > 7 || stopRow > 7 ||
+        dropCaptureRow > 7 || dropCaptureCol > 1) {
         return false;
     }
 
@@ -1153,8 +1155,11 @@ bool ApplicationController::calculateSequencePromotePiece(uint8_t startRow, uint
                          uint8_t dropPawnPromoteSide, uint8_t dropPawnToPromoteRow, uint8_t dropPawnToPromoteCol,
                          uint8_t dropCaptureSide, uint8_t dropCaptureRow, uint8_t dropCaptureCol)
 {
-    if( startCol < 0 || startCol > 7 || stopCol < 0 || stopCol > 7 ||
-        startRow < 0 || startRow > 7 || stopRow < 0 || stopRow > 7) {
+    if(startCol > 7 || stopCol > 7 ||
+       startRow > 7 || stopRow > 7 ||
+       promoteRow > 7 || promoteCol > 1 ||
+       dropPawnToPromoteRow > 7 || dropPawnToPromoteCol > 1 ||
+       dropCaptureRow > 7 || dropCaptureCol > 1) {
         return false;
     }
     // append move from attack piece -> drop -> promote -> stop -> start -> drop -> standby
@@ -1180,7 +1185,7 @@ bool ApplicationController::calculateSequencePromotePiece(uint8_t startRow, uint
 bool ApplicationController::calculateSequenceCastle(uint8_t kingRow, uint8_t kingCol,
                                                     uint8_t rookRow, uint8_t rookCol, bool straightMove)
 {
-    if( kingCol < 0 || kingCol > 7 || rookCol < 0 || rookCol > 7 ||
+    if( kingCol > 7 || rookCol > 7 ||
         (kingRow != 0 && kingRow != 7) || kingRow != rookRow) {
         return false;
     }
@@ -1197,7 +1202,7 @@ bool ApplicationController::calculateSequenceCastle(uint8_t kingRow, uint8_t kin
         rookNewPoint = m_chessBoard->convertChessBoardPoint(kingRow,kingCol+1);
     }
     clearSequenceMove();
-    appendSequenceMove(kingPoint, kingNewPoint, true);
+    appendSequenceMove(kingPoint, kingNewPoint, straightMove);
     appendSequenceMove(rookPoint, rookNewPoint);
     return true;
 }

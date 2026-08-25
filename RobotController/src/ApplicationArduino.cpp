@@ -84,8 +84,8 @@ Point ApplicationArduino::calculateCellCenter(int row, int col, Point c00, Point
     Point center;
 
     // Normalize coordinates to a 0.0 to 1.0 range
-    double u = (double)row / 7.0;
-    double v = (double)col / 7.0;
+    float u = (float)row / 7.0;
+    float v = (float)col / 7.0;
 
     // Bilinear interpolation formula
     center.x = (1.0 - u) * (1.0 - v) * c00.x +
@@ -136,6 +136,22 @@ void ApplicationArduino::initRobot()
         for (int c = 0; c < 8; c++) {
             Point center = calculateCellCenter(r, c, c00, c70, c77, c07);
             m_chessBoard->setCalibChessBoardPoint(r, c, center);
+        }
+    }
+
+    // Compute and print centers for bot drop zone
+    for (int r = -3; r <= -2; r++) {
+        for (int c = 0; c < 8; c++) {
+            Point center = calculateCellCenter(r, c, c00, c70, c77, c07);
+            m_chessBoard->setCalibDropZonePoint(r+3, c, ZONE_BOT, center);
+        }
+    }
+
+    // Compute and print centers for player drop zone
+    for (int r = 9; r <= 10; r++) {
+        for (int c = 0; c < 8; c++) {
+            Point center = calculateCellCenter(r, c, c00, c70, c77, c07);
+            m_chessBoard->setCalibDropZonePoint(r-9, c, ZONE_PLAYER, center);
         }
     }
 }
