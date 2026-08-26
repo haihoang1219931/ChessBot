@@ -1158,16 +1158,6 @@ bool ApplicationController::calculateSequencePromotePiece(uint8_t startRow, uint
                          uint8_t dropPawnPromoteSide, uint8_t dropPawnToPromoteRow, uint8_t dropPawnToPromoteCol,
                          uint8_t dropCaptureSide, uint8_t dropCaptureRow, uint8_t dropCaptureCol)
 {
-    ::printf("startRow[%d]\r\n",startRow);
-    ::printf("startCol[%d]\r\n",startCol);
-    ::printf("stopRow[%d]\r\n",stopRow);
-    ::printf("stopCol[%d]\r\n",stopCol);
-    ::printf("promoteRow[%d]\r\n",promoteRow);
-    ::printf("promoteCol[%d]\r\n",promoteCol);
-    ::printf("dropPawnToPromoteRow[%d]\r\n",dropPawnToPromoteRow);
-    ::printf("dropPawnToPromoteCol[%d]\r\n",dropPawnToPromoteCol);
-    ::printf("dropCaptureRow[%d]\r\n",dropCaptureRow);
-    ::printf("dropCaptureCol[%d]\r\n",dropCaptureCol);
     if(startCol > 7 || stopCol > 7 ||
        startRow != 6 || stopRow != 7 ||
        abs(startCol-stopCol)>1 ||
