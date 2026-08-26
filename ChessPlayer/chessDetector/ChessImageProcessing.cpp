@@ -1,7 +1,11 @@
 #include "ChessImageProcessing.h"
 #include <set>
 #include <algorithm>
-
+// Returns a brand new uppercase string
+std::string to_upper(std::string str) {
+    for (char &c : str) c = std::toupper(static_cast<unsigned char>(c));
+    return str;
+}
 ChessImageProcessing::ChessImageProcessing()
 {
     m_sourceConnected = false;
@@ -600,6 +604,61 @@ std::vector < std::vector < int >> ChessImageProcessing::cellColorFilterToMatrix
     cv::imwrite("Warped"+name+".jpg",display);
 #endif
     return matrix;
+}
+
+int ChessImageProcessing::countMatchPixelColor(const cv::Mat& imageHSV, const std::vector<TargetColor>& targetColors, int maxH, int maxSV) {
+    cv::Mat finalMask = cv::Mat::zeros(imageHSV.size(), CV_8UC1);
+    // Loop through every standalone paired color configuration context block
+    for (const auto& target : targetColors) {
+        int lowerH = std::max(0, (int)target.hsvValue[0] - target.hTolerance);
+        int upperH = std::min(maxH, (int)target.hsvValue[0] + target.hTolerance);
+
+        int lowerS = std::max(0, (int)target.hsvValue[1] - target.sTolerance);
+        int upperS = std::min(maxSV, (int)target.hsvValue[1] + target.sTolerance);
+
+        int lowerV = std::max(0, (int)target.hsvValue[2] - target.vTolerance);
+        int upperV = std::min(maxSV, (int)target.hsvValue[2] + target.vTolerance);
+
+        cv::Scalar lowerBound(lowerH, lowerS, lowerV);
+        cv::Scalar upperBound(upperH, upperS, upperV);
+
+        cv::Mat singleMask;
+        cv::inRange(imageHSV, lowerBound, upperBound, singleMask);
+
+        // Merge mask arrays using logical bitwise operations
+        cv::bitwise_or(finalMask, singleMask, finalMask);
+    }
+    return cv::countNonZero(finalMask);
+}
+
+void ChessImageProcessing::checkPieceColor(const cv::Mat& imageRGB, ClassificationResult& pieceClass)
+{
+    cv::Mat imgHSV;
+    cv::cvtColor(imageRGB, imgHSV, cv::COLOR_BGR2HSV);
+    // Gray
+    std::vector<TargetColor> configGray;
+    configGray.push_back({cv::Scalar(20, 8, 91),50,40,40});
+    configGray.push_back({cv::Scalar(0, 0, 156),50,40,40});
+
+    // Gold
+    std::vector<TargetColor> configGold;
+    configGold.push_back({cv::Scalar(18, 190, 185),50,40,40});
+    configGold.push_back({cv::Scalar(21, 98, 243),50,40,40});
+    cv::Size originImageSize = imgHSV.size();
+    cv::Mat bottomHSV = imgHSV(cv::Rect(0,originImageSize.height/2,
+                                                originImageSize.width,originImageSize.height/2));
+    int grayPixels = countMatchPixelColor(bottomHSV,configGray,180,255);
+    int goldPixels = countMatchPixelColor(bottomHSV,configGold,180,255);
+    std::string pieceColor = "unknown";
+    if(grayPixels > 3 * goldPixels / 2 && grayPixels > 1500) pieceColor = "black";
+    else if((goldPixels > 3 * grayPixels / 2 && goldPixels > 1500) ||
+            goldPixels > 5000) {
+        pieceColor = "white";
+        pieceClass.className = to_upper(pieceClass.className);
+    }
+    pieceClass.color = pieceColor;
+    pieceClass.goldPixels = goldPixels;
+    pieceClass.grayPixels = grayPixels;
 }
 
 bool ChessImageProcessing::detectMovePhase3Classification()
@@ -1341,10 +1400,23 @@ void ChessImageProcessing::classsifyChessBoardImage(cv::Mat& warpedBoard) {
             cv::Rect tallCellROI(cropX, cropY, cropW, cropH);
             cv::Mat croppedCell = warpedBoard(tallCellROI);
             ClassificationResult piece = classifyImage(croppedCell);
+            std::string cropCellName = "debug/"
+                                       "r"+std::to_string(row)+
+                                       "c"+std::to_string(col)+".jpg";
+            cv::imwrite(cropCellName,croppedCell);
+            checkPieceColor(croppedCell, piece);
 #ifdef DEBUG_ROI
             cv::rectangle(warpedBoard,tallCellROI,cv::Scalar(0,255,255),2);
-            cv::putText(warpedBoard,piece.className + ":" +std::to_string((int)piece.probability),
+            cv::putText(warpedBoard,piece.className + " :" +std::to_string((int)piece.probability),
                         cv::Point(cropX + 20,cropY+ 60),
+                         cv::FONT_HERSHEY_SIMPLEX, 2, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+            cv::putText(warpedBoard,
+                        std::to_string(piece.grayPixels),
+                        cv::Point(cropX + 20,cropY+ 120),
+                         cv::FONT_HERSHEY_SIMPLEX, 2, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+            cv::putText(warpedBoard,
+                        std::to_string(piece.goldPixels),
+                        cv::Point(cropX + 20,cropY+ 180),
                          cv::FONT_HERSHEY_SIMPLEX, 2, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
 
 #endif

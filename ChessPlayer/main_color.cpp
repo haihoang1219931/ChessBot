@@ -1,413 +1,255 @@
-//#include <opencv2/opencv.hpp>
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <vector>
 
-//#include <opencv2/imgproc.hpp>
+// 1. Struct to hold a single color paired with its specific tolerances
+struct TargetColor {
+    cv::Scalar hsvValue;
+    int hTolerance;
+    int sTolerance;
+    int vTolerance;
+};
 
-//#include <iostream>
+// 2. Master configuration struct to hold application state
+struct ColorFilterConfig {
+    cv::Mat imgOriginal;
+    cv::Mat imgHSV;
+    cv::Mat imgResult;
 
-//#include <vector>
+    // Dynamic array tracking both colors and their paired individual tolerances
+    std::vector<TargetColor> targetColors;
 
-////#define CALIBRATION_COLOR
-//using namespace cv;
-//using namespace std;
-//typedef enum {
-//    BLACK,
-//    WHITE,
-//    YELLOW
-//} COLOR_FILTER;
-//static Mat img, warped, hsvWarp;
-//static vector < Point2f > srcCorners;
-//static bool warpedReady = false;
+    // Trackbar variables linked directly to the UI (tracks the active color layer)
+    int currentHTolerance = 10;
+    int currentSTolerance = 40;
+    int currentVTolerance = 40;
 
-//static Vec3b sampledHSV = Vec3b(0, 0, 0);
-//static bool hasSample = false;
-//static int hTolSample = 55;
-//static int sTolSample = 87;
-//static int vTolSample = 12;
-//static int roiPercentSample = 60;
+    const int MAX_H = 180;
+    const int MAX_SV = 255;
+};
 
-//static int minWhitePercentSample = 10;
-//static int maxBlackPercentSample = 25;
+// Function declarations
+void updateFilter(ColorFilterConfig* config);
+void onMouseClick(int event, int x, int y, int flags, void* userdata);
+void onTrackbarChange(int, void* userdata);
 
-//// Calibration slots
-//static Vec3b blackHSV = Vec3b(96,87,40);
-////static Vec3b whiteHSV = Vec3b(85,44,145);
-//static Vec3b whiteHSV = Vec3b(93,60,145);
-//static Vec3b yellowHSV = Vec3b(25,81,181);
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        std::cout << "Usage: " << argv[0] << " <Path_to_Image>" << std::endl;
+        return -1;
+    }
 
-//#ifndef CALIBRATION_COLOR
-//static bool blackCalibrated = true;
-//static bool whiteCalibrated = true;
-//static bool yellowCalibrated = true;
-//#else
-//static bool blackCalibrated = false;
-//static bool whiteCalibrated = false;
-//static bool yellowCalibrated = false;
+    cv::Mat imageOrigin = cv::imread(argv[1]);
+    if (imageOrigin.empty()) {
+        std::cerr << "Error: Could not open or find the image at: " << argv[1] << std::endl;
+        return -1;
+    }
+    ColorFilterConfig config;
+    cv::resize(imageOrigin,config.imgOriginal,cv::Size(240,240));
+    cv::cvtColor(config.imgOriginal, config.imgHSV, cv::COLOR_BGR2HSV);
+    config.imgResult = cv::Mat::zeros(config.imgOriginal.size(), config.imgOriginal.type());
 
-//#endif
-//static int hTolCalibrated[5] = {38, 49, 11};
-//static int sTolCalibrated[5] = {60, 26, 85};
-//static int vTolCalibrated[5] = {60, 131, 113};
-//static int roiPercentCalibrated[5] = {71, 54, 69};
+    cv::namedWindow("Original Image", cv::WINDOW_AUTOSIZE);
+    cv::namedWindow("Filtered Result", cv::WINDOW_AUTOSIZE);
+    cv::namedWindow("Controls", cv::WINDOW_AUTOSIZE);
 
-//static int minWhitePercentCalibrated[5] = {70,86,20};
-//static int maxBlackPercentCalibrated[5] = {25,25,25};
+    cv::setMouseCallback("Original Image", onMouseClick, &config);
 
-//const int WARP_SIZE = 640;
+    // Trackbars bind to current variables; changes propagate to the active target color
+    cv::createTrackbar("Active Hue Range", "Controls", &config.currentHTolerance, config.MAX_H, onTrackbarChange, &config);
+    cv::createTrackbar("Active Sat Range", "Controls", &config.currentSTolerance, config.MAX_SV, onTrackbarChange, &config);
+    cv::createTrackbar("Active Val Range", "Controls", &config.currentVTolerance, config.MAX_SV, onTrackbarChange, &config);
 
+    cv::imshow("Original Image", config.imgOriginal);
+    cv::imshow("Filtered Result", config.imgResult);
 
-//// Helper to print matrix properties cleanly to the console log
-//static void printMatrix(const string & name,
-//                        const vector < vector < int >> & mat) {
-//    cout << "\n--- 8x8 Matrix: " << name << " ---" << endl;
-//    for (int r = 0; r < 8; ++r) {
-//        for (int c = 0; c < 8; ++c) {
-//            cout << mat[r][c] << " ";
-//        }
-//        cout << endl;
-//    }
-//}
+    std::cout << "Instructions:" << std::endl;
+    std::cout << "- Click on 'Original Image' to add a new color target." << std::endl;
+    std::cout << "- Move trackbars to tweak tolerances *only* for the last color clicked." << std::endl;
+    std::cout << "- Press 'U' to undo the last clicked color layer." << std::endl;
+    std::cout << "- Press 'C' to clear all layers entirely." << std::endl;
+    std::cout << "- Press 'ESC' or 'Q' to quit." << std::endl;
 
-//static void drawCornersAndShow() {
-//    Mat disp = img.clone();
-//    for (size_t i = 0; i < srcCorners.size(); ++i) {
-//        circle(disp, srcCorners[i], 6, Scalar(0, 255, 0), -1);
-//        putText(disp, to_string((int) i + 1), srcCorners[i] + Point2f(6.f, -6.f), FONT_HERSHEY_SIMPLEX, 0.6, Scalar(0, 255, 0), 2);
-//    }
-//    imshow("Original", disp);
-//}
+    while (true) {
+        char key = (char)cv::waitKey(10);
+        if (key == 27 || key == 'q' || key == 'Q') {
+            break;
+        }
+        // 'C' to clear everything
+        if (key == 'c' || key == 'C') {
+            config.targetColors.clear();
+            config.imgResult = cv::Mat::zeros(config.imgOriginal.size(), config.imgOriginal.type());
+            cv::imshow("Filtered Result", config.imgResult);
+            std::cout << "Cleared all color layers." << std::endl;
+        }
+        // 'U' to undo the last color layer added
+        if (key == 'u' || key == 'U') {
+            if (!config.targetColors.empty()) {
+                config.targetColors.pop_back();
+                std::cout << "Removed last layer. Remaining color layers: " << config.targetColors.size() << std::endl;
 
-//static void computeWarp() {
-//    if (srcCorners.size() != 4) return;
-//    vector < Point2f > dst {
-//        Point2f(0, 0), Point2f(WARP_SIZE - 1, 0), Point2f(WARP_SIZE - 1, WARP_SIZE - 1), Point2f(0, WARP_SIZE - 1)
-//    };
-//    Mat M = getPerspectiveTransform(srcCorners, dst);
-//    warpPerspective(img, warped, M, Size(WARP_SIZE, WARP_SIZE));
-//    cvtColor(warped, hsvWarp, COLOR_BGR2HSV);
-//    warpedReady = true;
-//}
+                // If a previous layer exists, restore its specific sliders to the UI view
+                if (!config.targetColors.empty()) {
+                    TargetColor lastRemaining = config.targetColors.back();
+                    config.currentHTolerance = lastRemaining.hTolerance;
+                    config.currentSTolerance = lastRemaining.sTolerance;
+                    config.currentVTolerance = lastRemaining.vTolerance;
 
-//// PARAMETERIZED API: Accepts an HSV target input and returns an 8x8 status matrix
-//static vector < vector < int >> updateAndShow(Vec3b targetHSV,
-//                                              int hTol, int sTol, int vTol,
-//                                              int roiPercent, int minWhitePercent, int maxBlackPercent,
-//                                              bool updateUI = true) {
-//    vector < vector < int >> matrix(8, vector < int > (8, 0));
-//    if (!warpedReady) return matrix;
+                    cv::setTrackbarPos("Active Hue Range", "Controls", config.currentHTolerance);
+                    cv::setTrackbarPos("Active Sat Range", "Controls", config.currentSTolerance);
+                    cv::setTrackbarPos("Active Val Range", "Controls", config.currentVTolerance);
+                }
+                updateFilter(&config);
+            } else {
+                std::cout << "No color layers left to remove!" << std::endl;
+            }
+        }
+    }
 
-//    Mat display = warped.clone();
-//    Mat maskAll = Mat::zeros(warped.size(), CV_8UC1);
+    cv::destroyAllWindows();
+    return 0;
+}
+int countMatchPixelColor(const cv::Mat& imageHSV, const std::vector<TargetColor>& targetColors, int maxH, int maxSV) {
+    cv::Mat finalMask = cv::Mat::zeros(imageHSV.size(), CV_8UC1);
+    // Loop through every standalone paired color configuration context block
+    for (const auto& target : targetColors) {
+        int lowerH = std::max(0, (int)target.hsvValue[0] - target.hTolerance);
+        int upperH = std::min(maxH, (int)target.hsvValue[0] + target.hTolerance);
 
-//    int h = targetHSV[0];
-//    int s = targetHSV[1];
-//    int v = targetHSV[2];
+        int lowerS = std::max(0, (int)target.hsvValue[1] - target.sTolerance);
+        int upperS = std::min(maxSV, (int)target.hsvValue[1] + target.sTolerance);
 
-//    int lowH = h - hTol;
-//    int highH = h + hTol;
-//    int lowS = max(0, s - sTol);
-//    int highS = min(255, s + sTol);
-//    int lowV = max(0, v - vTol);
-//    int highV = min(255, v + vTol);
+        int lowerV = std::max(0, (int)target.hsvValue[2] - target.vTolerance);
+        int upperV = std::min(maxSV, (int)target.hsvValue[2] + target.vTolerance);
 
-//    Mat mask;
-//    if (lowH < 0) {
-//        Mat m1, m2;
-//        inRange(hsvWarp, Scalar(0, lowS, lowV), Scalar(highH, highS, highV), m1);
-//        inRange(hsvWarp, Scalar(180 + lowH, lowS, lowV), Scalar(180, highS, highV), m2);
-//        bitwise_or(m1, m2, mask);
-//    } else if (highH > 180) {
-//        Mat m1, m2;
-//        inRange(hsvWarp, Scalar(lowH, lowS, lowV), Scalar(180, highS, highV), m1);
-//        inRange(hsvWarp, Scalar(0, lowS, lowV), Scalar(highH - 180, highS, highV), m2);
-//        bitwise_or(m1, m2, mask);
-//    } else {
-//        inRange(hsvWarp, Scalar(lowH, lowS, lowV), Scalar(highH, highS, highV), mask);
-//    }
+        cv::Scalar lowerBound(lowerH, lowerS, lowerV);
+        cv::Scalar upperBound(upperH, upperS, upperV);
 
-//    Mat kernel = getStructuringElement(MORPH_ELLIPSE, Size(3, 3));
-//    morphologyEx(mask, mask, MORPH_OPEN, kernel);
-//    morphologyEx(mask, mask, MORPH_CLOSE, kernel);
+        cv::Mat singleMask;
+        cv::inRange(imageHSV, lowerBound, upperBound, singleMask);
 
-//    const int cellW = WARP_SIZE / 8;
-//    const int cellH = WARP_SIZE / 8;
-//    const int roiW = max(2, (cellW * roiPercent) / 100);
-//    const int roiH = max(2, (cellH * roiPercent) / 100);
+        // Merge mask arrays using logical bitwise operations
+        cv::bitwise_or(finalMask, singleMask, finalMask);
+    }
+    return cv::countNonZero(finalMask);
+}
+#define DEBUG_FILTER_COLOR
+// Process and isolate independent color masks using their specific individual tolerances
+void updateFilter(ColorFilterConfig* config) {
+    if (config->targetColors.empty()) {
+        config->imgResult = cv::Mat::zeros(config->imgOriginal.size(), config->imgOriginal.type());
+        cv::imshow("Filtered Result", config->imgResult);
+        return;
+    }
+#ifdef DEBUG_FILTER_COLOR
+    cv::Mat finalMask = cv::Mat::zeros(config->imgOriginal.size(), CV_8UC1);
 
-//    for (int r = 0; r < 8; ++r) {
-//        for (int c = 0; c < 8; ++c) {
-//            int cx = c * cellW + cellW / 2;
-//            int cy = r * cellH + cellH / 2;
-//            int x0 = cx - roiW / 2;
-//            int y0 = cy - roiH / 2;
-//            Rect roiRect(x0, y0, roiW, roiH);
-//            roiRect &= Rect(0, 0, warped.cols, warped.rows);
+    // Loop through every standalone paired color configuration context block
+    for (const auto& target : config->targetColors) {
+        int lowerH = std::max(0, (int)target.hsvValue[0] - target.hTolerance);
+        int upperH = std::min(config->MAX_H, (int)target.hsvValue[0] + target.hTolerance);
 
-//            Mat roiMask = mask(roiRect);
-//            double whitePixels = countNonZero(roiMask);
-//            double area = roiRect.width * roiRect.height;
-//            double blackPixels = area - whitePixels;
+        int lowerS = std::max(0, (int)target.hsvValue[1] - target.sTolerance);
+        int upperS = std::min(config->MAX_SV, (int)target.hsvValue[1] + target.sTolerance);
 
-//            double whiteFrac = area > 0 ? (whitePixels / area) : 0.0;
-//            double blackFrac = area > 0 ? (blackPixels / area) : 0.0;
+        int lowerV = std::max(0, (int)target.hsvValue[2] - target.vTolerance);
+        int upperV = std::min(config->MAX_SV, (int)target.hsvValue[2] + target.vTolerance);
 
-//            double minWhiteThresh = minWhitePercent / 100.0;
-//            double maxBlackThresh = maxBlackPercent / 100.0;
+        cv::Scalar lowerBound(lowerH, lowerS, lowerV);
+        cv::Scalar upperBound(upperH, upperS, upperV);
 
-//            // Logic: Mostly the selected input color backdrop containing a small edge profile/shadow
-//            //      bool isColorDetected = (whiteFrac >= minWhiteThresh) && (blackFrac > 0.01) && (blackFrac <= maxBlackThresh);
-//            bool isColorDetected = whiteFrac >= minWhiteThresh;
-//            if (isColorDetected) {
-//                matrix[r][c] = 1;
-//            }
+        cv::Mat singleMask;
+        cv::inRange(config->imgHSV, lowerBound, upperBound, singleMask);
 
-//            if (updateUI) {
-//                Scalar boxColor = isColorDetected ? Scalar(0, 255, 0) : Scalar(0, 0, 255);
-//                rectangle(display, roiRect, boxColor, 2);
-//                if (isColorDetected) {
-//                    putText(display, std::to_string(whiteFrac), Point(roiRect.x + 2, roiRect.y + 16), FONT_HERSHEY_SIMPLEX, 0.4, boxColor, 1);
-//                }
-//                Mat maskAllRoi = maskAll(roiRect);
-//                bitwise_or(maskAllRoi, roiMask, maskAllRoi);
-//            }
-//        }
-//    }
+        // Merge mask arrays using logical bitwise operations
+        cv::bitwise_or(finalMask, singleMask, finalMask);
+        cv::imshow("singleMask",singleMask);
+        cv::imshow("finalMask",finalMask);
+    }
 
-//    if (updateUI) {
-//        Mat overlay = Mat::zeros(warped.size(), CV_8UC3);
-//        overlay.setTo(Scalar(0, 255, 255), maskAll);
-//        addWeighted(overlay, 0.4, display, 0.6, 0, display);
+    config->imgResult = cv::Mat::zeros(config->imgOriginal.size(), config->imgOriginal.type());
+    config->imgOriginal.copyTo(config->imgResult, finalMask);
 
-//        stringstream ss;
-//        ss << "Testing HSV(" << h << "," << s << "," << v << ")";
-//        putText(display, ss.str(), Point(10, 20), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(255, 255, 255), 2);
-//        imshow("Warped", display);
-//        imshow("Mask", maskAll);
-//    }
-//    printMatrix("matrix",matrix);
-//    return matrix;
-//}
+    cv::imshow("Filtered Result", config->imgResult);
+#else
+    // Gray
+    std::vector<TargetColor> configGray;
+    configGray.push_back({cv::Scalar(20, 8, 91),50,40,40});
+    configGray.push_back({cv::Scalar(0, 0, 156),50,40,40});
 
-//// Trackbar callback redirection helper
-//static void onTrackbarChange(int, void * ) {
-//    if (hasSample) updateAndShow(sampledHSV,
-//                                 hTolSample,sTolSample,vTolSample,
-//                                 roiPercentSample,minWhitePercentSample,maxBlackPercentSample,
-//                                 true);
-//}
+    // Gold
+    std::vector<TargetColor> configGold;
+    configGold.push_back({cv::Scalar(18, 190, 185),50,40,40});
+    configGold.push_back({cv::Scalar(21, 98, 243),50,40,40});
+    cv::Size originImageSize = config->imgHSV.size();
+    cv::Mat bottomHSV = config->imgHSV(cv::Rect(0,originImageSize.height/2,
+                                                originImageSize.width,originImageSize.height/2));
+    int grayPixels = countMatchPixelColor(bottomHSV,configGray,180,255);
+    int goldPixels = countMatchPixelColor(bottomHSV,configGold,180,255);
+    std::string pieceColor;
 
-//static void onOriginalMouse(int event, int x, int y, int flags, void * userdata) {
-//    if (event != EVENT_LBUTTONDOWN) return;
-//    if (srcCorners.size() < 4) {
-//        srcCorners.emplace_back((float) x, (float) y);
-//        drawCornersAndShow();
-//        if (srcCorners.size() == 4) {
-//            computeWarp();
-//            updateAndShow(sampledHSV,
-//                          hTolSample,sTolSample,vTolSample,
-//                          roiPercentSample,minWhitePercentSample,maxBlackPercentSample,
-//                          true);
-//        }
-//    }
-//}
+    if(grayPixels > 3 * goldPixels) pieceColor = "black";
+    else if(goldPixels > 3 * grayPixels) pieceColor = "white";
+    else pieceColor = "unknown";
+    printf("Gray(%d/%d)Gold => [%s]\r\n",
+           grayPixels,goldPixels,pieceColor.c_str());
+#endif
+}
 
-//static void onWarpedMouse(int event, int x, int y, int flags, void * userdata) {
-//    if (event != EVENT_LBUTTONDOWN) return;
-//    if (!warpedReady) return;
-//    if (x < 0 || x >= warped.cols || y < 0 || y >= warped.rows) return;
+// Mouse parser capturing unique values and embedding them into standalone structs
+void onMouseClick(int event, int x, int y, int flags, void* userdata) {
+    if (event == cv::EVENT_LBUTTONDOWN) {
+        ColorFilterConfig* config = static_cast<ColorFilterConfig*>(userdata);
 
-//    int r = 3;
-//    int x0 = max(0, x - r), x1 = min(warped.cols - 1, x + r);
-//    int y0 = max(0, y - r), y1 = min(warped.rows - 1, y + r);
-//    Mat roi = hsvWarp(Range(y0, y1 + 1), Range(x0, x1 + 1));
-//    Scalar avg = mean(roi);
-//    sampledHSV[0] = static_cast < uchar > (avg[0]);
-//    sampledHSV[1] = static_cast < uchar > (avg[1]);
-//    sampledHSV[2] = static_cast < uchar > (avg[2]);
-//    hasSample = true;
-//    updateAndShow(sampledHSV,
-//                  hTolSample,sTolSample,vTolSample,
-//                  roiPercentSample,minWhitePercentSample,maxBlackPercentSample,
-//                  true);
-//}
+        cv::Vec3b hsvPixel = config->imgHSV.at<cv::Vec3b>(cv::Point(x, y));
+        cv::Scalar newColorValue(hsvPixel[0], hsvPixel[1], hsvPixel[2]);
 
-//int main(int argc, char ** argv) {
-//    if (argc < 2) {
-//        cout << "Usage: " << argv[0] << " <image_path>" << endl;
-//        return -1;
-//    }
+        // Construct a unique color package matching current slider adjustments
+        TargetColor newTarget;
+        newTarget.hsvValue = newColorValue;
+        newTarget.hTolerance = config->currentHTolerance;
+        newTarget.sTolerance = config->currentSTolerance;
+        newTarget.vTolerance = config->currentVTolerance;
 
-//    img = imread(argv[1], IMREAD_COLOR);
-//    if (img.empty()) {
-//        cerr << "Failed to open image" << endl;
-//        return -1;
-//    }
+        config->targetColors.push_back(newTarget);
 
-//    namedWindow("Original", WINDOW_NORMAL);
-//    namedWindow("Warped", WINDOW_NORMAL);
-//    namedWindow("Mask", WINDOW_NORMAL);
+        std::cout << "\nAdded Layer #" << config->targetColors.size() << std::endl;
+        std::cout << "-> HSV Base: [" << (int)newColorValue[0] << ", " << (int)newColorValue[1] << ", " << (int)newColorValue[2] << "]" << std::endl;
+        std::cout << "-> Frozen Tolerances: [H=" << newTarget.hTolerance << ", S=" << newTarget.sTolerance << ", V=" << newTarget.vTolerance << "]" << std::endl;
 
-//    setMouseCallback("Original", onOriginalMouse);
-//    setMouseCallback("Warped", onWarpedMouse);
+        updateFilter(config);
+    }
+}
 
-//    createTrackbar("H Tol", "Warped", & hTolSample, 90, onTrackbarChange);
-//    createTrackbar("S Tol", "Warped", & sTolSample, 255, onTrackbarChange);
-//    createTrackbar("V Tol", "Warped", & vTolSample, 255, onTrackbarChange);
-//    createTrackbar("ROI %", "Warped", & roiPercentSample, 100, onTrackbarChange);
-//    createTrackbar("Min White %", "Warped", & minWhitePercentSample, 100, onTrackbarChange);
-//    createTrackbar("Max Black %", "Warped", & maxBlackPercentSample, 100, onTrackbarChange);
+// Slider routine updating the active color layer configuration profile
+void onTrackbarChange(int, void* userdata) {
+    ColorFilterConfig* config = static_cast<ColorFilterConfig*>(userdata);
 
-//    cout << "Instructions:\n" <<
-//            " - Select 4 corners on 'Original'.\n" <<
-//            " - Click anywhere on 'Warped' to track live color attributes.\n" <<
-//            " - Press '1' to save live selection as BLACK cell color.\n" <<
-//            " - Press '2' to save live selection as WHITE cell color.\n" <<
-//            " - Press '3' to save live selection as YELLOW chess piece color.\n" <<
-//            " - Press '4' to compute Silver chess pieces matrix & display on standalone frame.\n" <<
-//            " - Press 'r' to clear corners, 'q' to exit.\n" << endl;
+    // If a layer is active, update its isolated settings using the adjusted sliders
+    if (!config->targetColors.empty()) {
+        TargetColor& activeTarget = config->targetColors.back();
+        activeTarget.hTolerance = config->currentHTolerance;
+        activeTarget.sTolerance = config->currentSTolerance;
+        activeTarget.vTolerance = config->currentVTolerance;
+    }
 
-//    drawCornersAndShow();
+    updateFilter(config);
+}
 
-//    while (true) {
-//        char key = (char) waitKey(30);
-//        if (key == 'q' || key == 27) break;
-//        if (key == 'r') {
-//            srcCorners.clear();
-//            warpedReady = false;
-//            hasSample = false;
-//            drawCornersAndShow();
-//        }
-
-//        if (key == '1') // Calibrate Black cell
-//        {
-//            if (hasSample) {
-//                blackHSV = sampledHSV;
-//                hTolCalibrated[BLACK] = hTolSample;
-//                sTolCalibrated[BLACK] = sTolSample;
-//                vTolCalibrated[BLACK] = vTolSample;
-//                roiPercentCalibrated[BLACK] = roiPercentSample;
-//                minWhitePercentCalibrated[BLACK] = minWhitePercentSample;
-//                maxBlackPercentCalibrated[BLACK] = maxBlackPercentSample;
-//                blackCalibrated = true;
-//                cout << "[CALIB] Saved Black Cells HSV: (" << (int) blackHSV[0] << "," << (int) blackHSV[1] << "," << (int) blackHSV[2] << ")"
-//                     <<"["<< hTolSample << ","
-//                     << sTolSample << ","
-//                     << vTolSample << ","
-//                     << roiPercentSample << ","
-//                     << minWhitePercentSample << ","
-//                     << maxBlackPercentSample << "]" << endl;
-//            } else {
-//                cout << "[WARN] Please click to sample a color first!" << endl;
-//            }
-//        }
-//        if (key == '2') // Calibrate White cell
-//        {
-//            if (hasSample) {
-//                whiteHSV = sampledHSV;
-//                hTolCalibrated[WHITE] = hTolSample;
-//                sTolCalibrated[WHITE] = sTolSample;
-//                vTolCalibrated[WHITE] = vTolSample;
-//                roiPercentCalibrated[WHITE] = roiPercentSample;
-//                minWhitePercentCalibrated[WHITE] = minWhitePercentSample;
-//                maxBlackPercentCalibrated[WHITE] = maxBlackPercentSample;
-//                whiteCalibrated = true;
-//                cout << "[CALIB] Saved White Cells HSV: (" << (int) whiteHSV[0] << "," << (int) whiteHSV[1] << "," << (int) whiteHSV[2] << ")"
-//                     <<"["<< hTolSample << ","
-//                     << sTolSample << ","
-//                     << vTolSample << ","
-//                     << roiPercentSample << ","
-//                     << minWhitePercentSample << ","
-//                     << maxBlackPercentSample << "]" << endl;
-//            } else {
-//                cout << "[WARN] Please click to sample a color first!" << endl;
-//            }
-//        }
-//        if (key == '3') // Calibrate Yellow chess pieces
-//        {
-//            if (hasSample) {
-//                yellowHSV = sampledHSV;
-//                hTolCalibrated[YELLOW] = hTolSample;
-//                sTolCalibrated[YELLOW] = sTolSample;
-//                vTolCalibrated[YELLOW] = vTolSample;
-//                roiPercentCalibrated[YELLOW] = roiPercentSample;
-//                minWhitePercentCalibrated[YELLOW] = minWhitePercentSample;
-//                maxBlackPercentCalibrated[YELLOW] = maxBlackPercentSample;
-//                yellowCalibrated = true;
-//                cout << "[CALIB] Saved Yellow Pieces HSV: (" << (int) yellowHSV[0] << "," << (int) yellowHSV[1] << "," << (int) yellowHSV[2] << ")"
-//                     <<"["<< hTolSample << ","
-//                     << sTolSample << ","
-//                     << vTolSample << ","
-//                     << roiPercentSample << ","
-//                     << minWhitePercentSample << ","
-//                     << maxBlackPercentSample << "]" << endl;
-//            } else {
-//                cout << "[WARN] Click to sample a piece profile on the warped view first!" << endl;
-//            }
-//        }
-//        if (key == '4') // Logical processing step
-//        {
-//            if (!warpedReady) {
-//                cout << "[ERROR] You must finish defining the 4 board corners first." << endl;
-//                continue;
-//            }
-//            if (!blackCalibrated || !whiteCalibrated || !yellowCalibrated) {
-//                cout << "[ERROR] Calibration profiling incomplete! Run steps '1' and '2' first." << endl;
-//                continue;
-//            }
-//            // Run analysis loops completely independent of current live preview drawing
-//            auto blackResult = updateAndShow(blackHSV,
-//                                             hTolCalibrated[BLACK],sTolCalibrated[BLACK],vTolCalibrated[BLACK],
-//                                             roiPercentCalibrated[BLACK],minWhitePercentCalibrated[BLACK],maxBlackPercentCalibrated[BLACK],
-//                                             false);
-//            auto whiteResult = updateAndShow(whiteHSV,
-//                                             hTolCalibrated[WHITE],sTolCalibrated[WHITE],vTolCalibrated[WHITE],
-//                                             roiPercentCalibrated[WHITE],minWhitePercentCalibrated[WHITE],maxBlackPercentCalibrated[WHITE],
-//                                             false);
-//            auto yellowResult = updateAndShow(yellowHSV,
-//                                              hTolCalibrated[YELLOW],sTolCalibrated[YELLOW],vTolCalibrated[YELLOW],
-//                                              roiPercentCalibrated[YELLOW],minWhitePercentCalibrated[YELLOW],maxBlackPercentCalibrated[YELLOW],
-//                                              false);
-//            printMatrix("Black Targets", blackResult);
-//            printMatrix("White Targets", whiteResult);
-//            printMatrix("Yellow Pieces", yellowResult);
-//            // Inversion matrix configuration: NOT black board, NOT white board, NOT yellow piece = Silver piece
-//            vector < vector < int >> silverResult(8, vector<int>(8, 0));
-//            Mat silverDisplay = warped.clone();
-//            const int cellW = WARP_SIZE / 8;
-//            const int cellH = WARP_SIZE / 8;
-//            const int roiW = max(2, (cellW * roiPercentSample) / 100);
-//            const int roiH = max(2, (cellH * roiPercentSample) / 100);
-//            for (int r = 0; r < 8; ++r) {
-//                for (int c = 0; c < 8; ++c) {
-//                    int cx = c * cellW + cellW / 2;
-//                    int cy = r * cellH + cellH / 2;
-//                    int x0 = cx - roiW / 2;
-//                    int y0 = cy - roiH / 2;
-//                    Rect roiRect(x0, y0, roiW, roiH);
-//                    roiRect &= Rect(0, 0, warped.cols, warped.rows);
-//                    if (blackResult[r][c] == 1) {
-//                        rectangle(silverDisplay, roiRect, Scalar(0, 0, 0), 2); // Highlight bounding box
-//                        putText(silverDisplay, "BLACK", Point(roiRect.x + 2, roiRect.y + 16), FONT_HERSHEY_SIMPLEX, 0.4, Scalar(0, 0, 0), 1);
-//                    }
-//                    if (whiteResult[r][c] == 1) {
-//                        rectangle(silverDisplay, roiRect, Scalar(255, 255, 255), 2); // Highlight bounding box
-//                        putText(silverDisplay, "WHITE", Point(roiRect.x + 2, roiRect.y + 16), FONT_HERSHEY_SIMPLEX, 0.4, Scalar(255, 255, 255), 1);
-//                    }
-//                    if (yellowResult[r][c] == 1) {
-//                        rectangle(silverDisplay, roiRect, Scalar(0, 255, 255), 2); // Highlight bounding box
-//                        putText(silverDisplay, "YELLOW", Point(roiRect.x + 2, roiRect.y + 16), FONT_HERSHEY_SIMPLEX, 0.4, Scalar(0, 255, 255), 1);
-//                    }
-//                    if (blackResult[r][c] == 0 && whiteResult[r][c] == 0 && yellowResult[r][c] == 0) {
-//                        silverResult[r][c] = 1;
-//                        rectangle(silverDisplay, roiRect, Scalar(255, 255, 0), 2); // Highlight bounding box
-//                        putText(silverDisplay, "SILVER", Point(roiRect.x + 2, roiRect.y + 16), FONT_HERSHEY_SIMPLEX, 0.4, Scalar(255, 255, 0), 1);
-//                    }
-//                }
-//            }
-//            printMatrix("Silver Pieces Output Array", silverResult);
-//            namedWindow("Silver Pieces", WINDOW_NORMAL);
-//            imshow("Silver Pieces", silverDisplay);
-//            cout << "[LOG] Pass computations complete. Processing grids printed above." << endl;
-//        }
-//    }
-//    return 0;
-//}
+/**
+ * Gray
+ * Hue: 83, Sat: 100, Val: 40
+ * Gray HSV: [40, 17, 135]
+ * Gray HSV: [15, 65, 94]
+ * Gray HSV: [86, 17, 104]
+ *
+ * Gray HSV: [30, 8, 194] Hue: 92, Sat: 47, Val: 127
+ *
+ * Hue: 6, Sat: 24, Val: 254
+ * Gray HSV: [100, 47, 211]
+ * Yellow HSV: [20, 157, 210]
+ * Yellow HSV: [19, 178, 191]
+ *
+ * 92, 85, 67
+ * Yellow HSV: [20, 155, 188]
+*/

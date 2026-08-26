@@ -49,10 +49,18 @@ struct MoveDetectParams {
     int numLoopCheckPiece = 5;  // Color threshold
     std::string playerSide = "white";
 };
-
+struct TargetColor {
+    cv::Scalar hsvValue;
+    int hTolerance;
+    int sTolerance;
+    int vTolerance;
+};
 typedef struct {
     std::string className;
     float probability;
+    std::string color;
+    int grayPixels;
+    int goldPixels;
 } ClassificationResult;
 
 class ChessImageProcessing
@@ -98,6 +106,8 @@ public:
                                                   int hTol, int sTol, int vTol,
                                                   int roiPercent, int minWhitePercent, int maxBlackPercent,
                                                   std::string name);
+    int countMatchPixelColor(const cv::Mat& imageHSV, const std::vector<TargetColor>& targetColors, int maxH, int maxSV);
+    void checkPieceColor(const cv::Mat& imageRGB, ClassificationResult& pieceClass);
     bool detectMovePhase3Classification();
     ClassificationResult classifyImage(const cv::Mat& input_mat);
     void classsifyChessBoardImage(cv::Mat& warpedBoard);
