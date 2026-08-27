@@ -664,7 +664,7 @@ void ApplicationController::executeSingleMotor(int motorID,
 //#define DEBUG_KINEMATIC
 bool ApplicationController::inverseKinematic(float x, float y, float a1, float a2, float* p1, float* p2)
 {
-//    if(sqrtf(x*x+y*y) > fabs(a1+a2) || sqrtf(x*x+y*y) < fabs(a1-a2)) return false;
+    if(sqrtf(x*x+y*y) > fabs(a1+a2) || sqrtf(x*x+y*y) < fabs(a1-a2)) return false;
     *p2 = acos((x*x+y*y-a1*a1-a2*a2)/(2*a1*a2));
     *p1 = atan(y/x) - atan((a2*sin(*p2))/(a1+a2*cos(*p2)));
     *p1 =  *p1 < 0?*p1+M_PI:*p1;
@@ -717,7 +717,7 @@ void ApplicationController::calculatePolygonEdgeA2345(float upAngleInDegree, flo
 #endif
 }
 
-void ApplicationController::calculateJoints(float xPos, float yPos, float upAngleInDegree, int* jointSteps)
+bool ApplicationController::calculateJoints(float xPos, float yPos, float upAngleInDegree, int* jointSteps)
 {    
     float a1 = m_robot->armLength(MOTOR_ARM1);
     float a2345 = 0;
@@ -739,7 +739,7 @@ void ApplicationController::calculateJoints(float xPos, float yPos, float upAngl
     this->printf("angleA2A2345[%d]\r\n",(int)(angleA2A2345*180.f/M_PI));
     this->printf("Inverse\r\n");
 #endif
-    inverseKinematic(xPos, yPos, a1, a2345, &q1, &q2);
+    if(!inverseKinematic(xPos, yPos, a1, a2345, &q1, &q2)) return false;
 #ifdef DEBUG_KINEMATIC
     this->printf("Inverse done\r\n");
 #endif
@@ -767,6 +767,7 @@ void ApplicationController::calculateJoints(float xPos, float yPos, float upAngl
 #ifdef DEBUG_KINEMATIC
     this->printf("calculateJoints upAngleInDegree[%f]\r\n",upAngleInDegree);
 #endif
+    return true;
 }
 
 Point ApplicationController::calibPos()
@@ -928,7 +929,7 @@ void ApplicationController::gotoPosition(float x, float y, float upAngleInDegree
     jointSteps[MOTOR_CAPTURE] = m_robot->maxStep(MOTOR_CAPTURE);
     jointSteps[MOTOR_ARM3] = m_robot->homeStep(MOTOR_ARM3);
     jointSteps[MOTOR_ARM4] = m_robot->homeStep(MOTOR_ARM4);
-    calculateJoints(x, y, upAngleInDegree, jointSteps);
+    if(!calculateJoints(x, y, upAngleInDegree, jointSteps)) return;
     m_robot->setMoveTarget(jointSteps);
     m_robot->moveToTarget(MAX_MOTOR);
     setMachineState(MACHINE_EXECUTE_POSITION);
@@ -1033,24 +1034,6 @@ bool ApplicationController::calculateSequenceMoveStraight(uint8_t startRow, uint
     m_commandSequenceState = COMMAND_SEQUENCE_STATE_INIT;
 }
 
-bool ApplicationController::calculateSequenceMove(uint8_t startRow, uint8_t startCol, int upAngleInDegree, bool isCapture)
-{
-#ifdef DEBUG_COMMAND
-    printf("ApplicationController::calculateSequenceMove\r\n");
-#endif
-    Point targetPoint = m_chessBoard->convertChessBoardPoint(startRow,startCol);
-    int jointSteps[MAX_MOTOR];
-    clearSequenceMove();
-    
-    jointSteps[MOTOR_CAPTURE] = isCapture?(m_robot->maxStep(MOTOR_CAPTURE) - m_robot->minStep(MOTOR_CAPTURE))
-                                            :0;
-    // Inverse axis Oxy -> Oyx
-    calculateJoints(targetPoint.y, -targetPoint.x, upAngleInDegree, jointSteps);
-
-    m_robot->setMoveTarget(jointSteps);
-    m_robot->moveToTarget(MAX_MOTOR);
-    setMachineState(MACHINE_EXECUTE_POSITION);
-}
 #define DEBUG_COMMAND
 bool ApplicationController::calculateSequenceMoveTest(uint8_t targetRow, uint8_t targetCol)
 {
@@ -1090,7 +1073,7 @@ bool ApplicationController::calculateSequenceMoveNormal(uint8_t startRow, uint8_
         stopCol < 0 || stopCol > 7 || stopRow < 0 || stopRow > 7) {
         return false;
     }
-    
+    bool sequenceValid = true;
     // append move from start -> stop -> standy
     m_startPoint = m_chessBoard->convertChessBoardPoint(startRow,startCol);
 #ifdef DEBUG_COMMAND
@@ -1100,8 +1083,8 @@ bool ApplicationController::calculateSequenceMoveNormal(uint8_t startRow, uint8_
 #endif
     m_stopPoint = m_chessBoard->convertChessBoardPoint(stopRow,stopCol);
     clearSequenceMove();
-    appendSequenceMove(m_startPoint, m_stopPoint, straightMove);
-    return true;
+    sequenceValid = sequenceValid && appendSequenceMove(m_startPoint, m_stopPoint, straightMove);
+    return sequenceValid;
 }
 
 bool ApplicationController::calculateSequenceAttack(uint8_t startRow, uint8_t startCol,
@@ -1114,6 +1097,7 @@ bool ApplicationController::calculateSequenceAttack(uint8_t startRow, uint8_t st
         dropCaptureRow > 7 || dropCaptureCol > 1) {
         return false;
     }
+    bool sequenceValid = true;
     m_dropCapturePoint = m_chessBoard->convertDropPoint(dropCaptureRow, dropCaptureCol, 
         dropCaptureSide == 'b'? ZONE_BOT:ZONE_PLAYER);
     // get free drop point
@@ -1122,9 +1106,9 @@ bool ApplicationController::calculateSequenceAttack(uint8_t startRow, uint8_t st
     m_stopPoint = m_chessBoard->convertChessBoardPoint(stopRow,stopCol);
 
     clearSequenceMove();
-    appendSequenceMove(m_stopPoint, m_dropCapturePoint);
-    appendSequenceMove(m_startPoint, m_stopPoint, straightMove);
-    return true;
+    sequenceValid = sequenceValid && appendSequenceMove(m_stopPoint, m_dropCapturePoint);
+    sequenceValid = sequenceValid && appendSequenceMove(m_startPoint, m_stopPoint, straightMove);
+    return sequenceValid;
 }
 
 bool ApplicationController::calculateSequencePastPawn(uint8_t startRow, uint8_t startCol,
@@ -1139,7 +1123,7 @@ bool ApplicationController::calculateSequencePastPawn(uint8_t startRow, uint8_t 
         dropCaptureRow > 7 || dropCaptureCol > 1) {
         return false;
     }
-
+    bool sequenceValid = true;
     // append move from attack pawn -> drop -> start -> stop -> standby
     m_dropCapturePoint = m_chessBoard->convertDropPoint(dropCaptureRow, dropCaptureCol, 
         dropCaptureSide == 'b'? ZONE_BOT:ZONE_PLAYER);
@@ -1147,9 +1131,9 @@ bool ApplicationController::calculateSequencePastPawn(uint8_t startRow, uint8_t 
     m_startPoint = m_chessBoard->convertChessBoardPoint(startRow,startCol);
     m_stopPoint = m_chessBoard->convertChessBoardPoint(stopRow,stopCol);
     clearSequenceMove();
-    appendSequenceMove(m_pawnPoint, m_dropCapturePoint);
-    appendSequenceMove(m_startPoint, m_stopPoint, straightMove);
-    return true;
+    sequenceValid = sequenceValid && appendSequenceMove(m_pawnPoint, m_dropCapturePoint);
+    sequenceValid = sequenceValid && appendSequenceMove(m_startPoint, m_stopPoint, straightMove);
+    return sequenceValid;
 }
 
 bool ApplicationController::calculateSequencePromotePiece(uint8_t startRow, uint8_t startCol,
@@ -1166,6 +1150,7 @@ bool ApplicationController::calculateSequencePromotePiece(uint8_t startRow, uint
        dropCaptureRow > 7 || dropCaptureCol > 1) {
         return false;
     }
+    bool sequenceValid = true;
     // append move from attack piece -> drop -> promote -> stop -> start -> drop -> standby
     m_promotePiecePoint = m_chessBoard->convertDropPoint(promoteRow, promoteCol, 
         promoteSide == 'b'? ZONE_BOT:ZONE_PLAYER);
@@ -1179,11 +1164,11 @@ bool ApplicationController::calculateSequencePromotePiece(uint8_t startRow, uint
         // pawn attack piece, move attack piece -> drop
         m_dropCapturePoint = m_chessBoard->convertDropPoint(dropCaptureRow, dropCaptureCol, 
             dropCaptureSide == 'b'? ZONE_BOT:ZONE_PLAYER);
-        appendSequenceMove(m_stopPoint, m_dropCapturePoint);
+        sequenceValid = sequenceValid && appendSequenceMove(m_stopPoint, m_dropCapturePoint);
     }
-    appendSequenceMove(m_promotePiecePoint, m_stopPoint);
-    appendSequenceMove(m_startPoint, m_dropPieceBotPoint);
-    return true;
+    sequenceValid = sequenceValid && appendSequenceMove(m_promotePiecePoint, m_stopPoint);
+    sequenceValid = sequenceValid && appendSequenceMove(m_startPoint, m_dropPieceBotPoint);
+    return sequenceValid;
 }
 
 bool ApplicationController::calculateSequenceCastle(uint8_t kingRow, uint8_t kingCol,
@@ -1193,6 +1178,7 @@ bool ApplicationController::calculateSequenceCastle(uint8_t kingRow, uint8_t kin
         (kingRow != 0 && kingRow != 7) || kingRow != rookRow) {
         return false;
     }
+    bool sequenceValid = true;
     // append move king -> new point -> rook -> new point
     Point kingPoint = m_chessBoard->convertChessBoardPoint(kingRow,kingCol);
     Point rookPoint = m_chessBoard->convertChessBoardPoint(rookRow,rookCol);
@@ -1206,9 +1192,9 @@ bool ApplicationController::calculateSequenceCastle(uint8_t kingRow, uint8_t kin
         rookNewPoint = m_chessBoard->convertChessBoardPoint(kingRow,kingCol+1);
     }
     clearSequenceMove();
-    appendSequenceMove(kingPoint, kingNewPoint, straightMove);
-    appendSequenceMove(rookPoint, rookNewPoint);
-    return true;
+    sequenceValid = sequenceValid && appendSequenceMove(kingPoint, kingNewPoint, straightMove);
+    sequenceValid = sequenceValid && appendSequenceMove(rookPoint, rookNewPoint);
+    return sequenceValid;
 }
 
 float ApplicationController::distance(float x1, float y1, float x2, float y2)
@@ -1223,7 +1209,15 @@ void ApplicationController::clearSequenceMove() {
     m_numCommand = 0;
     m_curCommandId = 0;
 }
-void ApplicationController::appendSequenceMove(Point start, Point stop, bool straightMove) {
+bool ApplicationController::appendSequenceMove(Point start, Point stop, bool straightMove) {
+    int jointSteps[MAX_MOTOR];
+    jointSteps[MOTOR_CAPTURE] = 0;
+    // Validation input
+    if(!calculateJoints(start.x, start.y, m_robot->homeAngle(MOTOR_ARM5), jointSteps) ||
+       !calculateJoints(stop.x, stop.y, m_robot->homeAngle(MOTOR_ARM5), jointSteps)) {
+        return false;
+    }
+
     if(!straightMove) {
         float upAngles[6] = {m_robot->homeAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),m_robot->homeAngle(MOTOR_ARM5),
                              m_robot->homeAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),m_robot->homeAngle(MOTOR_ARM5)};
@@ -1258,6 +1252,7 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
             m_numCommand++;
         }
     }
+    return true;
 }
 
 void ApplicationController::initSequenceMove(int numberOfJoints) {

@@ -49,7 +49,6 @@ public:
                          uint8_t dropPawnPromoteSide = 255, uint8_t dropPawnToPromoteRow = 255, uint8_t dropPawnToPromoteCol = 255);
     void sendCalibrationProgress();
     bool calculateSequenceMoveStraight(uint8_t startRow, uint8_t startCol, uint8_t stopRow, uint8_t stopCol);
-    bool calculateSequenceMove(uint8_t startRow, uint8_t startCol, int upAngleInDegree, bool isCapture);
     bool calculateSequenceMoveTest(uint8_t targetRow, uint8_t targetCol);
     bool calculateSequenceMoveNormal(uint8_t startRow, uint8_t startCol,
                          uint8_t stopRow, uint8_t stopCol, bool straightMove);
@@ -68,13 +67,13 @@ public:
     bool calculateSequenceCastle(uint8_t kingRow, uint8_t kingCol,
                                  uint8_t rookRow, uint8_t rookCol, bool straightMove);
     void calculatePolygonEdgeA2345(float upAngleInDegree, float* edge, float* angleA2A2345);
-    void calculateJoints(float xPos, float yPos, float upAngleInDegree, int* jointSteps);
+    bool calculateJoints(float xPos, float yPos, float upAngleInDegree, int* jointSteps);
     Point calibPos();
     Command calculateNextPointInLine(Point currPos, Point targetPos, float numPointInCommand);
     Point currentPos();
     float distance(float x1, float y1, float x2, float y2);
     void clearSequenceMove();
-    void appendSequenceMove(Point start, Point stop, bool straightMove = false);
+    bool appendSequenceMove(Point start, Point stop, bool straightMove = false);
     void initSequenceMove(int numberOfJoints);
     void executeSmoothMotionLoop(int motorID);
     Point calculateCellCenter(int row, int col, Point c00, Point c70, Point c77, Point c07);

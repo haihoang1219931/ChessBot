@@ -116,7 +116,7 @@ Item {
                             id: txtRawCommand
                             width: 200
                             height: 40
-                            text: "p0 0050 0001 a"
+                            text: "pm6273b71p71p71"
                         }
 
                         Button {
