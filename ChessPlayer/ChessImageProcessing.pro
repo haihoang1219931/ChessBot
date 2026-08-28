@@ -6,7 +6,9 @@ CONFIG -= qt
 CONFIG += use_image_processing
 use_image_processing {
 DEFINES += DEBUG_SHOW_IMAGE
-DEFINES += DEBUG_ROI
+#DEFINES += DEBUG_ROI
+#DEFINES += GEN_CHESSBOARD_DATA
+DEFINES += GEN_DROPZONE_DATA
 unix:!macx: INCLUDEPATH += /usr/local/include/opencv4
 unix:!macx: DEPENDPATH += /usr/local/include/opencv4
 unix:!macx: LIBS += -L/usr/local/lib/  \
