@@ -653,8 +653,24 @@ void ChessImageProcessing::checkPieceColor(const cv::Mat& imageRGB,
     configGold.push_back({cv::Scalar(18, 190, 185),50,40,40});
     configGold.push_back({cv::Scalar(21, 98, 243),50,40,40});
     cv::Size originImageSize = imgHSV.size();
-    cv::Mat bottomHSV = imgHSV(cv::Rect(0,originImageSize.height/2,
-                                                originImageSize.width,originImageSize.height/2));
+    cv::Rect cropRect;
+    if(col <= 3) {
+        cropRect.width = originImageSize.width * 2 / 3;
+        cropRect.height = originImageSize.height * 2 / 3;
+        cropRect.x = originImageSize.width - cropRect.width;
+        cropRect.y = originImageSize.height - cropRect.height;
+    } else if(col >= 10) {
+        cropRect.width = originImageSize.width * 2 / 3;
+        cropRect.height = originImageSize.height * 2 / 3;
+        cropRect.x = 0;
+        cropRect.y = originImageSize.height - cropRect.height;
+    } else {
+        cropRect.width = originImageSize.width;
+        cropRect.height = originImageSize.height/2;
+        cropRect.x = 0;
+        cropRect.y = originImageSize.height - cropRect.height;
+    }
+    cv::Mat bottomHSV = imgHSV(cropRect);
     int grayPixels = countMatchPixelColor(bottomHSV,configGray,180,255,"gray");
     int goldPixels = countMatchPixelColor(bottomHSV,configGold,180,255,"gold");
     std::string pieceColor = "unknown";
@@ -1418,7 +1434,7 @@ void ChessImageProcessing::classsifyChessBoardImage(cv::Mat& warpedBoard) {
             std::string cropCellName = "debug/"
                                        "r"+std::to_string(row)+
                                        "c"+std::to_string(col)+".jpg";
-//            cv::imwrite(cropCellName,croppedCell);
+            cv::imwrite(cropCellName,croppedCell);
             checkPieceColor(croppedCell, piece, row, col);
 #ifdef DEBUG_ROI
             cv::rectangle(warpedBoard,tallCellROI,cv::Scalar(0,255,255),2);
