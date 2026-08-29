@@ -109,7 +109,9 @@
 //    cv::destroyAllWindows();
 //    return 0;
 //}
-//int countMatchPixelColor(const cv::Mat& imageHSV, const std::vector<TargetColor>& targetColors, int maxH, int maxSV) {
+//int countMatchPixelColor(const cv::Mat& imageHSV,
+//                         const std::vector<TargetColor>& targetColors, int maxH, int maxSV,
+//                         std::string showName) {
 //    cv::Mat finalMask = cv::Mat::zeros(imageHSV.size(), CV_8UC1);
 //    // Loop through every standalone paired color configuration context block
 //    for (const auto& target : targetColors) {
@@ -131,9 +133,10 @@
 //        // Merge mask arrays using logical bitwise operations
 //        cv::bitwise_or(finalMask, singleMask, finalMask);
 //    }
+//    cv::imshow("final"+showName,finalMask);
 //    return cv::countNonZero(finalMask);
 //}
-//#define DEBUG_FILTER_COLOR
+////#define DEBUG_FILTER_COLOR
 //// Process and isolate independent color masks using their specific individual tolerances
 //void updateFilter(ColorFilterConfig* config) {
 //    if (config->targetColors.empty()) {
@@ -144,28 +147,7 @@
 //#ifdef DEBUG_FILTER_COLOR
 //    cv::Mat finalMask = cv::Mat::zeros(config->imgOriginal.size(), CV_8UC1);
 
-//    // Loop through every standalone paired color configuration context block
-//    for (const auto& target : config->targetColors) {
-//        int lowerH = std::max(0, (int)target.hsvValue[0] - target.hTolerance);
-//        int upperH = std::min(config->MAX_H, (int)target.hsvValue[0] + target.hTolerance);
-
-//        int lowerS = std::max(0, (int)target.hsvValue[1] - target.sTolerance);
-//        int upperS = std::min(config->MAX_SV, (int)target.hsvValue[1] + target.sTolerance);
-
-//        int lowerV = std::max(0, (int)target.hsvValue[2] - target.vTolerance);
-//        int upperV = std::min(config->MAX_SV, (int)target.hsvValue[2] + target.vTolerance);
-
-//        cv::Scalar lowerBound(lowerH, lowerS, lowerV);
-//        cv::Scalar upperBound(upperH, upperS, upperV);
-
-//        cv::Mat singleMask;
-//        cv::inRange(config->imgHSV, lowerBound, upperBound, singleMask);
-
-//        // Merge mask arrays using logical bitwise operations
-//        cv::bitwise_or(finalMask, singleMask, finalMask);
-//        cv::imshow("singleMask",singleMask);
-//        cv::imshow("finalMask",finalMask);
-//    }
+//    countMatchPixelColor(config->imgHSV,config->targetColors,180,255,"clicked");
 
 //    config->imgResult = cv::Mat::zeros(config->imgOriginal.size(), config->imgOriginal.type());
 //    config->imgOriginal.copyTo(config->imgResult, finalMask);
@@ -176,6 +158,7 @@
 //    std::vector<TargetColor> configGray;
 //    configGray.push_back({cv::Scalar(20, 8, 91),50,40,40});
 //    configGray.push_back({cv::Scalar(0, 0, 156),50,40,40});
+//    configGray.push_back({cv::Scalar(95, 35, 167),10,40,40});
 
 //    // Gold
 //    std::vector<TargetColor> configGold;
@@ -184,8 +167,8 @@
 //    cv::Size originImageSize = config->imgHSV.size();
 //    cv::Mat bottomHSV = config->imgHSV(cv::Rect(0,originImageSize.height/2,
 //                                                originImageSize.width,originImageSize.height/2));
-//    int grayPixels = countMatchPixelColor(bottomHSV,configGray,180,255);
-//    int goldPixels = countMatchPixelColor(bottomHSV,configGold,180,255);
+//    int grayPixels = countMatchPixelColor(bottomHSV,configGray,180,255,"Gray");
+//    int goldPixels = countMatchPixelColor(bottomHSV,configGold,180,255,"Gold");
 //    std::string pieceColor;
 
 //    if(grayPixels > 3 * goldPixels) pieceColor = "black";

@@ -59,6 +59,8 @@ typedef struct {
     std::string className;
     float probability;
     std::string color;
+    int row;
+    int col;
     int grayPixels;
     int goldPixels;
 } ClassificationResult;
@@ -106,10 +108,10 @@ public:
                                                   int hTol, int sTol, int vTol,
                                                   int roiPercent, int minWhitePercent, int maxBlackPercent,
                                                   std::string name);
-    int countMatchPixelColor(const cv::Mat& imageHSV, const std::vector<TargetColor>& targetColors, int maxH, int maxSV);
-    void checkPieceColor(const cv::Mat& imageRGB, ClassificationResult& pieceClass);
+    int countMatchPixelColor(const cv::Mat& imageHSV, const std::vector<TargetColor>& targetColors, int maxH, int maxSV, std::string showName);
+    void checkPieceColor(const cv::Mat& imageRGB, ClassificationResult& pieceClass, int row, int col);
     bool detectMovePhase3Classification();
-    ClassificationResult classifyImage(const cv::Mat& input_mat);
+    ClassificationResult classifyImage(const cv::Mat& input_mat, int row, int col);
     void classsifyChessBoardImage(cv::Mat& warpedBoard);
     std::string coordToNotation(cv::Point pt, const std::string& playerSide);
     cv::Point notationToCoord(const std::string& notation, const std::string& playerSide);

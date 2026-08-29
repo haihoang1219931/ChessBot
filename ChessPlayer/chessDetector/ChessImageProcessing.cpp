@@ -606,7 +606,9 @@ std::vector < std::vector < int >> ChessImageProcessing::cellColorFilterToMatrix
     return matrix;
 }
 
-int ChessImageProcessing::countMatchPixelColor(const cv::Mat& imageHSV, const std::vector<TargetColor>& targetColors, int maxH, int maxSV) {
+int ChessImageProcessing::countMatchPixelColor(const cv::Mat& imageHSV,
+                                               const std::vector<TargetColor>& targetColors,
+                                               int maxH, int maxSV, std::string showName) {
     cv::Mat finalMask = cv::Mat::zeros(imageHSV.size(), CV_8UC1);
     // Loop through every standalone paired color configuration context block
     for (const auto& target : targetColors) {
@@ -628,10 +630,15 @@ int ChessImageProcessing::countMatchPixelColor(const cv::Mat& imageHSV, const st
         // Merge mask arrays using logical bitwise operations
         cv::bitwise_or(finalMask, singleMask, finalMask);
     }
+#if defined(DEBUG_SHOW_IMAGE) && defined(DEBUG_SINGLE_IMAGE)
+    cv::imshow("final"+showName,finalMask);
+#endif
     return cv::countNonZero(finalMask);
 }
 
-void ChessImageProcessing::checkPieceColor(const cv::Mat& imageRGB, ClassificationResult& pieceClass)
+void ChessImageProcessing::checkPieceColor(const cv::Mat& imageRGB,
+                                           ClassificationResult& pieceClass,
+                                           int row, int col)
 {
     cv::Mat imgHSV;
     cv::cvtColor(imageRGB, imgHSV, cv::COLOR_BGR2HSV);
@@ -639,6 +646,7 @@ void ChessImageProcessing::checkPieceColor(const cv::Mat& imageRGB, Classificati
     std::vector<TargetColor> configGray;
     configGray.push_back({cv::Scalar(20, 8, 91),50,40,40});
     configGray.push_back({cv::Scalar(0, 0, 156),50,40,40});
+    configGray.push_back({cv::Scalar(95, 35, 167),10,40,40});
 
     // Gold
     std::vector<TargetColor> configGold;
@@ -647,8 +655,8 @@ void ChessImageProcessing::checkPieceColor(const cv::Mat& imageRGB, Classificati
     cv::Size originImageSize = imgHSV.size();
     cv::Mat bottomHSV = imgHSV(cv::Rect(0,originImageSize.height/2,
                                                 originImageSize.width,originImageSize.height/2));
-    int grayPixels = countMatchPixelColor(bottomHSV,configGray,180,255);
-    int goldPixels = countMatchPixelColor(bottomHSV,configGold,180,255);
+    int grayPixels = countMatchPixelColor(bottomHSV,configGray,180,255,"gray");
+    int goldPixels = countMatchPixelColor(bottomHSV,configGold,180,255,"gold");
     std::string pieceColor = "unknown";
     if(grayPixels > 3 * goldPixels / 2 && grayPixels > 1500) pieceColor = "black";
     else if((goldPixels > 3 * grayPixels / 2 && goldPixels > 1500) ||
@@ -1308,8 +1316,12 @@ bool ChessImageProcessing::isCastleMove(const cv::Mat& warpedGray1, const cv::Ma
     return foundCastle;
 }
 
-ClassificationResult ChessImageProcessing::classifyImage(const cv::Mat& input_mat) {
-    ClassificationResult result{"",0};
+ClassificationResult ChessImageProcessing::classifyImage(const cv::Mat& input_mat, int row, int col) {
+    ClassificationResult result;
+    result.className = "";
+    result.probability = 0;
+    result.row = row;
+    result.col = col;
     if (input_mat.empty()) {
         std::cerr << "Error: Provided input cv::Mat is empty.\n";
         return result;
@@ -1365,15 +1377,18 @@ ClassificationResult ChessImageProcessing::classifyImage(const cv::Mat& input_ma
     float max_prob = 0.0f;
     for (int i = 0; i < num_classes; ++i) {
         float prob = exp_scores[i] / sum_exp;
+#ifdef DEBUG_SINGLE_IMAGE
+        printf("class[%s] prob[%f]\r\n",m_dnnClassNames[i].c_str(),prob);
+#endif
         if (prob > max_prob) {
             max_prob = prob;
             predicted_idx = i;
         }
     }
-#ifdef DEBUG_CLASSIFICATION
+#if defined(DEBUG_CLASSIFICATION) && defined (DEBUG_SINGLE_IMAGE)
     // 7. Print Results
-    std::cout << "Prediction Result: " << class_names[predicted_idx] << "\n";
-    std::cout << "Confidence Level: " << std::fixed << std::setprecision(2) << (max_prob * 100.0f) << "%\n";
+    std::cout << "Prediction Result: " << m_dnnClassNames[predicted_idx] << "\n";
+    std::cout << "Confidence Level: " << std::fixed << (max_prob * 100.0f) << "%\n";
 #endif
     result.className = m_dnnClassNames[predicted_idx];
     result.probability = max_prob * 100.0f;
@@ -1399,12 +1414,12 @@ void ChessImageProcessing::classsifyChessBoardImage(cv::Mat& warpedBoard) {
 
             cv::Rect tallCellROI(cropX, cropY, cropW, cropH);
             cv::Mat croppedCell = warpedBoard(tallCellROI);
-            ClassificationResult piece = classifyImage(croppedCell);
+            ClassificationResult piece = classifyImage(croppedCell,row,col);
             std::string cropCellName = "debug/"
                                        "r"+std::to_string(row)+
                                        "c"+std::to_string(col)+".jpg";
-            cv::imwrite(cropCellName,croppedCell);
-            checkPieceColor(croppedCell, piece);
+//            cv::imwrite(cropCellName,croppedCell);
+            checkPieceColor(croppedCell, piece, row, col);
 #ifdef DEBUG_ROI
             cv::rectangle(warpedBoard,tallCellROI,cv::Scalar(0,255,255),2);
             cv::putText(warpedBoard,piece.className + " :" +std::to_string((int)piece.probability),
