@@ -164,6 +164,7 @@
 //    std::vector<TargetColor> configGold;
 //    configGold.push_back({cv::Scalar(18, 190, 185),50,40,40});
 //    configGold.push_back({cv::Scalar(21, 98, 243),50,40,40});
+//    configGold.push_back({cv::Scalar(15, 204, 80),10,40,40});
 //    cv::Size originImageSize = config->imgHSV.size();
 //    cv::Mat bottomHSV = config->imgHSV(cv::Rect(0,originImageSize.height/2,
 //                                                originImageSize.width,originImageSize.height/2));

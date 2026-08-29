@@ -652,6 +652,7 @@ void ChessImageProcessing::checkPieceColor(const cv::Mat& imageRGB,
     std::vector<TargetColor> configGold;
     configGold.push_back({cv::Scalar(18, 190, 185),50,40,40});
     configGold.push_back({cv::Scalar(21, 98, 243),50,40,40});
+    configGold.push_back({cv::Scalar(15, 204, 80),10,40,40});
     cv::Size originImageSize = imgHSV.size();
     cv::Rect cropRect;
     if(col <= 3) {
@@ -679,6 +680,8 @@ void ChessImageProcessing::checkPieceColor(const cv::Mat& imageRGB,
             goldPixels > 5000) {
         pieceColor = "white";
         pieceClass.className = to_upper(pieceClass.className);
+    } else if(goldPixels + grayPixels < 2000){
+        pieceClass.className = ".";
     }
     pieceClass.color = pieceColor;
     pieceClass.goldPixels = goldPixels;
@@ -1431,6 +1434,10 @@ void ChessImageProcessing::classsifyChessBoardImage(cv::Mat& warpedBoard) {
             cv::Rect tallCellROI(cropX, cropY, cropW, cropH);
             cv::Mat croppedCell = warpedBoard(tallCellROI);
             ClassificationResult piece = classifyImage(croppedCell,row,col);
+            // exception for pawn and bishop
+            if(piece.className == "p" && piece.probability < 95) {
+                piece.className = "b";
+            }
             std::string cropCellName = "debug/"
                                        "r"+std::to_string(row)+
                                        "c"+std::to_string(col)+".jpg";
