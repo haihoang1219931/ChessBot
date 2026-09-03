@@ -21,6 +21,8 @@
 const int NUM_COL = 14;
 const int NUM_ROW = 8;
 const int CELL_SIZE = 240;
+const int IMAGE_WIDTH = 1920;
+const int IMAGE_HEIGHT = 1080;
 const int WARP_WIDTH = CELL_SIZE*NUM_COL;
 const int WARP_HEIGHT = CELL_SIZE*NUM_ROW;
 const int CELL_SMALL_SIZE = 80;
@@ -56,8 +58,10 @@ struct TargetColor {
     int vTolerance;
 };
 typedef struct {
-    std::string className;
+    char className;
     float probability;
+    char className2;
+    float probability2;
     std::string color;
     int row;
     int col;
@@ -69,7 +73,8 @@ class ChessImageProcessing
 {
 public:
     ChessImageProcessing();
-    void setDnnNet(char* source, const std::vector<std::string>& dnnClassNames);
+    void setDnnNetAllPieces(char* source, const std::vector<char>& dnnClassNames);
+    void setDnnNetSpecial(char* source, const std::vector<char>& dnnClassNames);
     void connectSource(char* source);
     cv::Mat getNewImageSide();
     bool detectSide(cv::Mat image);
@@ -78,7 +83,8 @@ public:
                     float topRightX, float topRightY,
                     float bottomRightX, float bottomRightY,
                     float bottomLeftX, float bottomLeftY);
-    cv::Mat getTranformMatrix();
+    cv::Mat getSubTranformMatrix();
+    cv::Mat getFullTranformMatrix();
     int chessBoardBox();
     int chessBoardRow();
     int chessBoardSize();
@@ -113,6 +119,7 @@ public:
     bool detectMovePhase3Classification();
     ClassificationResult classifyImage(const cv::Mat& input_mat, int row, int col);
     void classsifyChessBoardImage(cv::Mat& warpedBoard);
+    void excludeCellList(std::vector<cv::Point> listCell);
     std::string coordToNotation(cv::Point pt, const std::string& playerSide);
     cv::Point notationToCoord(const std::string& notation, const std::string& playerSide);
     bool getCenterOfWhitePixels(const cv::Mat& binary_img, cv::Point& center);
@@ -145,7 +152,8 @@ public:
       std::string nameToShow);
     bool isCastleMove(const cv::Mat& warpedGray1, const cv::Mat& warpedGray2, const MoveDetectParams& params,
                       cv::Point& startCell, cv::Point& endCell);
-
+    bool findDropCells(std::vector<cv::Point>& dropCells);
+    bool findPromotePiece(cv::Point& dropCell, char piece);
 private:
     bool m_sourceConnected;
     bool m_isBlackSide;
@@ -155,11 +163,16 @@ private:
     int m_threshold;
     cv::Mat m_prevImage;
     cv::Mat m_currImage;
+    cv::Mat m_transformHeadPiecesWholeBoard;
     cv::Mat m_transformMatrix;
     bool m_transformMaxtrixValid;
     int m_detectState;
-    cv::dnn::Net m_dnnNet;
-    std::vector<std::string> m_dnnClassNames;
+    cv::dnn::Net m_dnnNetAllPieces;
+    std::vector<char> m_dnnAllPiecesNames;
+    cv::dnn::Net m_dnnNetBishopPawn;
+    std::vector<char> m_dnnBishopPawnNames;
+    uint8_t m_mapExcludedCell[NUM_ROW][NUM_COL];
+    uint8_t m_mapClassifiedCell[NUM_ROW][NUM_COL];
 };
 
 #endif // CHESSIMAGEPROCESSING_H

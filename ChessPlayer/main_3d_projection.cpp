@@ -10,7 +10,8 @@ cv::Mat img_input;
 cv::Mat img_original, img_display;
 std::vector<cv::Point2f> clicked_points;
 std::string window_name = "Chessboard Multi-Level Projection";
-
+std::vector<cv::Point2f> dstCorners;
+std::vector<cv::Point2f> srcCorners;
 // Base parameters calculated from your 4 corner clicks
 cv::Mat base_rvec, base_tvec;
 double base_tilt_deg = 0.0;
@@ -117,34 +118,32 @@ void updateProjection() {
 
     cv::Mat dist_coeffs = cv::Mat::zeros(4, 1, CV_64F);
 
-    // 5. Calculate initial camera pose if not done yet
-    if (!is_pnp_initialized) {
-        cv::solvePnP(board_corners_3d, clicked_points, camera_matrix, dist_coeffs, base_rvec, base_tvec);
+    // 5. ALWAYS calculate the base camera pose relative to the current FOV
+    // to anchor the 3D base board corners perfectly to the static 2D clicked points.
+    cv::solvePnP(board_corners_3d, clicked_points, camera_matrix, dist_coeffs, base_rvec, base_tvec);
 
-        // Calculate base tilt angle
-        cv::Mat R_initial;
-        cv::Rodrigues(base_rvec, R_initial);
-        cv::Mat R_T = R_initial.t();
-        cv::Mat cam_pos_W = -R_T * base_tvec;
+    // Calculate base tilt angle
+    cv::Mat R_initial;
+    cv::Rodrigues(base_rvec, R_initial);
+    cv::Mat R_T = R_initial.t();
+    cv::Mat cam_pos_W = -R_T * base_tvec;
 
-        double ax = cam_pos_W.at<double>(0);
-        double ay = cam_pos_W.at<double>(1);
-        double az = cam_pos_W.at<double>(2);
+    double ax = cam_pos_W.at<double>(0);
+    double ay = cam_pos_W.at<double>(1);
+    double az = cam_pos_W.at<double>(2);
 
-        double ao_norm = std::sqrt(ax*ax + ay*ay + az*az);
-        double am_x = R_T.at<double>(0, 2);
-        double am_y = R_T.at<double>(1, 2);
-        double am_z = R_T.at<double>(2, 2);
-        double am_norm = std::sqrt(am_x*am_x + am_y*am_y + am_z*am_z);
+    double ao_norm = std::sqrt(ax*ax + ay*ay + az*az);
+    double am_x = R_T.at<double>(0, 2);
+    double am_y = R_T.at<double>(1, 2);
+    double am_z = R_T.at<double>(2, 2);
+    double am_norm = std::sqrt(am_x*am_x + am_y*am_y + am_z*am_z);
 
-        double dot_product = (am_x * (-ax)) + (am_y * (-ay)) + (am_z * (-az));
-        double cos_theta = std::max(-1.0, std::min(1.0, dot_product / (ao_norm * am_norm)));
-        base_tilt_deg = std::acos(cos_theta) * 180.0f / CV_PI;
+    double dot_product = (am_x * (-ax)) + (am_y * (-ay)) + (am_z * (-az));
+    double cos_theta = std::max(-1.0, std::min(1.0, dot_product / (ao_norm * am_norm)));
+    base_tilt_deg = std::acos(cos_theta) * 180.0f / CV_PI;
 
-        is_pnp_initialized = true;
-    }
-
-    // 6. Apply working modifications over our calculated base values
+    // 6. Keep base values completely clean for the ground grid.
+    // Apply offsets ONLY to a separate working set for the elevated/transformed grid.
     cv::Mat working_tvec = base_tvec.clone();
     working_tvec.at<double>(0) += dx_offset;
     working_tvec.at<double>(1) += dy_offset;
@@ -168,7 +167,10 @@ void updateProjection() {
     std::vector<cv::Point2f> projected_ground_points;
     std::vector<cv::Point2f> projected_elevated_points;
 
-    cv::projectPoints(ground_object_points, working_rvec, working_tvec, camera_matrix, dist_coeffs, projected_ground_points);
+    // FIX: Ground points use base_rvec/base_tvec so they remain locked to your clicks
+    cv::projectPoints(ground_object_points, base_rvec, base_tvec, camera_matrix, dist_coeffs, projected_ground_points);
+
+    // Elevated points use working_rvec/working_tvec to respond to sliders
     cv::projectPoints(elevated_object_points, working_rvec, working_tvec, camera_matrix, dist_coeffs, projected_elevated_points);
 
     // 8. Composite screen frames
@@ -198,14 +200,13 @@ void updateProjection() {
     }
     cv::imshow(window_name, img_display);
 
-    // 0. Classification
-    std::vector<cv::Point2f> dstCorners {
+    dstCorners = {
         cv::Point2f(0, 0),
         cv::Point2f(WARP_WIDTH - 1, 0),
         cv::Point2f(WARP_WIDTH - 1, WARP_HEIGHT - 1),
         cv::Point2f(0, WARP_HEIGHT - 1)
     };
-    std::vector<cv::Point2f> srcCorners;
+    srcCorners.clear();
     float scaleFactor = 3.0f;
     for(int idx : corner_indices) {
         srcCorners.push_back(cv::Point2f(scaleFactor*projected_elevated_points[idx].x,
@@ -214,12 +215,20 @@ void updateProjection() {
     for(cv::Point2f corner: srcCorners) {
         std::cout << "elevated corner (" << corner.x << ", " << corner.y << ")\n";
     }
-    cv::Mat homographyMatrix = cv::getPerspectiveTransform(srcCorners, dstCorners);
+}
+
+void classification() {
+    float scaleFactor = 3.0f;
+    chessDetector.setCorners(
+            scaleFactor*clicked_points[0].x,scaleFactor*clicked_points[0].y,
+            scaleFactor*clicked_points[1].x,scaleFactor*clicked_points[1].y,
+            scaleFactor*clicked_points[2].x,scaleFactor*clicked_points[2].y,
+            scaleFactor*clicked_points[3].x,scaleFactor*clicked_points[3].y);
+    cv::Mat homographyMatrix = chessDetector.getFullTranformMatrix();
     cv::Mat warpedBoard;
     cv::warpPerspective(img_input, warpedBoard, homographyMatrix, cv::Size(WARP_WIDTH, WARP_HEIGHT));
     chessDetector.classsifyChessBoardImage(warpedBoard);
 }
-
 void onTrackbar(int, void*) {
     updateProjection();
 }
@@ -235,11 +244,22 @@ int main(int argc, char** argv) {
         std::cerr << "Error: Could not open or find the image: " << argv[1] << "\n";
         return -1;
     }
-    std::vector<std::string> print_names = {
-        "b", ".", "k", "n", "p", "q", "r"
+    std::vector<char> print_names = {
+        'b', '.', 'k', 'n', 'p', 'q', 'r'
     };
 
-    chessDetector.setDnnNet(argv[1],print_names);
+    chessDetector.setDnnNetAllPieces(argv[1],print_names);
+    std::vector<cv::Point> listCell {
+        cv::Point(0,0),cv::Point(1,0),cv::Point(2,0),cv::Point(11,0),
+        cv::Point(0,1),cv::Point(1,1),cv::Point(2,1),cv::Point(11,1),
+        cv::Point(0,2),cv::Point(1,2),cv::Point(2,2),cv::Point(11,2),
+        cv::Point(2,3),cv::Point(11,3),
+        cv::Point(2,4),cv::Point(11,4),
+        cv::Point(2,5),cv::Point(11,5),
+        cv::Point(2,6),cv::Point(11,6),
+        cv::Point(2,7),cv::Point(11,7),
+    };
+    chessDetector.excludeCellList(listCell);
 #ifdef DEBUG_SINGLE_IMAGE
     int row = atoi(argv[3]);
     int col = atoi(argv[4]);
@@ -260,9 +280,9 @@ int main(int argc, char** argv) {
     std::cout << "Click the 4 outer corners clockwise starting from top-left.\n";
 
     while (clicked_points.size() < 4) {
-        updateProjection();
         char key = (char)cv::waitKey(10);
         if (key == 27) return 0;
+        updateProjection();
     }
 
     cv::setMouseCallback(window_name, nullptr, nullptr);
@@ -275,9 +295,9 @@ int main(int argc, char** argv) {
     cv::createTrackbar("Piece Height", window_name, &track_height, 200, onTrackbar);
 
     while (true) {
-        updateProjection();
         char key = (char)cv::waitKey();
         if (key == 27) break;
+        if (key == ' ') classification();
     }
 #endif
     return 0;

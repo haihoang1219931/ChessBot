@@ -1,11 +1,7 @@
 #include "ChessImageProcessing.h"
 #include <set>
 #include <algorithm>
-// Returns a brand new uppercase string
-std::string to_upper(std::string str) {
-    for (char &c : str) c = std::toupper(static_cast<unsigned char>(c));
-    return str;
-}
+
 ChessImageProcessing::ChessImageProcessing()
 {
     m_sourceConnected = false;
@@ -16,10 +12,16 @@ ChessImageProcessing::ChessImageProcessing()
     m_transformMaxtrixValid = false;
 }
 
-void ChessImageProcessing::setDnnNet(char* source, const std::vector<std::string>& dnnClassNames)
+void ChessImageProcessing::setDnnNetAllPieces(char* source, const std::vector<char>& dnnClassNames)
 {
-    m_dnnNet = cv::dnn::readNetFromONNX(source);
-    m_dnnClassNames = dnnClassNames;
+    m_dnnNetAllPieces = cv::dnn::readNetFromONNX(source);
+    m_dnnAllPiecesNames = dnnClassNames;
+}
+
+void ChessImageProcessing::setDnnNetSpecial(char* source, const std::vector<char>& dnnClassNames)
+{
+    m_dnnNetBishopPawn = cv::dnn::readNetFromONNX(source);
+    m_dnnBishopPawnNames = dnnClassNames;
 }
 
 static void printMatrix(const std::string & name,
@@ -49,26 +51,197 @@ void ChessImageProcessing::setCorners(float topLeftX, float topLeftY,
                                       float bottomRightX, float bottomRightY,
                                       float bottomLeftX, float bottomLeftY)
 {
-    std::vector<cv::Point2f> corners;
-    corners.push_back(cv::Point2f(topLeftX, topLeftY));
-    corners.push_back(cv::Point2f(topRightX, topRightY));
-    corners.push_back(cv::Point2f(bottomRightX, bottomRightY));
-    corners.push_back(cv::Point2f(bottomLeftX, bottomLeftY));
-    m_transformMatrix = getPerspectiveTransform(corners, std::vector<cv::Point2f>{{0,0},{WARP_SMALL_WIDTH,0},{WARP_SMALL_WIDTH,WARP_SMALL_HEIGHT},{0,WARP_SMALL_HEIGHT}});
+    std::vector<cv::Point2f> clicked_points;
+    clicked_points.push_back(cv::Point2f(topLeftX, topLeftY));
+    clicked_points.push_back(cv::Point2f(topRightX, topRightY));
+    clicked_points.push_back(cv::Point2f(bottomRightX, bottomRightY));
+    clicked_points.push_back(cv::Point2f(bottomLeftX, bottomLeftY));
+    std::vector<cv::Point2f> dstCorners;
+    std::vector<cv::Point2f> srcCorners;
+    std::vector<cv::Point2f> dstGroundCorners;
+    std::vector<cv::Point2f> srcGroundCorners;
+    // Base parameters calculated from your 4 corner clicks
+    cv::Mat base_rvec, base_tvec;
+    double base_tilt_deg = 0.0;
+    bool is_pnp_initialized = false;
+
+    // Trackbar variables (scaled to integers for OpenCV)
+    // These now serve purely as structural adjustments (+/- offsets) relative to the PnP base values
+    int track_dx = 500;    // Range 0-1000, mapped to -5.0 to 5.0 offset
+    int track_dy = 500;    // Range 0-1000, mapped to -5.0 to 5.0 offset
+    int track_dz = 500;    // Range 0-1000, mapped to -5.0 to 5.0 offset
+    int track_fov = 60;    // Range 1-179 degrees (Absolute field of view)
+    int track_tilt_offset = 180; // Range 0-360, maps to -90 to +90 degrees tilt change
+    int track_height = 20;  // Range 0-200, mapped to 0.0 to 2.0 units height above the board
+
+    // 1. Map trackbars back to actual float values
+    float dx_offset = (track_dx - 500) / 100.0f;
+    float dy_offset = (track_dy - 500) / 100.0f;
+    float dz_offset = (track_dz - 500) / 100.0f;
+    float fov = (float)track_fov;
+
+    float tilt_offset_deg = (float)(track_tilt_offset - 180) * 0.5f;
+    float tilt_offset_rad = tilt_offset_deg * CV_PI / 180.0f;
+    float piece_height = -(float)track_height / 100.0f;
+
+    // 2. Define standard 3D coordinates for Ground Chessboard & Elevated Head Plane
+    std::vector<cv::Point3f> ground_object_points;
+    std::vector<cv::Point3f> elevated_object_points;
+
+    int total_rows = NUM_ROW + 1;    // 8 board squares = 9 grid lines
+    int total_columns = NUM_COL + 1; // 14 board squares = 15 grid lines
+    float square_size = 0.2f;
+
+    for (int i = 0; i < total_rows; ++i) {
+        for (int j = 0; j < total_columns; ++j) {
+            // Center the grid's X and Y coordinates around the local origin
+            float x_coord = j * square_size - ((total_columns - 1) * square_size / 2.0f);
+            float y_coord = i * square_size - ((total_rows - 1) * square_size / 2.0f);
+
+            ground_object_points.push_back(cv::Point3f(x_coord, y_coord, 0.0f));
+            elevated_object_points.push_back(cv::Point3f(x_coord, y_coord, piece_height));
+        }
+    }
+
+    // 3. Define the 4 corner ground 3D points matching your 4 user mouse clicks
+    // Winding Order: Top-Left -> Top-Right -> Bottom-Right -> Bottom-Left
+    float half_width = (total_columns - 1) * square_size / 2.0f;  // 14 * 0.2 / 2 = 1.4
+    float half_height = (total_rows - 1) * square_size / 2.0f;    //  8 * 0.2 / 2 = 0.8
+
+    std::vector<cv::Point3f> board_corners_3d = {
+        cv::Point3f(-half_width, -half_height, 0.0f), // Top-Left
+        cv::Point3f( half_width, -half_height, 0.0f), // Top-Right
+        cv::Point3f( half_width,  half_height, 0.0f), // Bottom-Right
+        cv::Point3f(-half_width,  half_height, 0.0f)  // Bottom-Left
+    };
+
+    // 4. Construct camera intrinsics matrix based on FOV
+    float width = IMAGE_WIDTH;
+    float height = IMAGE_HEIGHT;
+    float f_val = (width / 2.0f) / tan((fov * CV_PI / 180.0f) / 2.0f);
+
+    cv::Mat camera_matrix = (cv::Mat_<double>(3, 3) <<
+        f_val, 0, width / 2.0f,
+        0, f_val, height / 2.0f,
+        0, 0, 1);
+
+    cv::Mat dist_coeffs = cv::Mat::zeros(4, 1, CV_64F);
+
+    // 5. ALWAYS calculate the base camera pose relative to the current FOV
+    // to anchor the 3D base board corners perfectly to the static 2D clicked points.
+    cv::solvePnP(board_corners_3d, clicked_points, camera_matrix, dist_coeffs, base_rvec, base_tvec);
+
+    // Calculate base tilt angle
+    cv::Mat R_initial;
+    cv::Rodrigues(base_rvec, R_initial);
+    cv::Mat R_T = R_initial.t();
+    cv::Mat cam_pos_W = -R_T * base_tvec;
+
+    double ax = cam_pos_W.at<double>(0);
+    double ay = cam_pos_W.at<double>(1);
+    double az = cam_pos_W.at<double>(2);
+
+    double ao_norm = std::sqrt(ax*ax + ay*ay + az*az);
+    double am_x = R_T.at<double>(0, 2);
+    double am_y = R_T.at<double>(1, 2);
+    double am_z = R_T.at<double>(2, 2);
+    double am_norm = std::sqrt(am_x*am_x + am_y*am_y + am_z*am_z);
+
+    double dot_product = (am_x * (-ax)) + (am_y * (-ay)) + (am_z * (-az));
+    double cos_theta = std::max(-1.0, std::min(1.0, dot_product / (ao_norm * am_norm)));
+    base_tilt_deg = std::acos(cos_theta) * 180.0f / CV_PI;
+
+    // 6. Keep base values completely clean for the ground grid.
+    // Apply offsets ONLY to a separate working set for the elevated/transformed grid.
+    cv::Mat working_tvec = base_tvec.clone();
+    working_tvec.at<double>(0) += dx_offset;
+    working_tvec.at<double>(1) += dy_offset;
+    working_tvec.at<double>(2) += dz_offset;
+
+    cv::Mat R_working;
+    cv::Rodrigues(base_rvec, R_working);
+
+    // Apply local camera tilt rotation matrix
+    cv::Mat R_tilt = (cv::Mat_<double>(3, 3) <<
+        1, 0,                   0,
+        0, cos(tilt_offset_rad), -sin(tilt_offset_rad),
+        0, sin(tilt_offset_rad),  cos(tilt_offset_rad));
+
+    R_working = R_working * R_tilt;
+
+    cv::Mat working_rvec;
+    cv::Rodrigues(R_working, working_rvec);
+
+    // 7. Project both grids onto the screen space map
+    std::vector<cv::Point2f> projected_ground_points;
+    std::vector<cv::Point2f> projected_elevated_points;
+
+    // FIX: Ground points use base_rvec/base_tvec so they remain locked to your clicks
+    cv::projectPoints(ground_object_points, base_rvec, base_tvec, camera_matrix, dist_coeffs, projected_ground_points);
+
+    // Elevated points use working_rvec/working_tvec to respond to sliders
+    cv::projectPoints(elevated_object_points, working_rvec, working_tvec, camera_matrix, dist_coeffs, projected_elevated_points);
+
+    // 8. Generate warp matrix for full 8x14 chess board
+    // Top-Left: 0, Top-Right: 14, Bottom-Right: (9*15)-1 = 134, Bottom-Left: 9*15 - 15 = 120
+    int corner_indices[] = {0, total_columns - 1, (total_rows * total_columns) - 1, (total_rows * total_columns) - total_columns};
+
+    dstCorners = {
+        cv::Point2f(0, 0),
+        cv::Point2f(WARP_WIDTH - 1, 0),
+        cv::Point2f(WARP_WIDTH - 1, WARP_HEIGHT - 1),
+        cv::Point2f(0, WARP_HEIGHT - 1)
+    };
+    srcCorners.clear();
+    for(int idx : corner_indices) {
+        srcCorners.push_back(cv::Point2f(projected_elevated_points[idx].x,
+                                         projected_elevated_points[idx].y));
+    }
+    for(cv::Point2f corner: srcCorners) {
+        std::cout << "elevated corner (" << corner.x << ", " << corner.y << ")\n";
+    }
+    m_transformHeadPiecesWholeBoard = cv::getPerspectiveTransform(srcCorners, dstCorners);
+
+    // 9. Generate warp matrix for only 8x8 chess board
+    // Top-Left: 3, Top-Right: 11, Bottom-Right: (9*15)-4 = 131, Bottom-Left: 9*15 - 15 + 3 = 123
+    int groundCorner_indices[] = {3, total_columns - 4,
+                                  (total_rows * total_columns) - 4, (total_rows * total_columns) - total_columns + 3};
+    for(int idx : groundCorner_indices) {
+        srcGroundCorners.push_back(cv::Point2f(projected_ground_points[idx].x,
+                                         projected_ground_points[idx].y));
+    }
+
+    dstGroundCorners = {
+        cv::Point2f(0, 0),
+        cv::Point2f(WARP_SMALL_HEIGHT - 1, 0),
+        cv::Point2f(WARP_SMALL_HEIGHT - 1, WARP_SMALL_HEIGHT - 1),
+        cv::Point2f(0, WARP_SMALL_HEIGHT - 1)
+    };
+
+    m_transformMatrix = cv::getPerspectiveTransform(srcGroundCorners, dstGroundCorners);
     m_transformMaxtrixValid = true;
 }
-cv::Mat ChessImageProcessing::getTranformMatrix() {
+
+cv::Mat ChessImageProcessing::getSubTranformMatrix() {
     return m_transformMatrix;
 }
+
+cv::Mat ChessImageProcessing::getFullTranformMatrix() {
+    return m_transformHeadPiecesWholeBoard;
+}
+
 int ChessImageProcessing::chessBoardBox() {
     return m_chessBoardBox;
 }
+
 int ChessImageProcessing::chessBoardRow() {
     return m_chessBoardRow;
 }
+
 int ChessImageProcessing::chessBoardSize() {
     return m_chessBoardSize;
 }
+
 void ChessImageProcessing::setThreshold(int threshold) {
     m_threshold = threshold;
 }
@@ -679,9 +852,9 @@ void ChessImageProcessing::checkPieceColor(const cv::Mat& imageRGB,
     else if((goldPixels > 3 * grayPixels / 2 && goldPixels > 1500) ||
             goldPixels > 5000) {
         pieceColor = "white";
-        pieceClass.className = to_upper(pieceClass.className);
+        pieceClass.className = std::toupper(pieceClass.className);
     } else if(goldPixels + grayPixels < 2000){
-        pieceClass.className = ".";
+        pieceClass.className = '.';
     }
     pieceClass.color = pieceColor;
     pieceClass.goldPixels = goldPixels;
@@ -1337,7 +1510,7 @@ bool ChessImageProcessing::isCastleMove(const cv::Mat& warpedGray1, const cv::Ma
 
 ClassificationResult ChessImageProcessing::classifyImage(const cv::Mat& input_mat, int row, int col) {
     ClassificationResult result;
-    result.className = "";
+    result.className = '.';
     result.probability = 0;
     result.row = row;
     result.col = col;
@@ -1373,8 +1546,8 @@ ClassificationResult ChessImageProcessing::classifyImage(const cv::Mat& input_ma
     cv::divide(blob, std_dev, blob);
 
     // 4. Run inference pass
-    m_dnnNet.setInput(blob);
-    cv::Mat outputs = m_dnnNet.forward(); // Output shape: [1, num_classes]
+    m_dnnNetAllPieces.setInput(blob);
+    cv::Mat outputs = m_dnnNetAllPieces.forward(); // Output shape: [1, num_classes]
 
     // 5. Post-processing: Apply manual Softmax to the row vector
     float* data_ptr = outputs.ptr<float>(0);
@@ -1394,23 +1567,32 @@ ClassificationResult ChessImageProcessing::classifyImage(const cv::Mat& input_ma
     // 6. Find the highest probability index
     int predicted_idx = 0;
     float max_prob = 0.0f;
+    int predicted2_idx = 0;
+    float max2_prob = 0.0f;
     for (int i = 0; i < num_classes; ++i) {
         float prob = exp_scores[i] / sum_exp;
 #ifdef DEBUG_SINGLE_IMAGE
-        printf("class[%s] prob[%f]\r\n",m_dnnClassNames[i].c_str(),prob);
+        printf("class[%s] prob[%f]\r\n",m_dnnAllPiecesNames[i].c_str(),prob);
 #endif
         if (prob > max_prob) {
+            max2_prob = max_prob;
+            predicted2_idx = predicted_idx;
             max_prob = prob;
             predicted_idx = i;
+        } else if (prob > max2_prob && prob != max_prob) {
+            max2_prob = prob;
+            predicted2_idx = i;
         }
     }
 #if defined(DEBUG_CLASSIFICATION) && defined (DEBUG_SINGLE_IMAGE)
     // 7. Print Results
-    std::cout << "Prediction Result: " << m_dnnClassNames[predicted_idx] << "\n";
+    std::cout << "Prediction Result: " << m_dnnAllPiecesNames[predicted_idx] << "\n";
     std::cout << "Confidence Level: " << std::fixed << (max_prob * 100.0f) << "%\n";
 #endif
-    result.className = m_dnnClassNames[predicted_idx];
+    result.className = m_dnnAllPiecesNames[predicted_idx];
     result.probability = max_prob * 100.0f;
+    result.className2 = m_dnnAllPiecesNames[predicted2_idx];
+    result.probability2 = max2_prob * 100.0f;
     return result;
 }
 
@@ -1419,6 +1601,10 @@ void ChessImageProcessing::classsifyChessBoardImage(cv::Mat& warpedBoard) {
     printf("classsifyChessBoardImage:\r\n");
     for(int row = 0; row < NUM_ROW; row ++) {
         for(int col = 0; col < NUM_COL; col ++) {
+            if(m_mapExcludedCell[row][col] == 0) {
+                m_mapClassifiedCell[row][col] = '.';
+                continue;
+            }
             // Stretch the bounding box upwards to swallow full tall piece outlines
             int cropX = col * cellSize;
             int cropY = row * cellSize;
@@ -1434,38 +1620,101 @@ void ChessImageProcessing::classsifyChessBoardImage(cv::Mat& warpedBoard) {
             cv::Rect tallCellROI(cropX, cropY, cropW, cropH);
             cv::Mat croppedCell = warpedBoard(tallCellROI);
             ClassificationResult piece = classifyImage(croppedCell,row,col);
-            // exception for pawn and bishop
-            if(piece.className == "p" && piece.probability < 95) {
-                piece.className = "b";
-            }
-            std::string cropCellName = "debug/"
-                                       "r"+std::to_string(row)+
-                                       "c"+std::to_string(col)+".jpg";
-            cv::imwrite(cropCellName,croppedCell);
+//            std::string cropCellName = "debug/"
+//                                       "r"+std::to_string(row)+
+//                                       "c"+std::to_string(col)+".jpg";
+//            cv::imwrite(cropCellName,croppedCell);
             checkPieceColor(croppedCell, piece, row, col);
+            m_mapClassifiedCell[row][col] = piece.className;
 #ifdef DEBUG_ROI
             cv::rectangle(warpedBoard,tallCellROI,cv::Scalar(0,255,255),2);
-            cv::putText(warpedBoard,piece.className + " :" +std::to_string((int)piece.probability),
+            cv::putText(warpedBoard,std::string{piece.className} + " :" +std::to_string((int)piece.probability),
                         cv::Point(cropX + 20,cropY+ 60),
-                         cv::FONT_HERSHEY_SIMPLEX, 2, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+                         cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+            cv::putText(warpedBoard,std::string{piece.className2} + " :" +std::to_string((int)piece.probability2),
+                        cv::Point(cropX + 20,cropY+ 90),
+                         cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
             cv::putText(warpedBoard,
-                        std::to_string(piece.grayPixels),
+                        "Gray: "+std::to_string(piece.grayPixels),
                         cv::Point(cropX + 20,cropY+ 120),
-                         cv::FONT_HERSHEY_SIMPLEX, 2, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+                         cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
             cv::putText(warpedBoard,
-                        std::to_string(piece.goldPixels),
-                        cv::Point(cropX + 20,cropY+ 180),
-                         cv::FONT_HERSHEY_SIMPLEX, 2, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+                        "Gold: "+std::to_string(piece.goldPixels),
+                        cv::Point(cropX + 20,cropY+ 150),
+                         cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
 
 #endif
-            printf("%s ",piece.className.c_str());
         }
-        printf("\r\n");
     }
 #ifdef DEBUG_ROI
     cv::Mat scaledWarped;
     cv::resize(warpedBoard,scaledWarped,cv::Size(WARP_SMALL_WIDTH,WARP_SMALL_HEIGHT),0,0, cv::INTER_NEAREST);
     cv::imshow("classification",scaledWarped);
-    cv::waitKey();
 #endif
+    printf("Mapped Board:\r\n");
+    for(int row = 0; row < NUM_ROW; row ++) {
+        for(int col = 0; col < NUM_COL; col ++) {
+            printf("%c ",m_mapClassifiedCell[row][col]);
+        }
+        printf("\r\n");
+    }
+}
+
+void ChessImageProcessing::excludeCellList(std::vector<cv::Point> listCell) {
+    memset(m_mapExcludedCell,1,NUM_ROW*NUM_COL);
+    for(cv::Point cell: listCell) {
+        if(cell.y >=0 && cell.y < NUM_ROW &&
+            cell.x >=0 && cell.x < NUM_COL) {
+            m_mapExcludedCell[cell.y][cell.x] = 0;
+        }
+    }
+}
+
+bool ChessImageProcessing::findDropCells(std::vector<cv::Point>& dropCells) {
+    dropCells.clear();
+    // Check drop zone on robot's right
+    for(int row=0; row<=7; row++) {
+        for(int col=12; col<=13; col++) {
+            if(m_mapClassifiedCell[row][col] == '.') {
+                dropCells.push_back(cv::Point(col,row));
+            }
+        }
+    }
+    // Check drop zone on robot's left
+    for(int row=3; row<=7; row++) {
+        for(int col=0; col<=1; col++) {
+            if(m_mapClassifiedCell[row][col] == '.') {
+                dropCells.push_back(cv::Point(col,row));
+            }
+        }
+    }
+    return dropCells.size()>0;
+}
+
+bool ChessImageProcessing::findPromotePiece(cv::Point& dropCell, char piece) {
+    bool foundPromotePiece = false;
+    // Check drop zone on robot's right
+    for(int row=0; row<=7; row++) {
+        for(int col=12; col<=13; col++) {
+            if(m_mapClassifiedCell[row][col] == piece) {
+                dropCell = cv::Point(col,row);
+                foundPromotePiece = true;
+                break;
+            }
+        }
+        if(foundPromotePiece) break;
+    }
+    if(foundPromotePiece) return true;
+    // Check drop zone on robot's left
+    for(int row=3; row<=7; row++) {
+        for(int col=0; col<=1; col++) {
+            if(m_mapClassifiedCell[row][col] == piece) {
+                dropCell = cv::Point(col,row);
+                foundPromotePiece = true;
+                break;
+            }
+        }
+        if(foundPromotePiece) break;
+    }
+    return foundPromotePiece;
 }
