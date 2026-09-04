@@ -64,7 +64,9 @@ HEADERS += chessDetector/ChessImageProcessing.h
 }
 
 SOURCES += \
-    main_gen_dataset.cpp
+    main_3d_construction.cpp \
+    main_gen_dataset.cpp \
+    main_hough_circle.cpp
 
 
 

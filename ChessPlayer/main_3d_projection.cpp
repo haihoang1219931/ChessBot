@@ -227,7 +227,7 @@ void classification() {
     cv::Mat homographyMatrix = chessDetector.getFullTranformMatrix();
     cv::Mat warpedBoard;
     cv::warpPerspective(img_input, warpedBoard, homographyMatrix, cv::Size(WARP_WIDTH, WARP_HEIGHT));
-    chessDetector.classsifyChessBoardImage(warpedBoard);
+    chessDetector.classsifyChessBoardImage((const cv::Mat&)warpedBoard);
 }
 void onTrackbar(int, void*) {
     updateProjection();

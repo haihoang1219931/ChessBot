@@ -1,6 +1,7 @@
 #include "ChessImageProcessing.h"
 #include <set>
 #include <algorithm>
+#include <chrono>
 
 ChessImageProcessing::ChessImageProcessing()
 {
@@ -10,6 +11,31 @@ ChessImageProcessing::ChessImageProcessing()
     m_chessBoardBox = 60;
     m_chessBoardSize = m_chessBoardRow * m_chessBoardBox;
     m_transformMaxtrixValid = false;
+    unsigned char testBoardPrev[64] = {
+        'q','q','Q','Q','R','N','P','P',
+        'b','b','B','b','p','p','p','p',
+        'k','k','k','k','K','.','.','.',
+        'p','p','p','p','r','r','R','r',
+        'p','P','N','B','.','.','.','.',
+        '.','.','.','.','.','.','.','.',
+        'P','.','.','.','.','.','.','.',
+        'P','P','P','P','N','n','R','n'};
+    unsigned char testBoardAfter[NUM_ROW][NUM_COL] = {
+    {'.','.','.','.','R','n','N','P','P','P','P','.','.','.'},
+    {'.','.','.','n','.','.','.','.','.','.','P','.','.','.'},
+    {'.','.','.','.','.','.','.','.','.','.','.','.','.','.'},
+    {'.','.','.','.','.','.','.','B','N','P','P','.','.','.'},
+    {'.','.','.','r','R','r','r','p','p','p','p','.','.','.'},
+    {'.','.','.','.','.','.','.','K','k','k','k','.','.','.'},
+    {'.','.','.','p','p','p','p','b','B','b','b','.','.','.'},
+    {'.','.','.','P','P','N','R','Q','Q','q','q','.','.','.'}};
+    for(int row = 0; row < NUM_ROW; row++) {
+        for(int col=0; col< NUM_COL; col++) {
+            m_mapClassifiedCell[row][col] = testBoardAfter[row][col];
+        }
+    }
+    MoveDetectParams params;
+    findPossibleMoves2(cv::Mat(),testBoardPrev,params);
 }
 
 void ChessImageProcessing::setDnnNetAllPieces(char* source, const std::vector<char>& dnnClassNames)
@@ -34,6 +60,7 @@ static void printMatrix(const std::string & name,
         std::cout << std::endl;
     }
 }
+
 void ChessImageProcessing::connectSource(char* source) {
 
 }
@@ -1596,9 +1623,171 @@ ClassificationResult ChessImageProcessing::classifyImage(const cv::Mat& input_ma
     return result;
 }
 
-void ChessImageProcessing::classsifyChessBoardImage(cv::Mat& warpedBoard) {
+void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) {
+    int cellSize = CELL_SIZE;
+    printf("classsifyChessBoardImage (BATCH INF MODE ACTIVE):\r\n");
+    auto start = std::chrono::steady_clock::now();
+    // Pre-allocate containers to eliminate memory thrashing inside the core loop
+    std::vector<cv::Mat> batchImages;
+    std::vector<std::pair<int, int>> validCellPositions; // Stores tracking mappings: {row, col}
+    batchImages.reserve(NUM_ROW * NUM_COL);
+    validCellPositions.reserve(NUM_ROW * NUM_COL);
+
+    // Phase 1: Rapidly parse coordinates and batch process structural cells
+    for(int row = 0; row < NUM_ROW; row++) {
+        for(int col = 0; col < NUM_COL; col++) {
+            if(m_mapExcludedCell[row][col] == 0) {
+                m_mapClassifiedCell[row][col] = '.';
+                continue;
+            }
+
+            int cropX = col * cellSize;
+            int cropY = row * cellSize;
+            int cropW = cellSize;
+            int cropH = cellSize;
+
+            // Safe bound clamping logic
+            if (cropX < 0) cropX = 0;
+            if (cropY < 0) cropY = 0;
+            if (cropX + cropW > warpedBoard.cols) cropW = warpedBoard.cols - cropX;
+            if (cropY + cropH > warpedBoard.rows) cropH = warpedBoard.rows - cropY;
+
+            cv::Rect tallCellROI(cropX, cropY, cropW, cropH);
+
+            // Collect references safely without forcing local copies
+            batchImages.push_back(warpedBoard(tallCellROI));
+            validCellPositions.push_back({row, col});
+        }
+    }
+
+    size_t totalValidPieces = batchImages.size();
+    if (totalValidPieces == 0) {
+        printf("No active piece cells identified for matching.\n");
+        return;
+    }
+
+    // Phase 2: Create a 4D Tensor Batch Blob using 'blobFromImages'
+    cv::Size target_size(240, 240);
+    double scale_factor = 1.0 / 255.0;
+    cv::Scalar mean(0.485 * 255.0, 0.456 * 255.0, 0.406 * 255.0);
+    cv::Scalar std_dev(0.229, 0.224, 0.225);
+
+    cv::Mat batchBlob;
+    cv::dnn::blobFromImages(
+        batchImages,
+        batchBlob,
+        scale_factor,
+        target_size,
+        mean,
+        true,  // swapRB = true (Converts BGR to RGB)
+        false  // crop = false
+    );
+
+    // Apply standard deviation correction across the 4D blob matrix elements
+    cv::divide(batchBlob, std_dev, batchBlob);
+
+    // Phase 3: Execute full batch processing in a single forward pass
+    m_dnnNetAllPieces.setInput(batchBlob);
+    cv::Mat outputs = m_dnnNetAllPieces.forward(); // Output matrix size: [totalValidPieces x num_classes]
+
+    int num_classes = outputs.cols;
+
+    // Phase 4: Parse back the tensor outputs maps
+    for (size_t i = 0; i < totalValidPieces; ++i) {
+        int row = validCellPositions[i].first;
+        int col = validCellPositions[i].second;
+        cv::Mat croppedCell = batchImages[i];
+
+        // Fetch scores vector array pointer for item 'i'
+        float* data_ptr = outputs.ptr<float>(static_cast<int>(i));
+
+        std::vector<float> raw_scores(data_ptr, data_ptr + num_classes);
+        std::vector<float> exp_scores(num_classes);
+
+        float max_score = *std::max_element(raw_scores.begin(), raw_scores.end());
+        float sum_exp = 0.0f;
+
+        for (int c = 0; c < num_classes; ++c) {
+            exp_scores[c] = std::exp(raw_scores[c] - max_score);
+            sum_exp += exp_scores[c];
+        }
+
+        int predicted_idx = 0;
+        float max_prob = 0.0f;
+        int predicted2_idx = 0;
+        float max2_prob = 0.0f;
+
+        for (int c = 0; c < num_classes; ++c) {
+            float prob = exp_scores[c] / sum_exp;
+            if (prob > max_prob) {
+                max2_prob = max_prob;
+                predicted2_idx = predicted_idx;
+                max_prob = prob;
+                predicted_idx = c;
+            } else if (prob > max2_prob && prob != max_prob) {
+                max2_prob = prob;
+                predicted2_idx = c;
+            }
+        }
+
+        ClassificationResult piece;
+        piece.row = row;
+        piece.col = col;
+        piece.className = m_dnnAllPiecesNames[predicted_idx];
+        piece.probability = max_prob * 100.0f;
+        piece.className2 = m_dnnAllPiecesNames[predicted2_idx];
+        piece.probability2 = max2_prob * 100.0f;
+
+        // Execute background color checks locally
+        checkPieceColor(croppedCell, piece, row, col);
+        m_mapClassifiedCell[row][col] = piece.className;
+
+        // CRITICAL NOTE: Debug I/O commands ('cv::imwrite') removed from main loop logic
+        // to prevent hard-disk read/write latency throttling. Only run when forced.
+#ifdef DEBUG_ROI
+        int cropX = col * cellSize;
+        int cropY = row * cellSize;
+        cv::Rect tallCellROI(cropX, cropY, croppedCell.cols, croppedCell.rows);
+        cv::rectangle(warpedBoard,tallCellROI,cv::Scalar(0,255,255),2);
+        cv::putText(warpedBoard,std::string{piece.className} + " :" +std::to_string((int)piece.probability),
+                    cv::Point(cropX + 20,cropY+ 60),
+                     cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+        cv::putText(warpedBoard,std::string{piece.className2} + " :" +std::to_string((int)piece.probability2),
+                    cv::Point(cropX + 20,cropY+ 90),
+                     cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+        cv::putText(warpedBoard,
+                    "Gray: "+std::to_string(piece.grayPixels),
+                    cv::Point(cropX + 20,cropY+ 120),
+                     cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+        cv::putText(warpedBoard,
+                    "Gold: "+std::to_string(piece.goldPixels),
+                    cv::Point(cropX + 20,cropY+ 150),
+                     cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+
+#endif
+    }
+    auto end = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    std::cout << "Elapsed time: " << elapsed << " ms" << std::endl;
+
+#ifdef DEBUG_ROI
+    cv::Mat scaledWarped;
+    cv::resize(warpedBoard, scaledWarped, cv::Size(WARP_SMALL_WIDTH, WARP_SMALL_HEIGHT), 0, 0, cv::INTER_NEAREST);
+    cv::imshow("classification", scaledWarped);
+#endif
+
+    printf("Mapped Board:\r\n");
+    for(int row = 0; row < NUM_ROW; row++) {
+        for(int col = 0; col < NUM_COL; col++) {
+            printf("%c ", m_mapClassifiedCell[row][col]);
+        }
+        printf("\r\n");
+    }
+}
+void ChessImageProcessing::classsifyChessBoardImage2(const cv::Mat& warpedBoard) {
     int cellSize = CELL_SIZE;
     printf("classsifyChessBoardImage:\r\n");
+    auto start = std::chrono::steady_clock::now();
     for(int row = 0; row < NUM_ROW; row ++) {
         for(int col = 0; col < NUM_COL; col ++) {
             if(m_mapExcludedCell[row][col] == 0) {
@@ -1646,6 +1835,10 @@ void ChessImageProcessing::classsifyChessBoardImage(cv::Mat& warpedBoard) {
 #endif
         }
     }
+    auto end = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    std::cout << "Elapsed time: " << elapsed << " ms" << std::endl;
+
 #ifdef DEBUG_ROI
     cv::Mat scaledWarped;
     cv::resize(warpedBoard,scaledWarped,cv::Size(WARP_SMALL_WIDTH,WARP_SMALL_HEIGHT),0,0, cv::INTER_NEAREST);
@@ -1673,16 +1866,16 @@ void ChessImageProcessing::excludeCellList(std::vector<cv::Point> listCell) {
 bool ChessImageProcessing::findDropCells(std::vector<cv::Point>& dropCells) {
     dropCells.clear();
     // Check drop zone on robot's right
-    for(int row=0; row<=7; row++) {
-        for(int col=12; col<=13; col++) {
+    for(int row=0; row<NUM_ROW; row++) {
+        for(int col=NUM_COL-2; col<NUM_COL; col++) {
             if(m_mapClassifiedCell[row][col] == '.') {
                 dropCells.push_back(cv::Point(col,row));
             }
         }
     }
     // Check drop zone on robot's left
-    for(int row=3; row<=7; row++) {
-        for(int col=0; col<=1; col++) {
+    for(int row=3; row<NUM_ROW; row++) {
+        for(int col=0; col<2; col++) {
             if(m_mapClassifiedCell[row][col] == '.') {
                 dropCells.push_back(cv::Point(col,row));
             }
@@ -1694,8 +1887,8 @@ bool ChessImageProcessing::findDropCells(std::vector<cv::Point>& dropCells) {
 bool ChessImageProcessing::findPromotePiece(cv::Point& dropCell, char piece) {
     bool foundPromotePiece = false;
     // Check drop zone on robot's right
-    for(int row=0; row<=7; row++) {
-        for(int col=12; col<=13; col++) {
+    for(int row=0; row<NUM_ROW; row++) {
+        for(int col=NUM_COL-2; col<NUM_COL; col++) {
             if(m_mapClassifiedCell[row][col] == piece) {
                 dropCell = cv::Point(col,row);
                 foundPromotePiece = true;
@@ -1706,8 +1899,8 @@ bool ChessImageProcessing::findPromotePiece(cv::Point& dropCell, char piece) {
     }
     if(foundPromotePiece) return true;
     // Check drop zone on robot's left
-    for(int row=3; row<=7; row++) {
-        for(int col=0; col<=1; col++) {
+    for(int row=3; row<NUM_ROW; row++) {
+        for(int col=0; col<2; col++) {
             if(m_mapClassifiedCell[row][col] == piece) {
                 dropCell = cv::Point(col,row);
                 foundPromotePiece = true;
@@ -1717,4 +1910,73 @@ bool ChessImageProcessing::findPromotePiece(cv::Point& dropCell, char piece) {
         if(foundPromotePiece) break;
     }
     return foundPromotePiece;
+}
+
+std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
+        const cv::Mat& imgCurrent,
+        const unsigned char* prevBoard,
+        const MoveDetectParams& params) {
+    std::vector<std::string> listMoves;
+    std::vector<cv::Point> listChangedCell;
+    // 1. Check board status
+//    classsifyChessBoardImage(imgCurrent);
+    unsigned char currentBoard[NUM_ROW][NUM_ROW];
+    unsigned char convertedPrevBoard[NUM_ROW][NUM_ROW];
+    for(int row = 0; row < NUM_ROW; row++) {
+        for(int col = 0; col < NUM_ROW; col++) {
+            currentBoard[row][col] =
+                    m_mapClassifiedCell[row][col+3];
+            convertedPrevBoard[NUM_ROW-1-row][NUM_ROW-1-col] =
+                    prevBoard[row*NUM_ROW+col];
+        }
+    }
+    printf("Prev:\r\n");
+    for (int r = 0; r < 8; ++r) {
+        for (int c = 0; c < 8; ++c) {
+            printf("%c ",convertedPrevBoard[r][c]);
+        }
+        printf("\r\n");
+    }
+    printf("Curr:\r\n");
+    for (int r = 0; r < 8; ++r) {
+        for (int c = 0; c < 8; ++c) {
+            printf("%c ",currentBoard[r][c]);
+        }
+        printf("\r\n");
+    }
+    // 2. Compare different with previous board
+    for(int row = 0; row < NUM_ROW; row++) {
+        for(int col = 0; col < NUM_ROW; col++) {
+            if(currentBoard[row][col] != convertedPrevBoard[row][col]) {
+                printf("row[%d] col[%d] [%c] != [%c]\r\n",
+                       row,col,
+                       currentBoard[row][col],
+                       convertedPrevBoard[row][col]);
+                listChangedCell.push_back(cv::Point(col,row));
+            }
+        }
+    }
+
+    // 3. Sort possible moves
+    for (int fromIndex = 0; fromIndex < listChangedCell.size(); fromIndex ++) {
+        for (int toIndex = 0; toIndex < listChangedCell.size(); toIndex ++) {
+            if(toIndex != fromIndex) {
+                std::string detectMove = coordToNotation(listChangedCell[fromIndex], params.playerSide)+
+                        coordToNotation(listChangedCell[toIndex], params.playerSide);
+                bool existMove = false;
+                for(std::string move: listMoves) {
+                    if(move == detectMove) {
+                        existMove = true;
+                        break;
+                    }
+                }
+                if(!existMove) listMoves.push_back(detectMove);
+            }
+        }
+    }
+    std::cout << "findPossibleMoves2 done" << std::endl;
+    for(int i = 0; i< listMoves.size(); i++) {
+        printf("Possible Move %s\r\n",listMoves[i].c_str());
+    }
+    return listMoves;
 }

@@ -118,7 +118,8 @@ public:
     void checkPieceColor(const cv::Mat& imageRGB, ClassificationResult& pieceClass, int row, int col);
     bool detectMovePhase3Classification();
     ClassificationResult classifyImage(const cv::Mat& input_mat, int row, int col);
-    void classsifyChessBoardImage(cv::Mat& warpedBoard);
+    void classsifyChessBoardImage(const cv::Mat& warpedBoard);
+    void classsifyChessBoardImage2(const cv::Mat& warpedBoard);
     void excludeCellList(std::vector<cv::Point> listCell);
     std::string coordToNotation(cv::Point pt, const std::string& playerSide);
     cv::Point notationToCoord(const std::string& notation, const std::string& playerSide);
@@ -130,6 +131,9 @@ public:
                               std::vector<cv::Point>& starts, std::vector<cv::Point>& ends);
     // findPossibleMoves now takes a MoveDetectParams struct
     std::vector<std::string> findPossibleMoves(const cv::Mat& img_start, const cv::Mat& img_end,
+                                    const MoveDetectParams& params);
+
+    std::vector<std::string> findPossibleMoves2(const cv::Mat& imgCurrent,const unsigned char* prevBoard,
                                     const MoveDetectParams& params);
 
     // GUI helpers: create a shared Controls window (main should call) and read current params
