@@ -4,7 +4,7 @@ CONFIG += c++11 console
 QT += core gui qml quick serialport multimedia
 
 CONFIG += use_chess_algo
-CONFIG += use_ai_assistant
+#CONFIG += use_ai_assistant
 CONFIG += use_image_processing
 CONFIG += use_system_voice
 #CONFIG += use_sanitize
@@ -17,10 +17,11 @@ QMAKE_LFLAGS += -fsanitize=address
 }
 #DEFINES += TEST_RANDOM_MOVE
 use_image_processing {
+DEFINES += DEBUG_ROI
 #DEFINES += DEBUG_SHOW_IMAGE
 #DEFINES += DEBUG_WRITE_IMAGE
 #DEFINES += DEBUG_SIMPLE_MOVE
-#DEFINES += IMAGE_PROCESS_MOVE
+DEFINES += IMAGE_PROCESS_MOVE
 unix:!macx: INCLUDEPATH += /usr/local/include/opencv4
 unix:!macx: DEPENDPATH += /usr/local/include/opencv4
 unix:!macx: LIBS += -L/usr/local/lib/  \
@@ -32,7 +33,10 @@ unix:!macx: LIBS += -L/usr/local/lib/  \
     -lopencv_highgui \
     -lopencv_imgcodecs \
     -lopencv_imgproc \
-    -lopencv_videoio
+    -lopencv_videoio \
+    -lopencv_dnn \
+    -lopencv_dnn_objdetect \
+    -lopencv_dnn_superres
 
 OPENCV_WINDOWS = $$PWD/../../ImageProcessing/compiledopencv
 win32: INCLUDEPATH += "$$OPENCV_WINDOWS/include"
@@ -100,6 +104,7 @@ HEADERS += \
 }
 
 use_ai_assistant {
+DEFINES += USE_AI_ASSISTANT
     win32 {
         # 1. Update these paths to match where your repositories live on your disk
         LLAMA_SOURCE_DIR = "$$PWD/../../Chatbot/llama.cpp"

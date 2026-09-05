@@ -193,7 +193,7 @@ private:
     void updateDropZone(uint8_t piece, int row, int col, ZONE_TYPE zone);
     char pieceName(int piece, int color);
 #ifdef IMAGE_PROCESS_MOVE
-    void processAndSaveFailures(const cv::Mat& imageBefore, const cv::Mat& imageAfter);
+    void processAndSaveFailures(const cv::Mat& imageAfter);
     int getNextFileCounter(const std::string& folderPath);
     void makeDirectory(const std::string& path);
     std::string formatFilename(const std::string& folder, int number);
@@ -207,7 +207,7 @@ private:
 #ifdef IMAGE_PROCESS_MOVE
     ChessImageProcessing* m_moveDetector;
     cv::VideoCapture cap;
-    cv::Mat imageBefore,imageAfter;
+    cv::Mat imageAfter;
     bool readFrame(cv::Mat& outImg);
 #endif
     QSerialPort *robotController;

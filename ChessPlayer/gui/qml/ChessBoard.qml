@@ -52,25 +52,31 @@ Item {
 
     function pieceText(code) {
         switch (code) {
-        case "wK": return "\u265A"
-        case "wQ": return "\u265B"
-        case "wR": return "\u265C"
-        case "wB": return "\u265D"
-        case "wN": return "\u265E"
-        case "wP": return "\u265F"
-        case "bK": return "\u265A"
-        case "bQ": return "\u265B"
-        case "bR": return "\u265C"
-        case "bB": return "\u265D"
-        case "bN": return "\u265E"
-        case "bP": return "\u265F"
-        default: return ""
+        case "K": return "\u265A"
+        case "Q": return "\u265B"
+        case "R": return "\u265C"
+        case "B": return "\u265D"
+        case "N": return "\u265E"
+        case "P": return "\u265F"
+        case "k": return "\u265A"
+        case "q": return "\u265B"
+        case "r": return "\u265C"
+        case "b": return "\u265D"
+        case "n": return "\u265E"
+        case "p": return "\u265F"
+        default: return "."
         }
+    }
+    function isFirstLetterUppercase(str) {
+      // Ensure the string isn't empty before testing
+      if (!str) return false;
+
+      return /^[A-Z]/.test(str);
     }
 
     function pieceColor(code) {
-        if (!code || code.length < 1) return "transparent"
-        return code.charAt(0) === "w" ? "gray" : "orange"
+        if (code.charAt(0) === ".") return "transparent"
+        return isFirstLetterUppercase(code) ? "orange":"gray"
     }
 
     Grid {

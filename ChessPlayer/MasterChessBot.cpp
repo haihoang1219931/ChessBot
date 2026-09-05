@@ -4,11 +4,13 @@
 MasterChessBot::MasterChessBot(QObject *parent) : QObject(parent)
 {
     m_workerChessbot = new ChessBot();
+#if defined(USE_AI_ASSISTANT)
     m_workerAssistant = new AssistantController();
     connect(m_workerChessbot, &ChessBot::newCommentAdded,
             m_workerAssistant, &AssistantController::singleVoice);
     connect(m_workerChessbot, &ChessBot::newMoveAdded,
             m_workerAssistant, &AssistantController::analyzeChessMove);
+#endif
     connect(m_workerChessbot, &ChessBot::boardChanged,
             this, &MasterChessBot::boardChanged);
     connect(m_workerChessbot, &ChessBot::detectFailed,
@@ -32,10 +34,12 @@ ChessBot* MasterChessBot::chessbot()
     return m_workerChessbot;
 }
 
+#if defined(USE_AI_ASSISTANT)
 AssistantController* MasterChessBot::assistant()
 {
     return m_workerAssistant;
 }
+#endif
 
 bool MasterChessBot::saveCalibrationData(QString fileName)
 {
@@ -108,13 +112,17 @@ void MasterChessBot::playInputCancelPromotion()
 void MasterChessBot::startService()
 {
     m_workerChessbot->startService();
+#if defined(USE_AI_ASSISTANT)
     m_workerAssistant->startService();
+#endif
 }
 
 void MasterChessBot::stopService()
 {
     m_workerChessbot->stopService();
+#if defined(USE_AI_ASSISTANT)
     m_workerAssistant->stopService();
+#endif
 }
 
 void MasterChessBot::sendTestCommand(QString command)

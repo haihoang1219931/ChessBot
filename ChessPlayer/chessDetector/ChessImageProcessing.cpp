@@ -11,37 +11,42 @@ ChessImageProcessing::ChessImageProcessing()
     m_chessBoardBox = 60;
     m_chessBoardSize = m_chessBoardRow * m_chessBoardBox;
     m_transformMaxtrixValid = false;
-    unsigned char testBoardPrev[64] = {
-        'q','q','Q','Q','R','N','P','P',
-        'b','b','B','b','p','p','p','p',
-        'k','k','k','k','K','.','.','.',
-        'p','p','p','p','r','r','R','r',
-        'p','P','N','B','.','.','.','.',
-        '.','.','.','.','.','.','.','.',
-        'P','.','.','.','.','.','.','.',
-        'P','P','P','P','N','n','R','n'};
-    unsigned char testBoardAfter[NUM_ROW][NUM_COL] = {
-    {'.','.','.','.','R','n','N','P','P','P','P','.','.','.'},
-    {'.','.','.','n','.','.','.','.','.','.','P','.','.','.'},
-    {'.','.','.','.','.','.','.','.','.','.','.','.','.','.'},
-    {'.','.','.','.','.','.','.','B','N','P','P','.','.','.'},
-    {'.','.','.','r','R','r','r','p','p','p','p','.','.','.'},
-    {'.','.','.','.','.','.','.','K','k','k','k','.','.','.'},
-    {'.','.','.','p','p','p','p','b','B','b','b','.','.','.'},
-    {'.','.','.','P','P','N','R','Q','Q','q','q','.','.','.'}};
-    for(int row = 0; row < NUM_ROW; row++) {
-        for(int col=0; col< NUM_COL; col++) {
-            m_mapClassifiedCell[row][col] = testBoardAfter[row][col];
-        }
-    }
-    MoveDetectParams params;
-    findPossibleMoves2(cv::Mat(),testBoardPrev,params);
+//    unsigned char testBoardPrev[64] = {
+//        'q','q','Q','Q','R','N','P','P',
+//        'b','b','B','b','p','p','p','p',
+//        'k','k','k','k','K','.','.','.',
+//        'p','p','p','p','r','r','R','r',
+//        'p','P','N','B','.','.','.','.',
+//        '.','.','.','.','.','.','.','.',
+//        'P','.','.','.','.','.','.','.',
+//        'P','P','P','P','N','n','R','n'};
+//    unsigned char testBoardAfter[NUM_ROW][NUM_COL] = {
+//    {'.','.','.','.','R','n','N','P','P','P','P','.','.','.'},
+//    {'.','.','.','n','.','.','.','.','.','.','P','.','.','.'},
+//    {'.','.','.','.','.','.','.','.','.','.','.','.','.','.'},
+//    {'.','.','.','.','.','.','.','B','N','P','P','.','.','.'},
+//    {'.','.','.','r','R','r','r','p','p','p','p','.','.','.'},
+//    {'.','.','.','.','.','.','.','K','k','k','k','.','.','.'},
+//    {'.','.','.','p','p','p','p','b','B','b','b','.','.','.'},
+//    {'.','.','.','P','P','N','R','Q','Q','q','q','.','.','.'}};
+//    for(int row = 0; row < NUM_ROW; row++) {
+//        for(int col=0; col< NUM_COL; col++) {
+//            m_mapClassifiedCell[row][col] = testBoardAfter[row][col];
+//        }
+//    }
+//    MoveDetectParams params;
+//    findPossibleMoves2(cv::Mat(),testBoardPrev,params);
 }
 
 void ChessImageProcessing::setDnnNetAllPieces(char* source, const std::vector<char>& dnnClassNames)
 {
     m_dnnNetAllPieces = cv::dnn::readNetFromONNX(source);
     m_dnnAllPiecesNames = dnnClassNames;
+    printf("setDnnNetAllPieces [%s] ",source);
+    for(char className: dnnClassNames) {
+        printf("%c ",className);
+    }
+    printf("\r\n");
 }
 
 void ChessImageProcessing::setDnnNetSpecial(char* source, const std::vector<char>& dnnClassNames)
@@ -1914,14 +1919,19 @@ bool ChessImageProcessing::findPromotePiece(cv::Point& dropCell, char piece) {
 
 std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
         const cv::Mat& imgCurrent,
-        const unsigned char* prevBoard,
+        const char* prevBoard,
         const MoveDetectParams& params) {
     std::vector<std::string> listMoves;
     std::vector<cv::Point> listChangedCell;
     // 1. Check board status
-//    classsifyChessBoardImage(imgCurrent);
-    unsigned char currentBoard[NUM_ROW][NUM_ROW];
-    unsigned char convertedPrevBoard[NUM_ROW][NUM_ROW];
+    cv::Mat warpImage;
+    cv::Mat homographyMatrix = getFullTranformMatrix();
+    cv::Mat warpedBoard;
+    cv::warpPerspective(imgCurrent, warpedBoard, homographyMatrix, cv::Size(WARP_WIDTH, WARP_HEIGHT));
+    printf("warpedBoard[%dx%d]\r\n",warpedBoard.cols,warpedBoard.rows);
+    classsifyChessBoardImage(warpedBoard);
+    char currentBoard[NUM_ROW][NUM_ROW];
+    char convertedPrevBoard[NUM_ROW][NUM_ROW];
     for(int row = 0; row < NUM_ROW; row++) {
         for(int col = 0; col < NUM_ROW; col++) {
             currentBoard[row][col] =
@@ -1975,8 +1985,8 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
         }
     }
     std::cout << "findPossibleMoves2 done" << std::endl;
-    for(int i = 0; i< listMoves.size(); i++) {
-        printf("Possible Move %s\r\n",listMoves[i].c_str());
-    }
+//    for(int i = 0; i< listMoves.size(); i++) {
+//        printf("Possible Move %s\r\n",listMoves[i].c_str());
+//    }
     return listMoves;
 }

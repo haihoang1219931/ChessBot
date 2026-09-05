@@ -133,7 +133,7 @@ public:
     std::vector<std::string> findPossibleMoves(const cv::Mat& img_start, const cv::Mat& img_end,
                                     const MoveDetectParams& params);
 
-    std::vector<std::string> findPossibleMoves2(const cv::Mat& imgCurrent,const unsigned char* prevBoard,
+    std::vector<std::string> findPossibleMoves2(const cv::Mat& imgCurrent,const char* prevBoard,
                                     const MoveDetectParams& params);
 
     // GUI helpers: create a shared Controls window (main should call) and read current params
@@ -176,7 +176,7 @@ private:
     cv::dnn::Net m_dnnNetBishopPawn;
     std::vector<char> m_dnnBishopPawnNames;
     uint8_t m_mapExcludedCell[NUM_ROW][NUM_COL];
-    uint8_t m_mapClassifiedCell[NUM_ROW][NUM_COL];
+    char m_mapClassifiedCell[NUM_ROW][NUM_COL];
 };
 
 #endif // CHESSIMAGEPROCESSING_H

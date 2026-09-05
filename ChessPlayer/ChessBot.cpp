@@ -16,6 +16,9 @@
 #include <QStringList>
 #include <QString>
 #include <QDebug>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
 #include "ChessBot.h"
 #include "chessAlgo/ChessController.h"
 #include "Move.hpp"
@@ -308,12 +311,6 @@ void ChessBot::playLoop()
         qDebug("Init FEN: %s",m_chessController->extractFEN().toStdString().c_str());
         logWithTimestampQt(m_chessController->extractFEN());
         qDebug("Init FEN done");
-#ifdef IMAGE_PROCESS_MOVE
-        executeCommand("rs");
-        readFrame(imageBefore);
-        qDebug("First image [%d,%d]",
-               imageBefore.rows,imageBefore.cols);
-#endif
         m_statePlay = PLAY_PROCESS_DONE;
     }
         break;
@@ -343,7 +340,7 @@ void ChessBot::playLoop()
         } else {
             m_statePlay = PLAY_INFORM_ERROR;
 #ifdef IMAGE_PROCESS_MOVE
-            processAndSaveFailures(imageBefore,imageAfter);
+            processAndSaveFailures(imageAfter);
 #endif
         }
     }
@@ -553,6 +550,7 @@ bool ChessBot::playCheckEndGame()
         return true;
     }
 }
+
 uint8_t ChessBot::playDetectMove()
 {
     qDebug("playDetectMove");
@@ -563,22 +561,51 @@ uint8_t ChessBot::playDetectMove()
     QString fenBeforeMove = m_chessController->extractFEN();
 #ifdef IMAGE_PROCESS_MOVE
     if(!readFrame(imageAfter)){
+        qDebug("playDetectMove capture failed");
         return STATE_DONE_FAIL;
     }
-    if(!imageBefore.empty() && !imageAfter.empty()) {
-        cv::imwrite("imageBefore.jpg",imageBefore);
+    if(!imageAfter.empty()) {
+        // Get current system time
+        auto now = std::chrono::system_clock::now();
+        std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+
+        // Format time as a string
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&now_c), "%Y-%m-%d %H:%M:%S");
+        std::string timestamp = ss.str();
+
+        // Define text properties
+        cv::Point org(30, 50); // Bottom-left corner of the text string in the image
+        int fontFace = cv::FONT_HERSHEY_SIMPLEX;
+        double fontScale = 1.0;
+        cv::Scalar color(0, 255, 0); // Green color in BGR
+        int thickness = 2;
+        int lineType = cv::LINE_AA;
+
+        // Put timestamp on the image
+        cv::putText(imageAfter, timestamp, org, fontFace, fontScale, color, thickness, lineType);
         cv::imwrite("imageAfter.jpg",imageAfter);
-        std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves(imageBefore, imageAfter,
+        QStringList prevBoard = m_chessController->board();
+        char prevBoardArr[64];
+        for(int i=0; i< 64; i++) {
+            if(i<prevBoard.size() && prevBoard[i].size()>0) {
+                prevBoardArr[i] = prevBoard[i].toStdString()[0];
+            } else {
+                prevBoardArr[i] = '.';
+            }
+        }
+        std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves2(imageAfter,prevBoardArr,
             *m_detectParams);
         std::string possibleMove = "";
         int numPossibleMove = 0;
         for(int i = 0; i< chessMoves.size(); i++) {
-            qDebug("Checking Move %s",chessMoves[i].c_str());
+//            qDebug("Checking Move %s",chessMoves[i].c_str());
             QString from = QString::fromStdString(chessMoves[i]).left(2);  // Result: "e2"
             QString to = QString::fromStdString(chessMoves[i]).right(2);   // Result: "e4"
             if(m_chessController->isValidMoveByCoordinates(from,to,choosenMove)) {
                 numPossibleMove++;
                 possibleMove = chessMoves[i];
+                qDebug("Possible Move %s",possibleMove.c_str());
             }
         }
         if(numPossibleMove == 1) {
@@ -597,35 +624,6 @@ uint8_t ChessBot::playDetectMove()
             }
         }
     }
-#elif defined(TEST_RANDOM_MOVE)
-        QStringList randomMoves = m_chessController->findBestMoveCoordinates();
-        printf("=== Player move %s->%s\r\n",
-                randomMoves[0].toStdString().c_str(),
-                randomMoves[1].toStdString().c_str());
-        if(randomMoves[0] != randomMoves[1]) {
-            QString from = randomMoves[0].left(2);  // Result: "e2"
-            QString to = randomMoves[1].right(2);   // Result: "e4"
-            choosenPiece = m_chessController->pieceType(from);
-            choosenPieceMoveNotation = to;
-            if(m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1],choosenMove)) {
-                detectState = STATE_DONE_SUCCESS;
-                QString formattedMove = choosenPiece + " "+
-                        from + " to "+ to;
-                Q_EMIT newMoveAdded(fenBeforeMove,
-                                    m_chessController->playerColor() == Color::WHITE?"White":"Black",
-                                    formattedMove);
-                break;
-            } else {
-                if(m_chessController->status() == "CHOOSE_PROMOTION_PIECE") {
-                    Q_EMIT showPromotionPieces();
-                    detectState = STATE_PENDING;
-                    break;
-                }
-            }
-        } else {
-            Q_EMIT newCommentAdded("No invalid move found\r\n");
-        }
-
 #endif
     return detectState;
 }
@@ -911,9 +909,6 @@ uint8_t ChessBot::playExecuteNextMove()
 uint8_t ChessBot::playInformResult()
 {
     // TODO: Signal GUI that robot execution is done
-#ifdef IMAGE_PROCESS_MOVE
-    readFrame(imageBefore);
-#endif
     return STATE_DONE_SUCCESS;
 }
 
@@ -1430,7 +1425,16 @@ bool ChessBot::saveCalibrationData(QString fileName)
 
     QJsonObject root;
 
-    // Save chessboard calibration (8x8)
+    // 1. Store ai models
+    QJsonObject childrenObj;
+    childrenObj["chess_detector"] = "";
+    childrenObj["class_list"] = "";
+    childrenObj["voice_detector"] = "";
+    childrenObj["speaker"] = "";
+
+    root["ai_model"] = childrenObj;
+
+    // 2. Save chessboard calibration (8x8)
     QJsonArray cameraCorners;
     for (int cornerID = 0; cornerID < m_chessboardConners.size(); cornerID++) {
         QJsonObject pointObj;
@@ -1440,7 +1444,7 @@ bool ChessBot::saveCalibrationData(QString fileName)
     }
     root["camera_calibration"] = cameraCorners;
 
-    // Save chessboard calibration (8x8)
+    // 3. Save chessboard calibration (8x8)
     QJsonArray chessboardArray;
     for (int row = 0; row < 8; row++) {
         for (int col = 0; col < 8; col++) {
@@ -1454,7 +1458,7 @@ bool ChessBot::saveCalibrationData(QString fileName)
     }
     root["chessboard"] = chessboardArray;
 
-    // Save right dropzone calibration (8x2)
+    // 4. Save right dropzone calibration (8x2)
     QJsonArray rightDropzoneArray;
     for (int row = 0; row < m_dropzoneRightCalib.size(); row++) {
         for (int col = 0; col < m_dropzoneRightCalib[row].size(); col++) {
@@ -1468,7 +1472,7 @@ bool ChessBot::saveCalibrationData(QString fileName)
     }
     root["dropzone_right"] = rightDropzoneArray;
 
-    // Save left dropzone calibration (8x2)
+    // 5. Save left dropzone calibration (8x2)
     QJsonArray leftDropzoneArray;
     for (int row = 0; row < m_dropzoneLeftCalib.size(); row++) {
         for (int col = 0; col < m_dropzoneLeftCalib[row].size(); col++) {
@@ -1482,7 +1486,7 @@ bool ChessBot::saveCalibrationData(QString fileName)
     }
     root["dropzone_left"] = leftDropzoneArray;
 
-    // Create JSON document and write to file
+    // 6. Create JSON document and write to file
     QJsonDocument doc(root);
     QFile file(fileName);
 
@@ -1565,6 +1569,38 @@ bool ChessBot::loadCalibrationData(QString fileName)
         }
 #endif
     }
+    if(root.contains("ai_model")) {
+        QJsonObject aiModelObj = root["ai_model"].toObject();
+
+        QString chessPath = aiModelObj["chess_detector"].toString();
+        QString classList = aiModelObj["class_list"].toString();
+        QString voicePath = aiModelObj["voice_detector"].toString();
+        QString speakerPath = aiModelObj["speaker"].toString();
+
+        // Print the values to verify
+        qDebug() << "Chess Detector Path:" << chessPath;
+        qDebug() << "Class List:" << classList;
+        qDebug() << "Voice Detector Path:" << voicePath;
+        qDebug() << "Speaker Path:" << speakerPath;
+        std::vector<char> dnnClassNames;
+        QStringList dnnClassArr = classList.split(",");
+        for(QString className:dnnClassArr) {
+            dnnClassNames.push_back(className.toStdString()[0]);
+        }
+        m_moveDetector->setDnnNetAllPieces((char*)chessPath.toStdString().c_str(),dnnClassNames);
+        std::vector<cv::Point> listCell {
+            cv::Point(0,0),cv::Point(1,0),cv::Point(2,0),cv::Point(11,0),
+            cv::Point(0,1),cv::Point(1,1),cv::Point(2,1),cv::Point(11,1),
+            cv::Point(0,2),cv::Point(1,2),cv::Point(2,2),cv::Point(11,2),
+            cv::Point(2,3),cv::Point(11,3),
+            cv::Point(2,4),cv::Point(11,4),
+            cv::Point(2,5),cv::Point(11,5),
+            cv::Point(2,6),cv::Point(11,6),
+            cv::Point(2,7),cv::Point(11,7),
+        };
+        m_moveDetector->excludeCellList(listCell);
+    }
+
 #endif
 
     return true;
@@ -2095,8 +2131,8 @@ int ChessBot::getNextFileCounter(const std::string& folderPath) {
     return maxIndex + 1;
 }
 
-void ChessBot::processAndSaveFailures(const cv::Mat& imageBefore, const cv::Mat& imageAfter) {
-    if(imageBefore.cols > 0 && imageBefore.rows > 0 && imageAfter.cols > 0 && imageAfter.rows > 0) {
+void ChessBot::processAndSaveFailures(const cv::Mat& imageAfter) {
+    if(imageAfter.cols > 0 && imageAfter.rows > 0) {
         qDebug("Processing and saving failure images.");
     } else {
         qDebug("Invalid images provided for saving.");
@@ -2107,13 +2143,11 @@ void ChessBot::processAndSaveFailures(const cv::Mat& imageBefore, const cv::Mat&
 
     static int fileCounter = getNextFileCounter(dirName);
 
-    std::string pathBefore = formatFilename(dirName, fileCounter++);
     std::string pathAfter  = formatFilename(dirName, fileCounter++);
-    
-    cv::imwrite(pathBefore, imageBefore);
+
     cv::imwrite(pathAfter, imageAfter);
 
-    qDebug("Saved:%s and %s", pathBefore.c_str(),pathAfter.c_str());
+    qDebug("Saved:%s", pathAfter.c_str());
 }
 #endif
 

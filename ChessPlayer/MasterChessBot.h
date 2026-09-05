@@ -3,7 +3,9 @@
 
 #include <QObject>
 #include "ChessBot.h"
+#if defined(USE_AI_ASSISTANT)
 #include "assistant/AssistantController.h"
+#endif
 
 class MasterChessBot : public QObject
 {
@@ -13,7 +15,9 @@ class MasterChessBot : public QObject
 public:
     explicit MasterChessBot(QObject *parent = nullptr);
     ChessBot* chessbot();
+#if defined(USE_AI_ASSISTANT)
     AssistantController* assistant();
+#endif
     Q_INVOKABLE bool saveCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
     Q_INVOKABLE bool loadCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
     Q_INVOKABLE void updateCorners(QVariantList corners);
@@ -47,7 +51,9 @@ Q_SIGNALS:
     void foundLastFEN();
 private:
     ChessBot* m_workerChessbot;
+#if defined(USE_AI_ASSISTANT)
     AssistantController* m_workerAssistant;
+#endif
 };
 
 #endif // MASTERCHESSBOT_H

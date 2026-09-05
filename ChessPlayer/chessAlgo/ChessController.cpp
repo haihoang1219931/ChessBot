@@ -150,7 +150,7 @@ void ChessController::updateBoard()
     refreshBoardModel();
     for(int row = 0; row < 8; row++) {
         for(int col = 0; col < 8; col ++) {
-            printf("%s ",m_boardModel[row*8+col] == ""?"__":m_boardModel[row*8+col].toStdString().c_str());
+            printf("%s ",m_boardModel[row*8+col].toStdString().c_str());
         }
         printf("\r\n");
     }
@@ -232,12 +232,12 @@ bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex, Move& c
     const int destinationSquare = uiIndexToSquare(stopUiIndex);
 
     const QString piece = pieceCodeAtSquare(originSquare);
-    if (piece.isEmpty())
+    if (piece == ".")
     {
         return false;
     }
 
-    const bool isWhitePiece = piece.startsWith("w");
+    const bool isWhitePiece = piece.isUpper();
     if ((isWhitePiece && m_board->getColorToPlay() != WHITE) || (!isWhitePiece && m_board->getColorToPlay() != BLACK))
     {
         setStatus("OWN_PIECE_SELECTED");
@@ -605,19 +605,19 @@ void ChessController::playEngineMove()
 
 QString ChessController::convertPieceText(QString pieceShortName)
 {
-    if (pieceShortName == "wP") return "White Pawn";
-    else if (pieceShortName == "wN") return "White Knight";
-    else if (pieceShortName == "wB") return "White Bishop";
-    else if (pieceShortName == "wR") return "White Rook";
-    else if (pieceShortName == "wQ") return "White Queen";
-    else if (pieceShortName == "wK") return "White King";
-    else if (pieceShortName == "bP") return "Black Pawn";
-    else if (pieceShortName == "bN") return "Black Knight";
-    else if (pieceShortName == "bB") return "Black Bishop";
-    else if (pieceShortName == "bR") return "Black Rook";
-    else if (pieceShortName == "bQ") return "Black Queen";
-    else if (pieceShortName == "bK") return "Black King";
-    else if (pieceShortName == "") return "Empty Square";
+    if (pieceShortName == "P") return "White Pawn";
+    else if (pieceShortName == "N") return "White Knight";
+    else if (pieceShortName == "B") return "White Bishop";
+    else if (pieceShortName == "R") return "White Rook";
+    else if (pieceShortName == "Q") return "White Queen";
+    else if (pieceShortName == "K") return "White King";
+    else if (pieceShortName == "p") return "Black Pawn";
+    else if (pieceShortName == "n") return "Black Knight";
+    else if (pieceShortName == "b") return "Black Bishop";
+    else if (pieceShortName == "r") return "Black Rook";
+    else if (pieceShortName == "Q") return "Black Queen";
+    else if (pieceShortName == "k") return "Black King";
+    else if (pieceShortName == ".") return "Empty Square";
     else return "Unknown Piece ID";
 }
 
@@ -713,21 +713,21 @@ QString ChessController::pieceCodeAtSquare(int square) const
 {
     const U64 mask = 1ULL << square;
 
-    if (m_board->getWhitePawns() & mask) return "wP";
-    if (m_board->getWhiteKnights() & mask) return "wN";
-    if (m_board->getWhiteBishops() & mask) return "wB";
-    if (m_board->getWhiteRooks() & mask) return "wR";
-    if (m_board->getWhiteQueens() & mask) return "wQ";
-    if (m_board->getWhiteKing() & mask) return "wK";
+    if (m_board->getWhitePawns() & mask) return "P";
+    if (m_board->getWhiteKnights() & mask) return "N";
+    if (m_board->getWhiteBishops() & mask) return "B";
+    if (m_board->getWhiteRooks() & mask) return "R";
+    if (m_board->getWhiteQueens() & mask) return "Q";
+    if (m_board->getWhiteKing() & mask) return "K";
 
-    if (m_board->getBlackPawns() & mask) return "bP";
-    if (m_board->getBlackKnights() & mask) return "bN";
-    if (m_board->getBlackBishops() & mask) return "bB";
-    if (m_board->getBlackRooks() & mask) return "bR";
-    if (m_board->getBlackQueens() & mask) return "bQ";
-    if (m_board->getBlackKing() & mask) return "bK";
+    if (m_board->getBlackPawns() & mask) return "p";
+    if (m_board->getBlackKnights() & mask) return "n";
+    if (m_board->getBlackBishops() & mask) return "b";
+    if (m_board->getBlackRooks() & mask) return "r";
+    if (m_board->getBlackQueens() & mask) return "q";
+    if (m_board->getBlackKing() & mask) return "k";
 
-    return "";
+    return ".";
 }
 
 QString ChessController::buildResultText() const
