@@ -785,9 +785,9 @@ uint8_t ChessBot::playCalculateNextMove()
                                    "%c%d%d",
                     fromCoord.y(),fromCoord.x(),
                     toCoord.y(),toCoord.x(),
-                    dropCells[0].y <=1 ?'b':'p',dropCells[0].y >=12 ? dropCells[0].y-12:dropCells[0].y,dropCells[0].x,
-                    promoteCell.y <=1?'b':'p',promoteCell.y,promoteCell.x,
-                    promoteCell.y <=1?'b':'p',promoteCell.y,promoteCell.x);
+                    dropCells[0].x <=1 ?'b':'p',dropCells[0].y,dropCells[0].x%12,
+                    promoteCell.x <=1?'b':'p',promoteCell.y,promoteCell.x%12,
+                    promoteCell.x <=1?'b':'p',promoteCell.y,promoteCell.x%12);
         }
         else
         {
@@ -806,7 +806,7 @@ uint8_t ChessBot::playCalculateNextMove()
                             fromCoord.y(),fromCoord.x(),
                             toCoord.y(),toCoord.x(),
                             canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),PIECE_MOVE_CAPTURE)?'-':'n',
-                            dropCells[0].y <=1 ?'b':'p',dropCells[0].y >=12 ? dropCells[0].y-12:dropCells[0].y,dropCells[0].x
+                            dropCells[0].x <=1 ?'b':'p',dropCells[0].y,dropCells[0].x%12
                         );
                 }
             }
@@ -829,7 +829,7 @@ uint8_t ChessBot::playCalculateNextMove()
                             fromCoord.y(),fromCoord.x(),
                             toCoord.y(),toCoord.x(),
                             canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),PIECE_MOVE_CAPTURE)?'-':'n',
-                            dropCells[0].y <=1 ?'b':'p',dropCells[0].y >=12 ? dropCells[0].y-12:dropCells[0].y,dropCells[0].x
+                            dropCells[0].x <=1 ?'b':'p',dropCells[0].y,dropCells[0].x%12
                         );
                 }
             }

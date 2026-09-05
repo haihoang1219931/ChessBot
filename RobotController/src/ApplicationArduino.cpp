@@ -96,7 +96,7 @@ void ApplicationArduino::initRobot()
         {true, 16.0f*70.0f/20.0f*(200.0f/360.0f),    72,     140,       48,         8,          48,       210,       2,   FREQUENCY_TIMER1,    250},
         {false,  1.0f/1.0f,                          26,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
         {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       6,   FREQUENCY_TIMER1,      0},
-        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -32,        36,         -36,         0,       6,   FREQUENCY_TIMER1,    100}
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -34,        36,         -36,         0,       6,   FREQUENCY_TIMER1,    100}
     };
 
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
@@ -176,11 +176,15 @@ void ApplicationArduino::specificPlatformGohome(int motorID, bool stopOtherStepp
           if( digitalRead(limitPin) == LOW ) {
             digitalWrite(dirPin, HIGH);
             stateGoHome = STATE_GO_TO_MAX_POSITION;
+#ifdef DEBUG_COMMAND
             Serial.println("Go to max position");
+#endif
           } else {
             digitalWrite(dirPin, LOW);
             stateGoHome = STATE_GO_TO_HOME;
+#ifdef DEBUG_COMMAND
             Serial.println("Go to home position");
+#endif
           }
           delay(100);
         }
@@ -222,7 +226,9 @@ void ApplicationArduino::specificPlatformGohome(int motorID, bool stopOtherStepp
       }
       // delay(1);
     }
+  #ifdef DEBUG_COMMAND
     Serial.println("Homing Capture done");
+  #endif
     digitalWrite(enPin, HIGH);
     if(stopOtherStepper) {
       // Enable arm1, arm 2 and arm 5 after homing capture

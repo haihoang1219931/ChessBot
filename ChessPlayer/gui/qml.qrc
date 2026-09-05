@@ -20,5 +20,6 @@
         <file>qml/PromotionPieces.qml</file>
         <file>qml/HomeOption.qml</file>
         <file>qml/ConfirmPlay.qml</file>
+        <file>qml/SettingTestCommand.qml</file>
     </qresource>
 </RCC>

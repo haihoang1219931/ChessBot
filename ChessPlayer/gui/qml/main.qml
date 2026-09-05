@@ -72,6 +72,8 @@ ApplicationWindow {
                     stack.push(calibPanel)
                 } else if (calibType === "chessboard") {
                     stack.push(calibrationPointsPanel)
+                } else if (calibType === "command") {
+                    stack.push(testCommandPanel)
                 }
             }
         }
@@ -90,6 +92,16 @@ ApplicationWindow {
     Component {
         id: calibrationPointsPanel
         SettingCalibrationPoints {
+            onExitPressed: {
+                stack.pop()
+                stack.push(settingsMenu)
+            }
+        }
+    }
+
+    Component {
+        id: testCommandPanel
+        SettingTestCommand {
             onExitPressed: {
                 stack.pop()
                 stack.push(settingsMenu)

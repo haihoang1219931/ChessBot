@@ -106,7 +106,7 @@ int ApplicationController::executeCommandSequenceLoop()
         if(executeCommandLoop() == COMMAND_STATE_DONE) {
             if(m_curCommandId >= m_numCommand - 1) {
                 m_commandSequenceState = COMMAND_SEQUENCE_STATE_DONE;
-                this->printf("Execute command sequence done\r\n");
+                // this->printf("Execute command sequence done\r\n");
             } else {
                 m_commandState = COMMAND_STATE_INIT;
                 m_curCommandId++;
@@ -491,7 +491,9 @@ void ApplicationController::executeCommand(char* command) {
         if (executeSequence(MOVE_ATTACK, command[1]-'0',command[2]-'0',
                 command[3]-'0',command[4]-'0',command[5] == '-',
                 command[6],command[7]-'0',command[8]-'0')) {
-            this->printf("[%s] Attack confirmed\r\n", command);
+            this->printf("[%s] Attack confirmed f(%d,%d)->t(%d,%d) d[%c](%d,%d)\r\n", command,
+                command[1]-'0',command[2]-'0',command[3]-'0',command[4]-'0',
+                command[6],command[7]-'0',command[8]-'0');
         } else {
             this->printf("[%s] Attack failed\r\n", command);
         }
