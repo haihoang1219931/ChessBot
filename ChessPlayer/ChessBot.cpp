@@ -489,8 +489,7 @@ bool ChessBot::canMoveStraight(int startRow, int startCol, int stopRow, int stop
     QStringList board = m_chessController->board();
     for(int row = 0; row < 8; row ++) {
         for(int col = 0 ; col < 8; col ++) {
-            printf("%s ",board[row*8+col] != "" ? board[row*8+col].toStdString().c_str():
-                    "__");
+            printf("%s ",board[row*8+col].toStdString().c_str());
         }
         printf("\r\n");
     }
@@ -503,13 +502,12 @@ bool ChessBot::canMoveStraight(int startRow, int startCol, int stopRow, int stop
     for(int row = minRow; row<= maxRow; row++) {
         for(int col = minCol; col <= maxCol; col++) {
             QString pieceType = (m_chessController->playerColor() == Color::WHITE ? board[row*8+col]:board[(7-row)*8+(7-col)]);
-            printf("%s ",pieceType != "" ? pieceType.toStdString().c_str():
-                    "__");
+            printf("%s ",pieceType.toStdString().c_str());
             if((row == startRow && col == startCol) ||
                 (row == stopRow && col == stopCol) ||
                 (moveType == PIECE_MOVE_ENPASSANT && row == startRow))
                 continue;
-            if(pieceType != "") {
+            if(pieceType != ".") {
                 foundBlockingPiece = true;
             }
         }
@@ -787,9 +785,9 @@ uint8_t ChessBot::playCalculateNextMove()
                                    "%c%d%d",
                     fromCoord.y(),fromCoord.x(),
                     toCoord.y(),toCoord.x(),
-                    dropCells[0].y >=12 ?'b':'p',dropCells[0].x,dropCells[0].y >=12 ? dropCells[0].y-12:dropCells[0].y,
-                    promoteCell.y >= 12?'b':'p',promoteCell.x,promoteCell.y,
-                    promoteCell.y >= 12?'b':'p',promoteCell.x,promoteCell.y);
+                    dropCells[0].y <=1 ?'b':'p',dropCells[0].y >=12 ? dropCells[0].y-12:dropCells[0].y,dropCells[0].x,
+                    promoteCell.y <=1?'b':'p',promoteCell.y,promoteCell.x,
+                    promoteCell.y <=1?'b':'p',promoteCell.y,promoteCell.x);
         }
         else
         {
@@ -808,7 +806,7 @@ uint8_t ChessBot::playCalculateNextMove()
                             fromCoord.y(),fromCoord.x(),
                             toCoord.y(),toCoord.x(),
                             canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),PIECE_MOVE_CAPTURE)?'-':'n',
-                            dropCells[0].y >=12 ?'b':'p',dropCells[0].x,dropCells[0].y >=12 ? dropCells[0].y-12:dropCells[0].y
+                            dropCells[0].y <=1 ?'b':'p',dropCells[0].y >=12 ? dropCells[0].y-12:dropCells[0].y,dropCells[0].x
                         );
                 }
             }
@@ -831,7 +829,7 @@ uint8_t ChessBot::playCalculateNextMove()
                             fromCoord.y(),fromCoord.x(),
                             toCoord.y(),toCoord.x(),
                             canMoveStraight(fromCoord.y(),fromCoord.x(),toCoord.y(),toCoord.x(),PIECE_MOVE_CAPTURE)?'-':'n',
-                            dropCells[0].y >=12 ?'b':'p',dropCells[0].x,dropCells[0].y >=12 ? dropCells[0].y-12:dropCells[0].y
+                            dropCells[0].y <=1 ?'b':'p',dropCells[0].y >=12 ? dropCells[0].y-12:dropCells[0].y,dropCells[0].x
                         );
                 }
             }

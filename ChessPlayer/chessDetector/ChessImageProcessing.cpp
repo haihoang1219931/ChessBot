@@ -1871,18 +1871,24 @@ void ChessImageProcessing::excludeCellList(std::vector<cv::Point> listCell) {
 bool ChessImageProcessing::findDropCells(std::vector<cv::Point>& dropCells) {
     dropCells.clear();
     // Check drop zone on robot's right
-    for(int row=0; row<NUM_ROW; row++) {
-        for(int col=NUM_COL-2; col<NUM_COL; col++) {
+    for(int row=NUM_ROW-1; row>=0; row--) {
+        for(int col=NUM_COL-1; col>=NUM_COL-2; col--) {
             if(m_mapClassifiedCell[row][col] == '.') {
+                // @Todo: Ignore first drop zone row
+                if(NUM_ROW-1-row == 0 && NUM_COL-1-col<=1) continue;
                 dropCells.push_back(cv::Point(NUM_COL-1-col,NUM_ROW-1-row));
+                printf("dropCell r[%d] c[%d] from r[%d] c[%d]\r\n",
+                       NUM_ROW-1-row,NUM_COL-1-col,row,col);
             }
         }
     }
     // Check drop zone on robot's left
-    for(int row=3; row<NUM_ROW; row++) {
-        for(int col=0; col<2; col++) {
+    for(int row=NUM_ROW-1; row>=3; row--) {
+        for(int col=1; col>=0; col--) {
             if(m_mapClassifiedCell[row][col] == '.') {
                 dropCells.push_back(cv::Point(NUM_COL-1-col,NUM_ROW-1-row));
+                printf("dropCell r[%d] c[%d] from r[%d] c[%d]\r\n",
+                       NUM_ROW-1-row,NUM_COL-1-col,row,col);
             }
         }
     }
@@ -1895,7 +1901,7 @@ bool ChessImageProcessing::findPromotePiece(cv::Point& promoteCell, char piece) 
     for(int row=0; row<NUM_ROW; row++) {
         for(int col=NUM_COL-2; col<NUM_COL; col++) {
             if(m_mapClassifiedCell[row][col] == piece) {
-                promoteCell = cv::Point(col,row);
+                promoteCell = cv::Point(NUM_COL-1-col,NUM_ROW-1-row);
                 foundPromotePiece = true;
                 break;
             }
@@ -1907,7 +1913,7 @@ bool ChessImageProcessing::findPromotePiece(cv::Point& promoteCell, char piece) 
     for(int row=3; row<NUM_ROW; row++) {
         for(int col=0; col<2; col++) {
             if(m_mapClassifiedCell[row][col] == piece) {
-                promoteCell = cv::Point(col,row);
+                promoteCell = cv::Point(NUM_COL-1-col,NUM_ROW-1-row);
                 foundPromotePiece = true;
                 break;
             }
