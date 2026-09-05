@@ -1874,7 +1874,7 @@ bool ChessImageProcessing::findDropCells(std::vector<cv::Point>& dropCells) {
     for(int row=0; row<NUM_ROW; row++) {
         for(int col=NUM_COL-2; col<NUM_COL; col++) {
             if(m_mapClassifiedCell[row][col] == '.') {
-                dropCells.push_back(cv::Point(col,row));
+                dropCells.push_back(cv::Point(NUM_COL-1-col,NUM_ROW-1-row));
             }
         }
     }
@@ -1882,20 +1882,20 @@ bool ChessImageProcessing::findDropCells(std::vector<cv::Point>& dropCells) {
     for(int row=3; row<NUM_ROW; row++) {
         for(int col=0; col<2; col++) {
             if(m_mapClassifiedCell[row][col] == '.') {
-                dropCells.push_back(cv::Point(col,row));
+                dropCells.push_back(cv::Point(NUM_COL-1-col,NUM_ROW-1-row));
             }
         }
     }
     return dropCells.size()>0;
 }
 
-bool ChessImageProcessing::findPromotePiece(cv::Point& dropCell, char piece) {
+bool ChessImageProcessing::findPromotePiece(cv::Point& promoteCell, char piece) {
     bool foundPromotePiece = false;
     // Check drop zone on robot's right
     for(int row=0; row<NUM_ROW; row++) {
         for(int col=NUM_COL-2; col<NUM_COL; col++) {
             if(m_mapClassifiedCell[row][col] == piece) {
-                dropCell = cv::Point(col,row);
+                promoteCell = cv::Point(col,row);
                 foundPromotePiece = true;
                 break;
             }
@@ -1907,7 +1907,7 @@ bool ChessImageProcessing::findPromotePiece(cv::Point& dropCell, char piece) {
     for(int row=3; row<NUM_ROW; row++) {
         for(int col=0; col<2; col++) {
             if(m_mapClassifiedCell[row][col] == piece) {
-                dropCell = cv::Point(col,row);
+                promoteCell = cv::Point(col,row);
                 foundPromotePiece = true;
                 break;
             }
@@ -1922,6 +1922,7 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
         const char* prevBoard,
         const MoveDetectParams& params) {
     std::vector<std::string> listMoves;
+    std::vector<cv::Point> listStartCell;
     std::vector<cv::Point> listChangedCell;
     // 1. Check board status
     cv::Mat warpImage;
@@ -1957,31 +1958,38 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
     // 2. Compare different with previous board
     for(int row = 0; row < NUM_ROW; row++) {
         for(int col = 0; col < NUM_ROW; col++) {
+            // exception for pawn and Bishop
+            if((convertedPrevBoard[row][col] == 'p' && currentBoard[row][col] == 'b') ||
+               (convertedPrevBoard[row][col] == 'P' && currentBoard[row][col] == 'B')) {
+                continue;
+            }
             if(currentBoard[row][col] != convertedPrevBoard[row][col]) {
                 printf("row[%d] col[%d] [%c] != [%c]\r\n",
                        row,col,
                        currentBoard[row][col],
                        convertedPrevBoard[row][col]);
-                listChangedCell.push_back(cv::Point(col,row));
+                if(currentBoard[row][col] == '.') {
+                    listStartCell.push_back(cv::Point(col,row));
+                } else {
+                    listChangedCell.push_back(cv::Point(col,row));
+                }
             }
         }
     }
 
     // 3. Sort possible moves
-    for (int fromIndex = 0; fromIndex < listChangedCell.size(); fromIndex ++) {
-        for (int toIndex = 0; toIndex < listChangedCell.size(); toIndex ++) {
-            if(toIndex != fromIndex) {
-                std::string detectMove = coordToNotation(listChangedCell[fromIndex], params.playerSide)+
-                        coordToNotation(listChangedCell[toIndex], params.playerSide);
-                bool existMove = false;
-                for(std::string move: listMoves) {
-                    if(move == detectMove) {
-                        existMove = true;
-                        break;
-                    }
+    for (cv::Point fromCell: listStartCell) {
+        for (cv::Point toCell: listChangedCell) {
+            std::string detectMove = coordToNotation(fromCell, params.playerSide)+
+                    coordToNotation(toCell, params.playerSide);
+            bool existMove = false;
+            for(std::string move: listMoves) {
+                if(move == detectMove) {
+                    existMove = true;
+                    break;
                 }
-                if(!existMove) listMoves.push_back(detectMove);
             }
+            if(!existMove) listMoves.push_back(detectMove);
         }
     }
     std::cout << "findPossibleMoves2 done" << std::endl;

@@ -104,12 +104,6 @@ struct GameInfo {
     bool success = false;
 };
 
-typedef struct{
-    int rowID;
-    int colID;
-    ZONE_TYPE zoneType;
-}DropPoint;
-
 class ChessBot : public QThread {
     Q_OBJECT
     Q_PROPERTY(QObject* chessController READ chessControllerObject CONSTANT)
@@ -188,9 +182,6 @@ private:
     bool findLastFENInLog();
     bool sendRobotCommand(const char* cmd, int waitTime = 200);
     QString readRobotResponse(int waitTime = 500);
-    bool getFreeDropPoint(DropPoint& result, uint8_t promotePiece = 0);
-    void resetDropZoneMap(int playerColor);
-    void updateDropZone(uint8_t piece, int row, int col, ZONE_TYPE zone);
     char pieceName(int piece, int color);
 #ifdef IMAGE_PROCESS_MOVE
     void processAndSaveFailures(const cv::Mat& imageAfter);
@@ -228,8 +219,6 @@ private:
     QVector<QVector<QPoint>> m_chessboardCalib;    // 8x8 chessboard
     QVector<QVector<QPoint>> m_dropzoneRightCalib; // 8x2 right
     QVector<QVector<QPoint>> m_dropzoneLeftCalib;  // 8x2 left
-    uint8_t m_dropZoneMapPlayer[8][2];
-    uint8_t m_dropZoneMapBot[8][2];
     int m_calibRow;
     int m_calibCol;
     int m_calibCellCount;

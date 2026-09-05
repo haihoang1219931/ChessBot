@@ -198,7 +198,7 @@ void ChessController::clickSquare(int uiIndex)
             return;
         }
 
-        const bool isWhitePiece = piece.startsWith("w");
+        const bool isWhitePiece = piece.isUpper();;
         if ((isWhitePiece && m_board->getColorToPlay() != WHITE) || (!isWhitePiece && m_board->getColorToPlay() != BLACK))
         {
             setStatus("OWN_PIECE_SELECTED");
@@ -276,7 +276,7 @@ bool ChessController::moveByUiIndex(int startUiIndex,
         return false;
     }
 
-    const bool isWhitePiece = piece.startsWith("w");
+    const bool isWhitePiece = piece.isUpper();;
     if ((isWhitePiece && m_board->getColorToPlay() != WHITE) || (!isWhitePiece && m_board->getColorToPlay() != BLACK))
     {
         setStatus("OWN_PIECE_SELECTED");
@@ -307,30 +307,39 @@ bool ChessController::isValidMoveByCoordinates(const QString& startSquare,
                                         QChar promotionSuffix)
 {
     int startUiIndex = -1;
+    printf("[%s] L[%d] from[%s] to[%s]\r\n",
+           __FUNCTION__,__LINE__,
+           startSquare.toStdString().c_str(),
+           stopSquare.toStdString().c_str());
     if (!tryParseCoordinate(startSquare, startUiIndex))
     {
+        printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
         return false;
     }
 
     const QString stopTrimmed = stopSquare.trimmed().toLower();
     if (stopTrimmed.size() != 2 && stopTrimmed.size() != 3)
     {
+        printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
         return false;
     }
 
     int stopUiIndex = -1;
     if (!tryParseCoordinate(stopTrimmed.left(2), stopUiIndex))
     {
+        printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
         return false;
     }
 
     if (startUiIndex < 0 || startUiIndex >= 64 || stopUiIndex < 0 || stopUiIndex >= 64)
     {
+        printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
         return false;
     }
 
     if (m_promotionPending)
     {
+        printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
         return false;
     }
 
@@ -340,12 +349,14 @@ bool ChessController::isValidMoveByCoordinates(const QString& startSquare,
     const QString piece = pieceCodeAtSquare(originSquare);
     if (piece.isEmpty())
     {
+        printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
         return false;
     }
 
-    const bool isWhitePiece = piece.startsWith("w");
+    const bool isWhitePiece = piece.isUpper();
     if ((isWhitePiece && m_board->getColorToPlay() != WHITE) || (!isWhitePiece && m_board->getColorToPlay() != BLACK))
     {
+        printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
         return false;
     }
 
@@ -384,6 +395,7 @@ bool ChessController::isValidMoveByCoordinates(const QString& startSquare,
             }
         }
     }
+    printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
     return false;
 }
 

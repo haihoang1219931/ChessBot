@@ -157,7 +157,7 @@ public:
     bool isCastleMove(const cv::Mat& warpedGray1, const cv::Mat& warpedGray2, const MoveDetectParams& params,
                       cv::Point& startCell, cv::Point& endCell);
     bool findDropCells(std::vector<cv::Point>& dropCells);
-    bool findPromotePiece(cv::Point& dropCell, char piece);
+    bool findPromotePiece(cv::Point& promoteCell, char piece);
 private:
     bool m_sourceConnected;
     bool m_isBlackSide;
