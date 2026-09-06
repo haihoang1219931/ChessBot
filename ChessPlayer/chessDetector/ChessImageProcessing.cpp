@@ -1540,6 +1540,67 @@ bool ChessImageProcessing::isCastleMove(const cv::Mat& warpedGray1, const cv::Ma
     return foundCastle;
 }
 
+bool ChessImageProcessing::isCastleMove(char* prevBoard, char* currBoard,
+                                        cv::Point& startCell, cv::Point& endCell) {
+    int r = 0;
+    startCell.x = -1;
+    startCell.y = -1;
+    endCell.x = -1;
+    endCell.y = -1;
+    printf("prev row:\r\n");
+    for (int c = 0; c < 8; ++c) {
+        printf("%c ",*(prevBoard + r*8 + c));
+    }
+    printf("\r\n");
+    printf("curr row:\r\n");
+    for (int c = 0; c < 8; ++c) {
+        printf("%c ",*(currBoard + r*8 + c));
+    }
+    printf("\r\n");
+    for (int c = 3; c <= 4; ++c) {
+        if((*(prevBoard + r*8 + c) == 'k' || *(prevBoard + r*8 + c) == 'K') &&
+                startCell.x < 0) {
+            startCell.x = c;
+            startCell.y = 0;
+            break;
+        }
+    }
+    for (int c = 1; c <= 6; ++c) {
+        if((*(currBoard + r*8 + c) == 'k' || *(currBoard + r*8 + c) == 'K') &&
+                endCell.x < 0) {
+            endCell.x = c;
+            endCell.y = 0;
+            break;
+        }
+    }
+
+    printf("startCell(x,y)=(%d,%d)\r\n",startCell.x,startCell.y);
+    printf("endCell(x,y)=(%d,%d)\r\n",endCell.x,endCell.y);
+
+    if(endCell.x>0 && startCell.x>0 && abs(endCell.x-startCell.x) == 2) {
+        int prevRowRook = startCell.x < endCell.x?7:0;
+        int currRowRook = (startCell.x + endCell.x)/2;
+        printf("prevRowRook[%d] prevBoard[%c] newBoard[%c]\r\n",
+               prevRowRook,
+               *(prevBoard + r*8 + prevRowRook),
+               *(currBoard + r*8 + prevRowRook));
+        printf("currRowRook[%d] prevBoard[%c] newBoard[%c]\r\n",
+               currRowRook,
+               *(prevBoard + r*8 + currRowRook),
+               *(currBoard + r*8 + currRowRook));
+        if((*(prevBoard + r*8 + prevRowRook) == 'r' || *(prevBoard + r*8 + prevRowRook) == 'R') &&
+           *(currBoard + r*8 + prevRowRook) == '.' &&
+           (*(currBoard + r*8 + currRowRook) == 'r' || *(currBoard + r*8 + currRowRook) == 'R') &&
+           *(prevBoard + r*8 + currRowRook) == '.')
+        return true;
+    }
+    return false;
+}
+
+bool ChessImageProcessing::isPromoteMove(char* prevBoard, char* currBoard, cv::Point& startCell, cv::Point& endCell, char& promotePice) {
+    return false;
+}
+
 ClassificationResult ChessImageProcessing::classifyImage(const cv::Mat& input_mat, int row, int col) {
     ClassificationResult result;
     result.className = '.';
@@ -1943,7 +2004,11 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
         for(int col = 0; col < NUM_ROW; col++) {
             currentBoard[row][col] =
                     m_mapClassifiedCell[row][col+3];
-            convertedPrevBoard[NUM_ROW-1-row][NUM_ROW-1-col] =
+            if(params.playerSide == "white")
+                convertedPrevBoard[NUM_ROW-1-row][NUM_ROW-1-col] =
+                    prevBoard[row*NUM_ROW+col];
+            else
+                convertedPrevBoard[row][col] =
                     prevBoard[row*NUM_ROW+col];
         }
     }
@@ -1961,7 +2026,28 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
         }
         printf("\r\n");
     }
-    // 2. Compare different with previous board
+    // 2. Check for castle
+    cv::Point startCastle,endCastle;
+    if(isCastleMove((char*)convertedPrevBoard,(char*)currentBoard,
+                    startCastle,endCastle)) {
+        std::string detectMove = coordToNotation(startCastle, params.playerSide)+
+                coordToNotation(endCastle, params.playerSide);
+        listMoves.push_back(detectMove);
+        printf("Castle found\r\n");
+        return listMoves;
+    }
+
+    // 3. Check for promotion
+    cv::Point startPromote,endPromote;
+    char promotePiece;
+    if(isPromoteMove((char*)convertedPrevBoard,(char*)currentBoard,startPromote,endPromote,promotePiece)) {
+        std::string promoteMove = coordToNotation(startCastle, params.playerSide)+
+                coordToNotation(endCastle, params.playerSide)+std::string(1, promotePiece);
+        listMoves.push_back(promoteMove);
+        printf("Promote found\r\n");
+        return listMoves;
+    }
+    // 4. Compare different with previous board
     for(int row = 0; row < NUM_ROW; row++) {
         for(int col = 0; col < NUM_ROW; col++) {
             // exception for pawn and Bishop
@@ -1983,7 +2069,8 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
         }
     }
 
-    // 3. Sort possible moves
+
+    // 5. Sort possible moves
     for (cv::Point fromCell: listStartCell) {
         for (cv::Point toCell: listChangedCell) {
             std::string detectMove = coordToNotation(fromCell, params.playerSide)+

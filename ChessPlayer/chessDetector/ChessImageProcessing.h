@@ -156,6 +156,8 @@ public:
       std::string nameToShow);
     bool isCastleMove(const cv::Mat& warpedGray1, const cv::Mat& warpedGray2, const MoveDetectParams& params,
                       cv::Point& startCell, cv::Point& endCell);
+    bool isCastleMove(char* prevBoard, char* currBoard, cv::Point& startCell, cv::Point& endCell);
+    bool isPromoteMove(char* prevBoard, char* currBoard, cv::Point& startCell, cv::Point& endCell, char& promotePice);
     bool findDropCells(std::vector<cv::Point>& dropCells);
     bool findPromotePiece(cv::Point& promoteCell, char piece);
 private:
