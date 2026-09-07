@@ -597,9 +597,12 @@ uint8_t ChessBot::playDetectMove()
         int numPossibleMove = 0;
         for(std::string move:chessMoves) {
             qDebug("Checking Move %s",move.c_str());
-            QString from = QString::fromStdString(move).left(2);  // Result: "e2"
-            QString to = QString::fromStdString(move).right(2);   // Result: "e4"
-            if(m_chessController->isValidMoveByCoordinates(from,to,choosenMove)) {
+            QString from = QString::fromStdString(move.substr(0,2));  // Result: "e2"
+            QString to = QString::fromStdString(move.substr(2,2));   // Result: "e4"
+            QChar promotePiece;
+            if(move.length()==5) promotePiece = QChar(move[4]);
+            if(m_chessController->isValidMoveByCoordinates(from,to,choosenMove,
+                                                           promotePiece.toLower())) {
                 numPossibleMove++;
                 possibleMove = move;
                 qDebug("Possible Move %s",possibleMove.c_str());
@@ -607,11 +610,14 @@ uint8_t ChessBot::playDetectMove()
         }
         if(numPossibleMove == 1) {
             qDebug("Found Move %s",possibleMove.c_str());
-            QString from = QString::fromStdString(possibleMove).left(2);  // Result: "e2"
-            QString to = QString::fromStdString(possibleMove).right(2);   // Result: "e4"
+            QString from = QString::fromStdString(possibleMove.substr(0,2));  // Result: "e2"
+            QString to = QString::fromStdString(possibleMove.substr(2,2));   // Result: "e4"
+            QChar promotePiece;
+            if(possibleMove.length()==5) promotePiece = QChar(possibleMove[4]);
             choosenPiece = m_chessController->pieceType(from);
             choosenPieceMoveNotation = to;
-            if(m_chessController->moveByCoordinates(from,to,choosenMove)) {
+            if(m_chessController->moveByCoordinates(from,to,choosenMove,
+                                                    promotePiece.toLower())) {
                 detectState = STATE_DONE_SUCCESS;
             } else {
                 if(m_chessController->status() == "CHOOSE_PROMOTION_PIECE") {

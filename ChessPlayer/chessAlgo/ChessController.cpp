@@ -136,6 +136,9 @@ const std::string whiteCatsling1 = "1nbqk2r/pppp1ppp/8/2p1bn2/5N2/1B1Q4/P1rPPPPP
 const std::string whiteCatsling2 = "r3k2r/8/8/8/3B4/8/8/R3K2R w KQkq - 0 1";
 const std::string blackCatsling2 = "r3k2r/8/8/8/8/8/8/4K3 w kq - 0 1";
 const std::string whitePawnPromotion = "8/2P1k3/8/3K4/8/8/8/8 w - - 0 1";
+const std::string whitePawnPromotion2 = "1q6/2P1k3/8/3K4/8/8/8/8 w - - 0 1";
+const std::string blackPawnPromotion = "7K/8/8/8/8/3k4/p7/8 w - - 0 1";
+const std::string blackPawnPromotion2 = "1k5K/8/8/8/8/8/Np6/RN6 w - - 0 1";
 const std::string whiteMateFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
 const std::string blackMateFen = "7K/6q1/6k1/8/8/8/8/8 w - - 0 1";
 const std::string staleMateFen = "7k/5Q2/7K/8/8/8/8/8 b - - 0 1";
@@ -165,7 +168,7 @@ void ChessController::newGame(QString lastMove)
     if(lastMove != "")
         m_board = std::make_shared<Board>(lastMove.toStdString());
     else
-        m_board = std::make_shared<Board>(blackCatsling2);
+        m_board = std::make_shared<Board>();
     globalTT.clearTT();
     m_promotionPending = false;
     m_pendingPromotionMoves.clear();
@@ -308,10 +311,11 @@ bool ChessController::isValidMoveByCoordinates(const QString& startSquare,
                                         QChar promotionSuffix)
 {
     int startUiIndex = -1;
-    printf("[%s] L[%d] from[%s] to[%s]\r\n",
+    printf("[%s] L[%d] from[%s] to[%s] promotionSuffix[%c]\r\n",
            __FUNCTION__,__LINE__,
            startSquare.toStdString().c_str(),
-           stopSquare.toStdString().c_str());
+           stopSquare.toStdString().c_str(),
+           promotionSuffix.toLatin1());
     if (!tryParseCoordinate(startSquare, startUiIndex))
     {
         printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
@@ -375,9 +379,12 @@ bool ChessController::isValidMoveByCoordinates(const QString& startSquare,
             if (move.isPromotion())
             {
                 hasMatchingPromotion = true;
+                printf("[%s] L[%d] hasMatchingPromotion\r\n",__FUNCTION__,__LINE__);
                 if (!promotionSuffix.isNull())
                 {
                     const QString moveText = QString::fromStdString(move.toShortString());
+                    printf("[%s] L[%d] moveText[%s]\r\n",
+                           __FUNCTION__,__LINE__,moveText.toStdString().c_str());
                     if (moveText.endsWith(promotionSuffix))
                     {
                         chosenMove = move;
