@@ -13,3 +13,6 @@ This project includes 2 sub projects:
 ### 2. RobotController
 - Control robotic arms with simulation
 - Control robotic arms with Arduino Mega2560
+
+### 3. Keyboard
+- Arduino code for tiny keyboard at the top left of the chessboard
