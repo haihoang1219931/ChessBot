@@ -2,18 +2,21 @@ import QtQuick.Window 2.2
 import QtQuick.Controls 2.0
 import QtQuick 2.12
 import QtQuick.Layouts 1.12
+import QtQml 2.0
 
 ApplicationWindow {
     id: wroot
     visible: true
-    width: 640
-    height: 480
+//    visibility: Window.FullScreen
     title: qsTr("ChessPlayer")
     color: "#050505"
-
+    width: 800
+    height: 480
     StackView {
         id: stack
-        anchors.fill: parent
+        width: 800
+        height: 480
+        anchors.centerIn: parent
         // 1. MUST HAVE FOCUS TRUE
         focus: true
 
@@ -24,7 +27,20 @@ ApplicationWindow {
         onCurrentItemChanged: if (currentItem) currentItem.forceActiveFocus()
 
         Component.onCompleted: {
-            stack.push(menuSelection)
+            stack.push(downloadProgressLoader)
+        }
+    }
+
+    Component {
+        id: downloadProgressLoader
+        DownloadProgress {
+            onOverlayHidden: {
+                stack.pop()
+                stack.push(menuSelection)
+            }
+            Component.onCompleted: {
+                masterBot.initRobotCommunication();
+            }
         }
     }
 
@@ -37,7 +53,27 @@ ApplicationWindow {
                     stack.push(levelSelection)
                 } else if(item === 1) {
                     stack.pop()
+                    stack.push(settingsMenu)
+                }
+            }
+        }
+    }
+
+    Component {
+        id: settingsMenu
+        SettingsMenu {
+            onExitPressed: {
+                stack.pop()
+                stack.push(menuSelection)
+            }
+            onSelectCalibration: {
+                stack.pop()
+                if (calibType === "camera") {
                     stack.push(calibPanel)
+                } else if (calibType === "chessboard") {
+                    stack.push(calibrationPointsPanel)
+                } else if (calibType === "command") {
+                    stack.push(testCommandPanel)
                 }
             }
         }
@@ -48,7 +84,27 @@ ApplicationWindow {
         SettingCalibChessBoard {
             onExitPressed: {
                 stack.pop()
-                stack.push(menuSelection)
+                stack.push(settingsMenu)
+            }
+        }
+    }
+
+    Component {
+        id: calibrationPointsPanel
+        SettingCalibrationPoints {
+            onExitPressed: {
+                stack.pop()
+                stack.push(settingsMenu)
+            }
+        }
+    }
+
+    Component {
+        id: testCommandPanel
+        SettingTestCommand {
+            onExitPressed: {
+                stack.pop()
+                stack.push(settingsMenu)
             }
         }
     }
@@ -69,7 +125,7 @@ ApplicationWindow {
             onItemSelected: {
                 stack.pop()
                 stack.push(sideSelection)
-                backend.setLevel(score)
+                masterBot.setEngineElo(rank,score)
             }
             onExitPressed: {
                 stack.pop()
@@ -87,8 +143,15 @@ ApplicationWindow {
             }
             onSideConfirmed: {
                 stack.pop();
-                stack.push(timer);
-                backend.setSide(side==="White"?0:1);
+                stack.push(timer, {
+                               "side":side==="White"?0:1,
+                               "gameTurn":side==="White"?0:1,
+                               "playTime": 600,
+                               "player1Time": 600,
+                               "player2Time": 600,
+                           });
+                masterBot.setPlayerColor(side==="White"?0:1);
+                masterBot.resetGame()
             }
         }
     }
@@ -104,5 +167,8 @@ ApplicationWindow {
                 stack.push(levelSelection)
             }
         }
+    }
+    Component.onCompleted: {
+        masterBot.startService();
     }
 }

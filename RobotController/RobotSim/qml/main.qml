@@ -196,7 +196,7 @@ ApplicationWindow {
                 arm1Width: command.arm1Length
                 arm2Width: command.arm2Length
                 arm3Width: command.arm3Length
-                arm4Width: parseInt(command.arm4Length * Math.cos((45-command.upAngle)/180.0*Math.PI))
+                arm4Width: parseInt(command.arm4Length * Math.cos((command.upAngle)/180.0*Math.PI))
                 arm5Width: command.arm5Length
                 angle1: 180-command.angle1
                 angle2: 180+command.angle2
@@ -223,7 +223,7 @@ ApplicationWindow {
             angle5: 180
             upAngle: mainProcess.listAngle[5]
             grabberAngle: mainProcess.listAngle[0]
-            chessBoardPosX: mainProcess.chessBoardInfo[0] * visualScale
+            chessBoardPosX: -mainProcess.chessBoardInfo[0] * visualScale
             chessBoardPosY: mainProcess.chessBoardInfo[1] * visualScale
             chessBoardWidth: mainProcess.chessBoardInfo[2] * visualScale
             onAngle1Changed: {

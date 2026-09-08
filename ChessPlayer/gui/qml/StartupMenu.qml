@@ -1,9 +1,11 @@
 import QtQuick 2.0
 import QtQuick.Layouts 1.12
 import QtGraphicalEffects 1.0
+import QtQml 2.0
+
 FocusScope {
     id: root
-    width: 640
+    width: 800
     height: 480
     signal enterItem(var item)
     // 3. FocusScope needs focus: true to accept focus from StackView
@@ -109,6 +111,10 @@ FocusScope {
 
                 // Custom keyboard actions (e.g., pressing Enter)
                 Keys.onReturnPressed: {
+                    root.enterItem(currentIndex)
+                    console.log("Selected:", menuModel.get(currentIndex).name)
+                }
+                Keys.onSpacePressed: {
                     root.enterItem(currentIndex)
                     console.log("Selected:", menuModel.get(currentIndex).name)
                 }

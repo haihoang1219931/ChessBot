@@ -358,17 +358,17 @@ void Board::executeMove(Move &move)
 {
 	Square origin = move.getOrigin();
 	Square destination = move.getDestination();
-	unsigned int pieceType = move.getPieceType();
+    unsigned int pieceType = move.getPieceType();
 	Color oppositeColor = Utils::getOppositeColor(myColorToPlay);
 
 	if(move.isQuiet())
-	{
+    {
 		movePiece(origin, destination, pieceType, myColorToPlay);
 	}
 	else //Castling or Promotion or Capture
 	{
 		if(move.isCastling())
-		{
+        {
 			//move King
 			movePiece(origin, destination, pieceType, myColorToPlay);
 
@@ -410,12 +410,12 @@ void Board::executeMove(Move &move)
 			movePiece(rookOrigin, rookDestination, Piece::ROOK, myColorToPlay);
 		}
 		else if (move.isPromotion())
-		{
+        {
 			unsigned int promotedType = move.getPromotedPieceType();
 
 			if(move.isCapture())
 			{
-				//remove the captured piece
+                //remove the captured piece
 				unsigned int capturedPieceType = move.getCapturedPieceType();
 				removePiece(destination, capturedPieceType, oppositeColor);
 			}

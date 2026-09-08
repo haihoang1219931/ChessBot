@@ -1,29 +1,82 @@
 import QtQuick 2.0
 Item {
     id: root
-    property var controller
+    property var board
+    property var playerColor
+    property var selectedSquare
+    property var checkedKingSquare
+    property bool activeUserInput: false
+    property int userInputIndex: 56
+    property int userInputIndexStart:-1
+    property int userInputIndexStop:-1
 
-    function pieceText(code) {
-        switch (code) {
-        case "wK": return "\u2654"
-        case "wQ": return "\u2655"
-        case "wR": return "\u2656"
-        case "wB": return "\u2657"
-        case "wN": return "\u2658"
-        case "wP": return "\u2659"
-        case "bK": return "\u265A"
-        case "bQ": return "\u265B"
-        case "bR": return "\u265C"
-        case "bB": return "\u265D"
-        case "bN": return "\u265E"
-        case "bP": return "\u265F"
-        default: return ""
+    function enableUserInput(enable) {
+        if(!activeUserInput) {
+            activeUserInput = enable;
+            userInputIndex = 56;
+            userInputIndexStart = -1
+            userInputIndexStop = -1
         }
     }
 
+    function updateUserInput(direction) {
+        if(userInputIndex+direction>=0 && userInputIndex+direction<64)
+            userInputIndex += direction;
+    }
+    function cancelUserSelection() {
+        if(userInputIndexStop != -1) {
+            userInputIndexStop = -1;
+        } else if(userInputIndexStart != -1) {
+            userInputIndex = userInputIndexStart;
+            userInputIndexStart = -1;
+        } else if(userInputIndexStop == -1 &&
+                  userInputIndexStart == -1) {
+            activeUserInput = false;
+        }
+    }
+
+    function updateUserSelection() {
+        if(activeUserInput) {
+            if(userInputIndexStart == -1) {
+                userInputIndexStart = userInputIndex;
+            } else if(userInputIndexStop == -1 && userInputIndex!=userInputIndexStart) {
+                userInputIndexStop = userInputIndex;
+            }
+            if(userInputIndexStop != -1 && userInputIndexStart != -1) {
+                masterBot.playInputMove(userInputIndexStart,userInputIndexStop);
+                activeUserInput = false;
+            }
+            console.log("move from "+userInputIndexStart+" to "+userInputIndexStop)
+        }
+    }
+
+    function pieceText(code) {
+        switch (code) {
+        case "K": return "\u265A"
+        case "Q": return "\u265B"
+        case "R": return "\u265C"
+        case "B": return "\u265D"
+        case "N": return "\u265E"
+        case "P": return "\u265F"
+        case "k": return "\u265A"
+        case "q": return "\u265B"
+        case "r": return "\u265C"
+        case "b": return "\u265D"
+        case "n": return "\u265E"
+        case "p": return "\u265F"
+        default: return "."
+        }
+    }
+    function isFirstLetterUppercase(str) {
+      // Ensure the string isn't empty before testing
+      if (!str) return false;
+
+      return /^[A-Z]/.test(str);
+    }
+
     function pieceColor(code) {
-        if (!code || code.length < 1) return "transparent"
-        return code.charAt(0) === "w" ? "#ffffff" : "#111111"
+        if (code.charAt(0) === ".") return "transparent"
+        return isFirstLetterUppercase(code) ? "orange":"gray"
     }
 
     Grid {
@@ -39,7 +92,7 @@ Item {
             model: 64
 
             Rectangle {
-                property int boardIndex: controller && controller.playerColor === 1 ? (63 - index) : index
+                property int boardIndex: playerColor === 1 ? (63 - index) : index
 
                 width: chessGrid.tileSize
                 height: chessGrid.tileSize
@@ -48,28 +101,43 @@ Item {
                     var rank = Math.floor(index / 8)
                     var file = index % 8
                     var light = ((rank + file) % 2) === 0
-                    if (!controller) return light ? "#f2d9b0" : "#8a5b34"
-                    if (controller.selectedSquare === boardIndex) return "#d35400"
-                    if (controller.checkedKingSquare === boardIndex) return "#bb1f1f"
-                    if (controller.isValidDestination(boardIndex)) return "#2e8b57"
-                    return light ? "#f2d9b0" : "#8a5b34"
+                    if (selectedSquare === boardIndex) return "#d35400"
+                    if (checkedKingSquare === boardIndex) return "#bb1f1f"
+                    return light ? "white" : "black"
                 }
-
-                border.width: 1
-                border.color: "#4f2f17"
-
+                Rectangle {
+                    width: chessGrid.tileSize
+                    height: chessGrid.tileSize
+                    color: "transparent"
+                    border.width: 5
+                    border.color: "steelblue"
+                    visible: root.activeUserInput &&
+                             index == root.userInputIndex
+                }
+                Rectangle {
+                    width: chessGrid.tileSize
+                    height: chessGrid.tileSize
+                    color: "transparent"
+                    border.width: 5
+                    border.color: "red"
+                    visible: root.activeUserInput &&
+                             index == root.userInputIndexStart
+                }
+                Rectangle {
+                    width: chessGrid.tileSize
+                    height: chessGrid.tileSize
+                    color: "transparent"
+                    border.width: 5
+                    border.color: "orange"
+                    visible: root.activeUserInput &&
+                             index == root.userInputIndexStop
+                }
                 Text {
                     anchors.centerIn: parent
-                    text: pieceText(controller && controller.board ? controller.board[boardIndex] : "")
-                    color: pieceColor(controller && controller.board ? controller.board[boardIndex] : "")
-                    font.pixelSize: parent.width * 0.55
+                    text: pieceText(board ? board[boardIndex] : "")
+                    color: pieceColor(board ? board[boardIndex] : "")
+                    font.pixelSize: chessGrid.tileSize
                     font.bold: true
-                    font.family: "Times New Roman"
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: if (controller) controller.clickSquare(boardIndex)
                 }
             }
         }

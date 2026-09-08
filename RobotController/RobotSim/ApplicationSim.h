@@ -9,8 +9,8 @@ public:
     ApplicationSim(MainProcess* mainProcess);
     ~ApplicationSim();
     void initRobot() override;
-    void specificPlatformGohome(int motorID = MAX_MOTOR) override;
-    void harwareStop(int motorID = MAX_MOTOR) override;
+    void specificPlatformGohome(int motorID = MAX_MOTOR, bool stopOtherStepper = true) override;
+    void hardwareStop(int motorID = MAX_MOTOR) override;
     void checkInput() override;
     int printf(const char *fmt, ...) override;
     void msleep(int millis) override;

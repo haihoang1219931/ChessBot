@@ -50,6 +50,7 @@ public:
     void updateCurrentStep(int motorID);
     int minStep(int motorID);
     int maxStep(int motorID);
+    float maxAngle(int motorID);
     float homeAngle(int motorID);
     int homeStep(int motorID);
     void executeSmoothMotion(int motorID);
@@ -58,7 +59,7 @@ public:
     void calculateTotalTime(int numStepAccel, int numStepTotal, float minsleep, float homeStepTime,
                             float* totalDelay, float* startDelay);
 
-private:
+public:
     ApplicationController* m_app;
     SmoothMotion* m_motorList[MAX_MOTOR];
     JointParam m_motorParamList[MAX_MOTOR];

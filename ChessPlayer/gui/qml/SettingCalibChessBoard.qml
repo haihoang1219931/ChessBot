@@ -1,14 +1,15 @@
 import QtQuick 2.0
 import QtMultimedia 5.12
+import QtQml 2.0
+
 FocusScope {
     id: root
-    width: 640; height: 480
+    width: 800; height: 480
     signal exitPressed()
-    property string filePath: "trapezoid_data.json"
-    // Trapezoid points: [Bottom-Left, Bottom-Right, Top-Right, Top-Left]
+    // Trapezoid points: [Top-Left, Top-Right, Bottom-Right, Bottom-Left]
     property var points: [
-        {"x": 150, "y": 350}, {"x": 450, "y": 350},
-        {"x": 350, "y": 150}, {"x": 250, "y": 150}
+        {"x": 0, "y": 0}, {"x": 360, "y": 0},
+        {"x": 640, "y": 360}, {"x": 0, "y": 360},
     ]
     property int activeIndex: 0
     property bool isEditing: false
@@ -16,25 +17,32 @@ FocusScope {
     // 1. Set up the camera
     Camera {
         id: camera
+        viewfinder {
+            resolution: "1920x1080"
+        }
     }
 
     // 2. Set up the VideoOutput
     VideoOutput {
         id: videoOutput
-        anchors.fill: parent
+        anchors.centerIn: parent
+        width: 640
+        height: 360
         source: camera
     }
 
     Component.onCompleted: {
-        var data = fileio.read(filePath);
-        if (data !== "") {
-            points = JSON.parse(data);
-            canvas.requestPaint();
+        var corners = masterBot.chessboardCorners();
+        if(corners.length === 4) {
+            root.points = corners;
         }
+        canvas.requestPaint();
     }
     Canvas {
         id: canvas
-        anchors.fill: parent
+        anchors.centerIn: parent
+        width: 640
+        height: 360
         focus: true
         onPaint: {
             var ctx = getContext("2d");
@@ -71,8 +79,7 @@ FocusScope {
         Keys.onPressed: (event) => {
             var step = 2;
             if (event.key === Qt.Key_Space) {
-                fileio.write(filePath, JSON.stringify(points));
-                console.log("Points saved to " + filePath);
+                masterBot.updateCorners(root.points);
             }
             else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 isEditing = !isEditing; // Toggle mode
@@ -87,9 +94,9 @@ FocusScope {
             else {
                 // Navigation Mode
                 if (event.key === Qt.Key_Left || event.key === Qt.Key_Down)
-                    activeIndex = (activeIndex + 1) % 4;
-                if (event.key === Qt.Key_Right || event.key === Qt.Key_Up)
                     activeIndex = ((activeIndex >= 1? activeIndex:activeIndex+4) - 1) % 4;
+                if (event.key === Qt.Key_Right || event.key === Qt.Key_Up)
+                    activeIndex = (activeIndex + 1) % 4;
             }
 
             canvas.requestPaint();

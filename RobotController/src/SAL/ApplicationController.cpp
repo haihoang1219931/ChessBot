@@ -17,6 +17,15 @@ ApplicationController::ApplicationController()
     m_chessBoard = new ChessBoard();
     m_machineState = MACHINE_WAIT_COMMAND;
     m_appTimer = 0;
+    m_engineEnabled = false;
+    m_calibrationReceivedCount = 0;
+    m_calibrationChessboardCount = 0;
+    m_calibrationRightDropzoneCount = 0;
+    m_calibrationLeftDropzoneCount = 0;
+    memset(m_calibrationChessboardCalibrated, 0, sizeof(m_calibrationChessboardCalibrated));
+    memset(m_calibrationRightDropzoneCalibrated, 0, sizeof(m_calibrationRightDropzoneCalibrated));
+    memset(m_calibrationLeftDropzoneCalibrated, 0, sizeof(m_calibrationLeftDropzoneCalibrated));
+    m_calibrationInProgress = false;
 }
 
 ApplicationController::~ApplicationController() {
@@ -28,6 +37,7 @@ void ApplicationController::loop() {
 #ifdef DEBUG_APP
     this->printf("APP Timer[%d] m_machineState[%d]\r\n",m_appTimer,m_machineState);
 #endif
+    readCommand();
     switch(m_machineState) {
         case MACHINE_WAIT_COMMAND: {            
             break;
@@ -40,18 +50,35 @@ void ApplicationController::loop() {
                 setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
             break;
         }
+        case MACHINE_EXECUTE_TEST: {
+            if(executeCommandSequenceLoop() == COMMAND_SEQUENCE_STATE_DONE) {
+                setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+            }
+            break;
+        }
         case MACHINE_EXECUTE_COMMAND: {
-            if(executeCommandSequenceLoop() == COMMAND_SEQUENCE_STATE_DONE)
-                setMachineState(MACHINE_EXECUTE_POSITION_STANDBY);
+            if(executeCommandSequenceLoop() == COMMAND_SEQUENCE_STATE_DONE) {
+                goToHomeToCalibPosition();
+            }
             break;
         }
         case MACHINE_EXECUTE_POSITION_STANDBY: {
-            goToReadyPosition();
+            if(executeReadyPositionLoop() == COMMAND_STANDBY_DONE) {
+                setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+            }
+            break;
+        }
+        case MACHINE_EXECUTE_POSITION_HOME_TO_CALIB: {
+            if(executeHomeToCalibPositionLoop() == COMMAND_HOME_TO_CALIB_DONE) {
+                setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+            }
             break;
         }
         case MACHINE_EXECUTE_COMMAND_DONE: {
+#ifdef DEBUG_COMMAND
             this->printf("_%04d EXECUTE DONE\r\n",m_comCommandID);
-            setMachineState(MACHINE_WAIT_COMMAND);        
+#endif
+            setMachineState(MACHINE_WAIT_COMMAND);
             break;
         }
     }
@@ -71,6 +98,7 @@ int ApplicationController::executeCommandSequenceLoop()
     {
         m_commandSequenceState = COMMAND_SEQUENCE_STATE_EXECUTE;
         m_commandState = COMMAND_STATE_INIT;
+        this->printf("Execute command sequence, numCommand=%d\r\n",m_numCommand);
     }
         break;
     case COMMAND_SEQUENCE_STATE_EXECUTE:
@@ -78,6 +106,7 @@ int ApplicationController::executeCommandSequenceLoop()
         if(executeCommandLoop() == COMMAND_STATE_DONE) {
             if(m_curCommandId >= m_numCommand - 1) {
                 m_commandSequenceState = COMMAND_SEQUENCE_STATE_DONE;
+                // this->printf("Execute command sequence done\r\n");
             } else {
                 m_commandState = COMMAND_STATE_INIT;
                 m_curCommandId++;
@@ -96,8 +125,10 @@ int ApplicationController::executeCommandSequenceLoop()
 int ApplicationController::executeCommandLoop()
 {
     int commandType = m_sequenceCommand[m_curCommandId].type;
-//    printf("executeCommandLoop state[%d] m_curCommandId[%d]\r\n",
-//           commandType,m_curCommandId);
+#ifdef DEBUG_COMMAND
+   printf("executeCommandLoop state[%d] m_curCommandId[%d]\r\n",
+          commandType,m_curCommandId);
+#endif
     switch (commandType) {
     case COMMAND_NORMAL: {
         executeCommandNormal();
@@ -116,8 +147,8 @@ int ApplicationController::executeCommandNormal()
     switch (m_commandState) {
     case COMMAND_STATE_INIT: {
         int jointSteps[MAX_MOTOR];
-        calculateJoints(m_sequenceCommand[m_curCommandId].y,
-                        m_sequenceCommand[m_curCommandId].x,
+        calculateJoints(m_sequenceCommand[m_curCommandId].x,
+                        m_sequenceCommand[m_curCommandId].y,
                         m_sequenceCommand[m_curCommandId].updownAngle,
                         jointSteps);
         jointSteps[MOTOR_CAPTURE] = m_sequenceCommand[m_curCommandId].captureStep;
@@ -145,8 +176,8 @@ int ApplicationController::executeCommandLine()
     switch (m_commandState) {
     case COMMAND_STATE_INIT: {
         m_curPos = currentPos();
-        m_tarPos = {m_sequenceCommand[m_curCommandId].y,
-                        m_sequenceCommand[m_curCommandId].x,
+        m_tarPos = {m_sequenceCommand[m_curCommandId].x,
+                        m_sequenceCommand[m_curCommandId].y,
                         0};
         m_curPointInCommand = 0;
         m_numPointInCommand = (uint32_t)(distance(m_curPos.x,m_curPos.y,m_tarPos.x,m_tarPos.y))/
@@ -160,8 +191,8 @@ int ApplicationController::executeCommandLine()
             m_nextPoint = calculateNextPointInLine(m_curPos,m_tarPos,(float)m_curPointInCommand);
             m_commandState = COMMAND_STATE_EXECUTE_THEN_RECAL;
         } else {
-            m_nextPoint.y = m_sequenceCommand[m_curCommandId].x;
-            m_nextPoint.x = m_sequenceCommand[m_curCommandId].y;
+            m_nextPoint.x = m_sequenceCommand[m_curCommandId].x;
+            m_nextPoint.y = m_sequenceCommand[m_curCommandId].y;
             m_nextPoint.updownAngle = m_sequenceCommand[m_curCommandId].updownAngle;
             m_nextPoint.captureStep = m_sequenceCommand[m_curCommandId].captureStep;
             m_commandState = COMMAND_STATE_EXECUTE_THEN_DONE;
@@ -234,16 +265,29 @@ void ApplicationController::getChessBoardParams(float* listParam, int* numParam)
 void ApplicationController::setMachineState(MACHINE_STATE machineState) {
     if(machineState != m_machineState) {
         m_machineState = machineState;
+#ifdef DEBUG_COMMAND        
         this->printf("APP STATE: %d\r\n",m_machineState);
+#endif
+    }
+}
+
+void ApplicationController::sendCalibrationProgress() {
+    if(m_calibrationInProgress) {
+        this->printf("R%d/16 L%d/16 C%d/64\r\n", 
+                    m_calibrationRightDropzoneCount,
+                    m_calibrationLeftDropzoneCount,
+                    m_calibrationChessboardCount);
     }
 }
 
 void ApplicationController::executeCommand(char* command) {
+#ifdef DEBUG_COMMAND
     this->printf("Command: [%s]\r\n",command);
+#endif
     if(command[0] == 'v') {
-        this->printf("[v]%s",ROBOT_VERSION);
+        this->printf("[v]%s\r\n",ROBOT_VERSION);
     } else if(strlen(command)>=3 && command[0] == 'c'&&command[1] == 'm'&&command[2] == 'd') {
-        this->printf("[cmd]%04d",m_comCommandID);
+        this->printf("[cmd]%04d\r\n",m_comCommandID);
     } else if(command[0] == '_') {
         if(strlen(command)>=5){
             char commandID[8];
@@ -254,68 +298,95 @@ void ApplicationController::executeCommand(char* command) {
             commandID[4] = 0;
             int comCommandID = atoi(commandID); // command from PC, must response
             if (m_comCommandID == comCommandID) {
-                this->printf("[_%04d]%s",comCommandID,
+                this->printf("[_%04d]%s\r\n",comCommandID,
                     m_machineState == MACHINE_WAIT_COMMAND?"DONE":"WAIT");
             } else {
-                this->printf("[_%04d]INVALID",comCommandID);
+                this->printf("[_%04d]INVALID\r\n",comCommandID);
             }
         }
     }
     else if(command[0] == 'b' && strlen(command)>=2 && command[1]>='0') {
         if(command[1]-'0' < MAX_BUTTON) {
             int buttonID = command[1]-'0';
-            this->printf("B%c %s\r\n",command[1],
+            this->printf("[B%c] %s\r\n",command[1],
                 m_buttonList[buttonID]->buttonState() == BUTTON_NOMAL?
                 "NORMAL":"PRESSED");
         }
         else {
-            this->printf("B%c INVALID\r\n",command[1]);
+            this->printf("[B%c] INVALID\r\n",command[1]);
         }        
     }
     else if(command[0] == 's' && strlen(command)>=2 && command[1]>='0') {
         if(command[1]-'0' < MAX_MOTOR) {
             int motorID = command[1]-'0';
-            this->printf("M%c %d\r\n",command[1],
+            this->printf("[M%c] %d\r\n",command[1],
                 m_robot->currentStep(motorID));
         }
         else {
-            this->printf("B%c INVALID\r\n",command[1]);
+            this->printf("[M%c] INVALID\r\n",command[1]);
         }        
     }
-    else if(command[0] == 'e') {
-        m_comCommandID ++;
-        this->enableEngine(true);
-        setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+    else if(command[0] == 'e' && strlen(command)>=2) {
+        if(command[1] == 'e') {
+            this->enableEngine(true);
+            setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+            this->printf("[ee] Engine enabled\r\n");
+        } else if(command[1] == 'd'){
+            this->enableEngine(false);
+            setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+            this->printf("[ed] Engine disabled\r\n");
+        } else if(command[1] == 's') {
+            this->printf("[es] %s\r\n", m_engineEnabled?"Enabled":"Disabled");
+            setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+        }
     }
     else if(command[0] == 'd') {
         m_comCommandID ++;
         this->enableEngine(false);
         setMachineState(MACHINE_EXECUTE_COMMAND_DONE);
+        this->printf("[d] Engine disabled\r\n");
     }
     else if(command[0] == 'r' && strlen(command)>=2) {
         if(command[1] == 'a') {
             m_comCommandID ++;
             goToReadyPosition();
+            this->printf("[r] Ready position confirmed\r\n");
+        } else if(command[1] == 'h') {
+            m_comCommandID ++;
+            goToHomeToCalibPosition();
+            this->printf("[rh] Home calibration confirmed\r\n");
         }
     }
     else if(command[0] == 'm' && strlen(command)>=2) {
         if(command[1] == 'l') {
             m_comCommandID ++;
             calculateSequenceMoveStraight(0,0,7,0);
+            this->printf("[m] Straight move confirmed\r\n");
         } else if(command[1] == 'c') {
             m_comCommandID ++;
             calculateSequenceMoveStraight(0,0,7,0);
+            this->printf("[m] Straight move confirmed\r\n");
         }
     }
-    else if(command[0] == 'h') {
-        if(strlen(command)>=2 && command[1] == 'a') {
+    else if(command[0] == 'h' && strlen(command)>=2) {
+        if(command[1] == 'a') {
             m_comCommandID ++;
             goToHome(MAX_MOTOR);
-        }
-        else if(strlen(command)>=2 && command[1] >= '0' && command[1] <= '5')
+            this->printf("[ha] Home position confirmed\r\n");
+        } else if(command[1] == 's') {
+            bool allAtHome = true;
+            for(int motorID=0; motorID< MAX_MOTOR; motorID++) {
+                if(!m_robot->isLimitReached(motorID,MOTOR_LIMIT_HOME)) {
+                    allAtHome = false;
+                    break;
+                }
+            }
+            this->printf("[hs] %s\r\n", allAtHome ? "TRUE" : "FALSE");
+        } else if(command[1] >= '0' && command[1] <= '5')
         {
             m_comCommandID ++;
             goToHome(command[1]-'0');
+            this->printf("[h%c] Home position confirmed\r\n", command[1]);
         }
     }
     else if(command[0] == 'l' && strlen(command)>=2) {        
@@ -324,7 +395,7 @@ void ApplicationController::executeCommand(char* command) {
             int rowId,colId;
             if(sscanf(command, "lccbr%dc%d", &rowId, &colId) == 2) {
                 // lccbr0c1
-                Point chessBoardPoint = m_chessBoard->convertPoint(rowId,colId);
+                Point chessBoardPoint = m_chessBoard->convertChessBoardPoint(rowId,colId);
                 this->printf("CB r[%d] c[%d] x[%d] y[%d]\r\n", 
                     rowId, 
                     colId,
@@ -338,10 +409,10 @@ void ApplicationController::executeCommand(char* command) {
                     colId,
                     (int)(dropZonePoint.x*10.0f), 
                     (int)(dropZonePoint.y*10.0f));
-            } else if(sscanf(command, "lcdbpr%dc%d", &rowId, &colId) == 2) {
+            } else if(sscanf(command, "lcdbr%dc%d", &rowId, &colId) == 2) {
                 // lcdbpr0c1
                 Point dropZonePoint = m_chessBoard->convertDropPoint(rowId,colId,ZONE_BOT);
-                this->printf("DP r[%d] c[%d] x[%d] y[%d]\r\n", 
+                this->printf("DB r[%d] c[%d] x[%d] y[%d]\r\n", 
                     rowId,
                     colId,
                     (int)(dropZonePoint.x*10.0f), 
@@ -380,64 +451,200 @@ void ApplicationController::executeCommand(char* command) {
         } else if( command[1] == 'r') {
             m_comCommandID ++;
             goToCalibPosition();
+            this->printf("[lr] Go to calib confirmed\r\n");
         } else if(command[1] == 'a') {
             m_comCommandID ++;
             calibToHome(MAX_MOTOR);
+            this->printf("[la] Calib to home confirmed\r\n");
         }
         else if(command[1] >= '0' && command[1] <= '5')
         {
             m_comCommandID ++;
             calibToHome(command[1]-'0');
+            this->printf("[l%d] Calib to home confirmed\r\n", command[1]-'0');
+        }
+    }else if(command[0] == 'T' && strlen(command)>=3) {
+        m_comCommandID ++;
+        if (executeSequence(MOVE_TEST, command[1]-'0',command[2]-'0',
+                0,0) )
+            this->printf("[%s] Test seq confirmed\r\n", command);
+        else
+            this->printf("[%s] Test seq failed\r\n", command);
+    }else if(command[0] == 'c' && strlen(command)>=6) {
+        m_comCommandID ++;
+        if (executeSequence(MOVE_NORMAL, command[1]-'0',command[2]-'0',
+                command[3]-'0',command[4]-'0',command[5] == '-')) {
+            this->printf("[%s] Normal seq confirmed\r\n", command);
+        } else {
+            this->printf("[%s] Normal seq failed\r\n", command);
+        }
+    }else if(command[0] == 'C' && strlen(command)>=8 && command[1] == 'S' && command[2] == 'T') {
+        m_comCommandID ++;
+        if (executeSequence(MOVE_CASTLE, command[3]-'0',command[4]-'0',
+                command[5]-'0',command[6]-'0',command[7] == '-')) {
+            this->printf("[%s] Castle confirmed\r\n", command);
+        } else {
+            this->printf("[%s] Castle failed\r\n", command);
+        }
+    }else if(command[0] == 'a' && strlen(command)>=9) {
+        m_comCommandID ++;
+        if (executeSequence(MOVE_ATTACK, command[1]-'0',command[2]-'0',
+                command[3]-'0',command[4]-'0',command[5] == '-',
+                command[6],command[7]-'0',command[8]-'0')) {
+            this->printf("[%s] Attack confirmed f(%d,%d)->t(%d,%d) d[%c](%d,%d)\r\n", command,
+                command[1]-'0',command[2]-'0',command[3]-'0',command[4]-'0',
+                command[6],command[7]-'0',command[8]-'0');
+        } else {
+            this->printf("[%s] Attack failed\r\n", command);
+        }
+    }else if(command[0] == 'p' && strlen(command)>=10 && command[1] == 'p') {
+        m_comCommandID ++;
+        if (executeSequence(MOVE_PASTPAWN, command[2]-'0',command[3]-'0',
+                command[4]-'0',command[5]-'0',command[6] == '-',
+                command[7],command[8]-'0',command[9]-'0')) {
+            this->printf("[%s] Past pawn confirmed\r\n", command);
+        } else {
+            this->printf("[%s] Past pawn failed\r\n", command);
+        }
+    }else if(command[0] == 'p' && strlen(command)>=15 && command[1] == 'm') {
+        m_comCommandID ++;
+        if (executeSequence(MOVE_PROMOTE, command[2]-'0',command[3]-'0',
+                command[4]-'0',command[5]-'0',false,
+                command[6],command[7]-'0',command[8]-'0',
+                command[9],command[10]-'0',command[11]-'0',
+                command[12],command[13]-'0',command[14]-'0')) {
+            this->printf("[%s] Promote confirmed\r\n", command);
+        } else {
+            this->printf("[%s] Promote failed\r\n", command);
+        }
+
+    }else if(command[0] == 't' && strlen(command)>=2)
+    {
+        m_comCommandID ++;
+        int xPos,yPos;
+        int row,col;
+        int cmd;
+        if(sscanf(command, "tx%dy%d", &xPos, &yPos) == 2) {
+            gotoPosition((float)xPos/10.0f, (float)yPos/10.0f, 0);
+            this->printf("[%s] Pos confirmed\r\n", command);
+        } else if(sscanf(command, "ts%c",&cmd) == 1) {
+            this->printf("[%s] TS confirmed\r\n", command);
+            Point currentPosition = currentPos();
+            this->printf("TS x[%d] y[%d] m[1][%d] m[2][%d] m[5][%d]\r\n",
+                (int)(currentPosition.x*10.0f),
+                (int)(currentPosition.y*10.0f),
+                m_robot->currentStep(1),
+                m_robot->currentStep(2),
+                m_robot->currentStep(5)
+            );
+        }
+    }else if(strncmp(command, "CALIB_START", 11) == 0) {
+        // Start calibration data transmission
+        m_calibrationReceivedCount = 0;
+        m_calibrationChessboardCount = 0;
+        m_calibrationRightDropzoneCount = 0;
+        m_calibrationLeftDropzoneCount = 0;
+        memset(m_calibrationChessboardCalibrated, 0, sizeof(m_calibrationChessboardCalibrated));
+        memset(m_calibrationRightDropzoneCalibrated, 0, sizeof(m_calibrationRightDropzoneCalibrated));
+        memset(m_calibrationLeftDropzoneCalibrated, 0, sizeof(m_calibrationLeftDropzoneCalibrated));
+        m_calibrationInProgress = true;
+        m_chessBoard->resetCalibrationToFormula(); // Reset all to formula values initially
+        this->printf("CALIB_START_ACK\r\n");
+    }
+    else if(strncmp(command, "SC r", 4) == 0) {
+        // Set chessboard calibration point: SC r[row] c[col] x[x] y[y]
+        if(m_calibrationInProgress) {
+            int row, col, x, y;
+            if(sscanf(command, "SC r%d c%d x%d y%d", &row, &col, &x, &y) == 4) {
+                if(row >= 0 && row < 8 && col >= 0 && col < 8) {
+                    // Only update if this cell hasn't been calibrated yet
+                    if(!m_calibrationChessboardCalibrated[row][col]) {
+                        m_chessBoard->setCalibChessBoardPoint(row, col, {(float)x, (float)y, 0, true});
+                        m_calibrationChessboardCalibrated[row][col] = true;
+                        m_calibrationChessboardCount++;
+                        m_calibrationReceivedCount++;
+                        sendCalibrationProgress();
+                    } else {
+                        // Cell already calibrated, just update the value without incrementing counters
+                        m_chessBoard->setCalibChessBoardPoint(row, col, {(float)x, (float)y, 0, true});
+                    }
+                }
+            }
         }
     }
-    else if(command[0] == 'c' && strlen(command)>=5) {
-        m_comCommandID ++;
-        executeSequence(MOVE_NORMAL, command[2]-'0',command[1]-'0',
-                command[4]-'0',command[3]-'0');
-    }else if(command[0] == 'c' && strlen(command)>=5) {
-        m_comCommandID ++;
-        executeSequence(MOVE_CASTLE, command[2]-'0',command[1]-'0',
-                command[4]-'0',command[3]-'0');
-    }else if(command[0] == 'a' && strlen(command)>=5) {
-        m_comCommandID ++;
-        executeSequence(MOVE_ATTACK, command[2]-'0',command[1]-'0',
-                command[4]-'0',command[3]-'0');
-    }else if(command[0] == 'p' && strlen(command)>=6 && command[1] == 'p') {
-        m_comCommandID ++;
-        executeSequence(MOVE_PASTPAWN, command[3]-'0',command[2]-'0',
-                command[5]-'0',command[4]-'0');
-    }else if(command[0] == 'p' && strlen(command)>=6) {
-        m_comCommandID ++;
-        executeSequence(MOVE_PROMOTE, command[3]-'0',command[2]-'0',
-                command[5]-'0',command[4]-'0',command[1]);
-    }else if(command[0] == 'p' && strlen(command)>=2 && command[1] >= '0' && command[1] <= '5')
-    {
-        int motorID = command[1]-'0';
-        char angleStr[8];
-        angleStr[0] = command[3];
-        angleStr[1] = command[4];
-        angleStr[2] = command[5];
-        angleStr[3] = command[6];
-        angleStr[4] = 0;
-        float angle = atoi(angleStr);
-
-        char stepTimeStr[8];
-        stepTimeStr[0] = command[8];
-        stepTimeStr[1] = command[9];
-        stepTimeStr[2] = command[10];
-        stepTimeStr[3] = command[11];
-        stepTimeStr[4] = 0;
-        int stepTime = atoi(stepTimeStr);
-
-        bool isRelative = command[13] == 'r';
-
-        m_robot->requestGoPosition(motorID,
-                m_robot->angleToStep(motorID, angle),
-                stepTime, isRelative);
-        setMachineState(MACHINE_EXECUTE_COMMAND);
+    else if(strncmp(command, "SR r", 4) == 0) {
+        // Set right dropzone calibration point: SR r[row] c[col] x[x] y[y]
+        if(m_calibrationInProgress) {
+            int row, col, x, y;
+            if(sscanf(command, "SR r%d c%d x%d y%d", &row, &col, &x, &y) == 4) {
+                if(row >= 0 && row < 8 && col >= 0 && col < 2) {
+                    // Only update if this cell hasn't been calibrated yet
+                    if(!m_calibrationRightDropzoneCalibrated[row][col]) {
+                        m_chessBoard->setCalibDropZonePoint(row, col, ZONE_BOT, {(float)x, (float)y, 0, true});
+                        m_calibrationRightDropzoneCalibrated[row][col] = true;
+                        m_calibrationRightDropzoneCount++;
+                        m_calibrationReceivedCount++;
+                        sendCalibrationProgress();
+                    } else {
+                        // Cell already calibrated, just update the value without incrementing counters
+                        m_chessBoard->setCalibDropZonePoint(row, col, ZONE_BOT, {(float)x, (float)y, 0, true});
+                    }
+                }
+            }
+        }
+    }
+    else if(strncmp(command, "SL r", 4) == 0) {
+        // Set left dropzone calibration point: SL r[row] c[col] x[x] y[y]
+        if(m_calibrationInProgress) {
+            int row, col, x, y;
+            if(sscanf(command, "SL r%d c%d x%d y%d", &row, &col, &x, &y) == 4) {
+                if(row >= 0 && row < 8 && col >= 0 && col < 2) {
+                    // Only update if this cell hasn't been calibrated yet
+                    if(!m_calibrationLeftDropzoneCalibrated[row][col]) {
+                        m_chessBoard->setCalibDropZonePoint(row, col, ZONE_PLAYER, {(float)x, (float)y, 0, true});
+                        m_calibrationLeftDropzoneCalibrated[row][col] = true;
+                        m_calibrationLeftDropzoneCount++;
+                        m_calibrationReceivedCount++;
+                        sendCalibrationProgress();
+                    } else {
+                        // Cell already calibrated, just update the value without incrementing counters
+                        m_chessBoard->setCalibDropZonePoint(row, col, ZONE_PLAYER, {(float)x, (float)y, 0, true});
+                    }
+                }
+            }
+        }
+    }
+    else if(strncmp(command, "CALIB_END", 9) == 0) {
+        // End calibration data transmission
+        if(m_calibrationInProgress) {
+            m_calibrationInProgress = false;
+            if(m_calibrationReceivedCount == 96) {
+                // All 96 cells received (64 chessboard + 16 right + 16 left)
+                this->printf("CALIB_OK\r\n");
+            } else {
+                // Incomplete calibration data - reset to formula values
+                m_chessBoard->resetCalibrationToFormula();
+                memset(m_calibrationChessboardCalibrated, 0, sizeof(m_calibrationChessboardCalibrated));
+                memset(m_calibrationRightDropzoneCalibrated, 0, sizeof(m_calibrationRightDropzoneCalibrated));
+                memset(m_calibrationLeftDropzoneCalibrated, 0, sizeof(m_calibrationLeftDropzoneCalibrated));
+                this->printf("CALIB_ERROR\r\n");
+            }
+        }
+    }
+    else if(strncmp(command, "CALIB_ABORT", 11) == 0) {
+        // Abort calibration data transmission
+        if(m_calibrationInProgress) {
+            m_calibrationInProgress = false;
+            // Reset all calibration data to formula values
+            m_chessBoard->resetCalibrationToFormula();
+            memset(m_calibrationChessboardCalibrated, 0, sizeof(m_calibrationChessboardCalibrated));
+            memset(m_calibrationRightDropzoneCalibrated, 0, sizeof(m_calibrationRightDropzoneCalibrated));
+            memset(m_calibrationLeftDropzoneCalibrated, 0, sizeof(m_calibrationLeftDropzoneCalibrated));
+            this->printf("CALIB_ABORT_ACK\r\n");
+        }
     }
     else {
-        this->printf("Unknown Command\r\n");
+        this->printf("[%s] Unknown Command\r\n", command);
     }
 }
 
@@ -456,7 +663,7 @@ void ApplicationController::executeSingleMotor(int motorID,
     }
     initSequenceMove(MAX_MOTOR);
 }
-
+//#define DEBUG_KINEMATIC
 bool ApplicationController::inverseKinematic(float x, float y, float a1, float a2, float* p1, float* p2)
 {
     if(sqrtf(x*x+y*y) > fabs(a1+a2) || sqrtf(x*x+y*y) < fabs(a1-a2)) return false;
@@ -481,42 +688,48 @@ void ApplicationController::forwardKinematic(float a1, float a2, float p1, float
 #endif
 }
 
-void ApplicationController::calculatePolygonEdge(float upAngleInDegree, float* edge, float* angle)
+void ApplicationController::calculatePolygonEdgeA2345(float upAngleInDegree, float* edge, float* angleA2A2345)
 {
-    float upAngle = (45-upAngleInDegree)/180.0f*M_PI;
-    float a1, a2, q1, q2, xFK, yFK;
-    float bufAngle = 0;
-    float lastEdge;
-    a1 = m_robot->armLength(MOTOR_ARM2);
-    a2 = m_robot->armLength(MOTOR_ARM3);
+#ifdef DEBUG_KINEMATIC
+    this->printf("ApplicationController::calculatePolygonEdgeA2345\r\n");
+#endif
+    float upAngle = upAngleInDegree/180.0f*M_PI;
+    float a2, a3, a45, a23, a2345, q1, q2, xFK, yFK;
+    float angleA3A23 = 0;
+    a2 = m_robot->armLength(MOTOR_ARM2);
+    a3 = m_robot->armLength(MOTOR_ARM3);
     q1 = 0;
-    q2 = (180.0f - m_robot->homeAngle(MOTOR_ARM3))/180.0f*M_PI + bufAngle;
-    forwardKinematic(a1,a2,q1,q2,&xFK,&yFK);
-    lastEdge = sqrt(xFK*xFK + yFK*yFK);
-    bufAngle = acosf((a2*a2 + lastEdge*lastEdge - a1*a1)/(2*a2*lastEdge));
-    a1 = lastEdge;
-    a2 = m_robot->armLength(MOTOR_ARM4) * cos(upAngle)
+    q2 = (180.0f - m_robot->homeAngle(MOTOR_ARM3))/180.0f*M_PI;
+    forwardKinematic(a2,a3,q1,q2,&xFK,&yFK);
+    a23 = sqrt(a2*a2 + a3*a3 - 2*a2*a3*cos(M_PI-q2));
+    angleA3A23 = acosf((a3*a3 + a23*a23 - a2*a2)/(2*a3*a23)); // Angle between A3 and A23
+    a45 = m_robot->armLength(MOTOR_ARM4) * cos(upAngle)
             + m_robot->armLength(MOTOR_ARM5);
     q1 = 0;
-    q2 = (180.0f - m_robot->homeAngle(MOTOR_ARM4))/180.0f*M_PI + bufAngle;
-    forwardKinematic(a1,a2,q1,q2,&xFK,&yFK);
-    lastEdge = sqrt(xFK*xFK + yFK*yFK);
-    bufAngle = acosf((a2*a2 + lastEdge*lastEdge - a1*a1)/(2*a2*lastEdge));
-    *edge = lastEdge;
-    *angle = bufAngle;
+    q2 = (180.0f - m_robot->homeAngle(MOTOR_ARM4))/180.0f*M_PI + angleA3A23;
+    forwardKinematic(a23,a45,q1,q2,&xFK,&yFK);
+    a2345 = sqrt(a23*a23 + a45*a45 - 2*a23*a45*cos(M_PI-q2));
+    *angleA2A2345 = 2*M_PI - acosf((a45*a45 + a2345*a2345 - a23*a23)/(2*a45*a2345))
+            - m_robot->homeAngle(MOTOR_ARM3)/180.0f*M_PI
+            - m_robot->homeAngle(MOTOR_ARM4)/180.0f*M_PI;
+    *edge = a2345;
+#ifdef DEBUG_KINEMATIC
+    this->printf("ApplicationController::calculatePolygonEdgeA2345 done a2345[%.02f] angleA2A2345[%.02f]\r\n",
+                 a2345,*angleA2A2345/M_PI*180.0f);
+#endif
 }
 
-void ApplicationController::calculateJoints(float xPos, float yPos, float upAngleInDegree, int* jointSteps)
+bool ApplicationController::calculateJoints(float xPos, float yPos, float upAngleInDegree, int* jointSteps)
 {    
     float a1 = m_robot->armLength(MOTOR_ARM1);
-    float a2 = 0;
-    float q2Offset = 0;
+    float a2345 = 0;
+    float angleA2A2345 = 0;
 #ifdef DEBUG_KINEMATIC
-    this->printf("=== calculatePolygonEdge\r\n");
+    this->printf("=== calculatePolygonEdgeA2345\r\n");
 #endif
-    calculatePolygonEdge(upAngleInDegree,&a2,&q2Offset);
+    calculatePolygonEdgeA2345(upAngleInDegree,&a2345,&angleA2A2345);
 #ifdef DEBUG_KINEMATIC    
-    this->printf("calculatePolygonEdge ===\r\n");
+    this->printf("calculatePolygonEdgeA2345 ===\r\n");
 #endif
     float q1 = 0;
     float q2 = 0;
@@ -524,36 +737,39 @@ void ApplicationController::calculateJoints(float xPos, float yPos, float upAngl
     this->printf("xPos[%d]\r\n",(int)xPos);
     this->printf("yPos[%d]\r\n",(int)yPos);
     this->printf("a1[%d]\r\n",(int)a1);
-    this->printf("a2[%d]\r\n",(int)a2);
-    this->printf("q2Offset[%d]\r\n",(int)(q2Offset*180.f/M_PI));
+    this->printf("a2345[%d]\r\n",(int)a2345);
+    this->printf("angleA2A2345[%d]\r\n",(int)(angleA2A2345*180.f/M_PI));
+    this->printf("Inverse\r\n");
 #endif
-    inverseKinematic(xPos, yPos, a1, a2, &q1, &q2);
-
+    if(!inverseKinematic(xPos, yPos, a1, a2345, &q1, &q2)) return false;
+#ifdef DEBUG_KINEMATIC
+    this->printf("Inverse done\r\n");
+#endif
     float xPosFK = 0, yPosFK = 0;
-    forwardKinematic(a1,a2,q1,q2,&xPosFK,&yPosFK);
+    forwardKinematic(a1,a2345,q1,q2,&xPosFK,&yPosFK);
     if(xPosFK*xPos < 0 || yPosFK * yPos < 0) q1 = q1 - M_PI;
 #ifdef DEBUG_KINEMATIC
-    this->printf("arm1Angle[%d]=[%d] arm2Angle[%d]=[%d] arm3Angle[%d] q2Offset[%d]\r\n",
+    this->printf("arm1Angle[%d]=[%d] arm2Angle[%d]=[%d]\r\n",
                  (int)(q1/M_PI*180.0f),
-                 (int)((M_PI/2 + q1)/M_PI*180.0f),
+                 (int)((q1)/M_PI*180.0f),
                  (int)((q2)/M_PI*180.0f),
-                 (int)((M_PI - q2 - q2Offset)/M_PI*180.0f),
-                 (int)(upAngleInDegree),
-                 (int)(q2Offset/M_PI*180.0f));
+                 (int)((M_PI - q2 + angleA2A2345)/M_PI*180.0f));
 #endif
     jointSteps[MOTOR_ARM1] = m_robot->angleToStep(
                 MOTOR_ARM1,
-                (M_PI/2 + q1)/M_PI*180.0f);
+                q1/M_PI*180.0f);
     jointSteps[MOTOR_ARM2] = m_robot->angleToStep(
                 MOTOR_ARM2,
-                (M_PI - q2 - q2Offset)/M_PI*180.0f +
-                m_robot->homeAngle(MOTOR_ARM2));
-    jointSteps[MOTOR_ARM3] = 0;
-    jointSteps[MOTOR_ARM4] = 0;
+                (M_PI - q2 + angleA2A2345)/M_PI*180.0f);
+    jointSteps[MOTOR_ARM3] = m_robot->homeStep(MOTOR_ARM3);
+    jointSteps[MOTOR_ARM4] = m_robot->homeStep(MOTOR_ARM4);
     jointSteps[MOTOR_ARM5] = m_robot->angleToStep(
                 MOTOR_ARM5,
                 upAngleInDegree);
+#ifdef DEBUG_KINEMATIC
     this->printf("calculateJoints upAngleInDegree[%f]\r\n",upAngleInDegree);
+#endif
+    return true;
 }
 
 Point ApplicationController::calibPos()
@@ -565,7 +781,7 @@ Point ApplicationController::calibPos()
     m_robot->calibAngle(listCalibAngle,&numMotor,ANGLE_RAD);
     float a2 = 0;
     float q2Offset = 0;
-    calculatePolygonEdge(listCalibAngle[MOTOR_ARM5]/M_PI*180.0f,&a2,&q2Offset);
+    calculatePolygonEdgeA2345(listCalibAngle[MOTOR_ARM5]/M_PI*180.0f,&a2,&q2Offset);
     float xPosFK = 0, yPosFK = 0;
     float q1 = listCalibAngle[MOTOR_ARM1] - M_PI/2.0f;
     float q2 = M_PI/2.0f - q2Offset;
@@ -593,13 +809,17 @@ Point ApplicationController::currentPos()
     float listCurrentAngle[MAX_MOTOR];
     int numMotor;
     m_robot->currentAngle(listCurrentAngle,&numMotor,ANGLE_RAD);
-    float a2 = 0;
-    float q2Offset = 0;
-    calculatePolygonEdge(listCurrentAngle[MOTOR_ARM5]/M_PI*180.0f,&a2,&q2Offset);
+    printf("Angle M1[%f] M2[%f] M5[%f]\r\n",
+           listCurrentAngle[MOTOR_ARM1]/M_PI*180.0f,
+           listCurrentAngle[MOTOR_ARM2]/M_PI*180.0f,
+           listCurrentAngle[MOTOR_ARM5]/M_PI*180.0f);
+    float a2345 = 0;
+    float angleA2A2345 = 0;
+    calculatePolygonEdgeA2345(listCurrentAngle[MOTOR_ARM5]/M_PI*180.0f,&a2345,&angleA2A2345);
     float xPosFK = 0, yPosFK = 0;
-    float q1 = listCurrentAngle[MOTOR_ARM1] - M_PI/2.0f;
-    float q2 = M_PI/2.0f - q2Offset;
-    forwardKinematic(a1,a2,q1,q2,&xPosFK,&yPosFK);
+    float q1 = listCurrentAngle[MOTOR_ARM1];
+    float q2 = M_PI - listCurrentAngle[MOTOR_ARM2] + angleA2A2345;
+    forwardKinematic(a1,a2345,q1,q2,&xPosFK,&yPosFK);
     resultPos.x = xPosFK;
     resultPos.y = yPosFK;
     return resultPos;
@@ -607,9 +827,16 @@ Point ApplicationController::currentPos()
 
 void ApplicationController::goToHome(int motorID)
 {
-    specificPlatformGohome(motorID);
-    m_robot->requestGoHome(motorID);
-    setMachineState(MACHINE_EXECUTE_HOME);
+    if(motorID == MOTOR_CAPTURE) {
+        specificPlatformGohome(MOTOR_CAPTURE);
+        m_robot->setState(ROBOT_EXECUTE_DONE);
+    } else {
+        if(motorID == MAX_MOTOR) {
+            specificPlatformGohome(MOTOR_CAPTURE);
+        }
+        m_robot->requestGoHome(motorID);
+        setMachineState(MACHINE_EXECUTE_HOME);
+    }
 }
 
 void ApplicationController::calibToHome(int motorID)
@@ -617,22 +844,80 @@ void ApplicationController::calibToHome(int motorID)
     m_robot->requestCalib(motorID);
     setMachineState(MACHINE_EXECUTE_CALIBRATION);
 }
-void ApplicationController::goToReadyPosition() {
-    int jointSteps[MAX_MOTOR];
-    jointSteps[MOTOR_CAPTURE] = 0;
+int jointSteps[MAX_MOTOR];
+void ApplicationController::goToReadyPosition()
+{
+    jointSteps[MOTOR_CAPTURE] = m_robot->maxStep(MOTOR_CAPTURE);
     jointSteps[MOTOR_ARM1] = m_robot->angleToStep(MOTOR_ARM1,0);
     jointSteps[MOTOR_ARM2] = m_robot->angleToStep(MOTOR_ARM2,90+m_robot->homeAngle(MOTOR_ARM2));
-    jointSteps[MOTOR_ARM3] = 0;
-    jointSteps[MOTOR_ARM4] = 0;
-    jointSteps[MOTOR_ARM5] = m_robot->angleToStep(MOTOR_ARM5,0);
+    jointSteps[MOTOR_ARM3] = m_robot->homeAngle(MOTOR_ARM3);
+    jointSteps[MOTOR_ARM4] = m_robot->homeAngle(MOTOR_ARM4);
+    jointSteps[MOTOR_ARM5] = m_robot->angleToStep(MOTOR_ARM5,m_robot->homeAngle(MOTOR_ARM5));
     m_robot->setMoveTarget(jointSteps);
     m_robot->moveToTarget(MAX_MOTOR);
-    setMachineState(MACHINE_EXECUTE_POSITION);
+    m_standByCommandState = COMMAND_STANDBY_INIT;
+    setMachineState(MACHINE_EXECUTE_POSITION_STANDBY);
+}
+void ApplicationController::goToHomeToCalibPosition()
+{
+    jointSteps[MOTOR_CAPTURE] = m_robot->maxStep(MOTOR_CAPTURE);
+    jointSteps[MOTOR_ARM1] = m_robot->angleToStep(MOTOR_ARM1,m_robot->homeAngle(MOTOR_ARM1)+5);
+    jointSteps[MOTOR_ARM2] = m_robot->angleToStep(MOTOR_ARM2,m_robot->homeAngle(MOTOR_ARM2)+5);
+    jointSteps[MOTOR_ARM3] = m_robot->homeAngle(MOTOR_ARM3);
+    jointSteps[MOTOR_ARM4] = m_robot->homeAngle(MOTOR_ARM4);
+    jointSteps[MOTOR_ARM5] = m_robot->angleToStep(MOTOR_ARM5,m_robot->homeAngle(MOTOR_ARM5));
+    m_robot->setMoveTarget(jointSteps);
+    m_robot->moveToTarget(MAX_MOTOR);
+    m_homeCalibCommandState = COMMAND_HOME_TO_CALIB_INIT;
+    setMachineState(MACHINE_EXECUTE_POSITION_HOME_TO_CALIB);
+}
+int ApplicationController::executeReadyPositionLoop()
+{
+    switch(m_standByCommandState) {
+    case COMMAND_STANDBY_INIT:
+        m_standByCommandState = COMMAND_STANDBY_EXECUTE;
+        break;
+    case COMMAND_STANDBY_EXECUTE: {
+        if(m_robot->loop() == ROBOT_EXECUTE_DONE) {
+            m_standByCommandState = COMMAND_STANDBY_PREDONE;
+        }
+    }
+    break;
+    case COMMAND_STANDBY_PREDONE: {
+        m_standByCommandState = COMMAND_STANDBY_DONE;
+    }
+    break;    
+    }
+    return m_standByCommandState;
 }
 
-void ApplicationController::goToCalibPosition() {
-    int jointSteps[MAX_MOTOR];
-    jointSteps[MOTOR_CAPTURE] = 0;
+int ApplicationController::executeHomeToCalibPositionLoop()
+{
+    switch(m_homeCalibCommandState) {
+    case COMMAND_HOME_TO_CALIB_INIT:
+        m_homeCalibCommandState = COMMAND_HOME_TO_CALIB_PHASE1;
+        break;
+    case COMMAND_HOME_TO_CALIB_PHASE1: {
+        if(m_robot->loop() == ROBOT_EXECUTE_DONE) {
+            specificPlatformGohome(MOTOR_CAPTURE);
+            m_robot->requestGoHome(MAX_MOTOR);
+            m_homeCalibCommandState = COMMAND_HOME_TO_CALIB_PHASE2;
+        }
+    }
+    break;
+    case COMMAND_HOME_TO_CALIB_PHASE2: {
+        if(m_robot->loop() == ROBOT_EXECUTE_DONE) {
+            m_homeCalibCommandState = COMMAND_HOME_TO_CALIB_DONE;
+        }
+    }
+    break;    
+    }
+    return m_homeCalibCommandState;
+}
+
+void ApplicationController::goToCalibPosition()
+{
+    jointSteps[MOTOR_CAPTURE] = m_robot->maxStep(MOTOR_CAPTURE);
     jointSteps[MOTOR_ARM1] = m_robot->calibStep(MOTOR_ARM1);
     jointSteps[MOTOR_ARM2] = m_robot->calibStep(MOTOR_ARM2);
     jointSteps[MOTOR_ARM3] = 0;
@@ -642,44 +927,89 @@ void ApplicationController::goToCalibPosition() {
     m_robot->moveToTarget(MAX_MOTOR);
     setMachineState(MACHINE_EXECUTE_POSITION);    
 }
-void ApplicationController::executeSequence(
+void ApplicationController::gotoPosition(float x, float y, float upAngleInDegree) {
+    jointSteps[MOTOR_CAPTURE] = m_robot->maxStep(MOTOR_CAPTURE);
+    jointSteps[MOTOR_ARM3] = m_robot->homeStep(MOTOR_ARM3);
+    jointSteps[MOTOR_ARM4] = m_robot->homeStep(MOTOR_ARM4);
+    if(!calculateJoints(x, y, upAngleInDegree, jointSteps)) return;
+    m_robot->setMoveTarget(jointSteps);
+    m_robot->moveToTarget(MAX_MOTOR);
+    setMachineState(MACHINE_EXECUTE_POSITION);
+}
+bool ApplicationController::executeSequence(
         MOVE_TYPE moveType,
-        int startCol, int startRow,
-        int stopCol, int stopRow,
-        char promotePiece) {
+        uint8_t startRow, uint8_t startCol,
+        uint8_t stopRow, uint8_t stopCol, bool straightMove,
+        uint8_t dropCaptureSide, uint8_t dropCaptureRow, uint8_t dropCaptureCol,
+        uint8_t promoteSide, uint8_t promoteRow, uint8_t promoteCol,
+        uint8_t dropPawnPromoteSide, uint8_t dropPawnToPromoteRow, uint8_t dropPawnToPromoteCol) {
+    bool executeInitResult = false;
+#ifdef DEBUG_COMMAND
     this->printf("Go to Pos [%d,%d] to [%d,%d] \r\n",
                  startCol, startRow, stopCol, stopRow);
-
+#endif
     // Attack: Move piece out -> Move attack piece -> Return to prepare
     // No attack: Move attack piece -> Return to prepare
     // Castle: Move king -> Move rook -> Return to prepare
     // Promote: Move pawn -> Move promote piece -> Return to prepare
     switch (moveType) {
+    case MOVE_TEST:
+        executeInitResult = calculateSequenceMoveTest(startRow, startCol);
+        if (executeInitResult) {
+            setMachineState(MACHINE_EXECUTE_TEST);
+        }
+        break;
     case MOVE_NORMAL:
-        calculateSequenceMoveNormal(startCol, startRow, stopCol, stopRow);
+        executeInitResult = calculateSequenceMoveNormal(startRow, startCol, 
+            stopRow, stopCol, straightMove);
+        if (executeInitResult) {
+            setMachineState(MACHINE_EXECUTE_COMMAND);
+        }
         break;
     case MOVE_ATTACK:
-        calculateSequenceAttack(startCol, startRow, stopCol, stopRow);
+        executeInitResult = calculateSequenceAttack(startRow, startCol, 
+            stopRow, stopCol, straightMove,
+            dropCaptureSide , dropCaptureRow, dropCaptureCol);
+        if (executeInitResult) {
+            setMachineState(MACHINE_EXECUTE_COMMAND);
+        }
         break;
     case MOVE_PASTPAWN:
-        calculateSequencePastPawn(startCol, startRow, stopCol, stopRow);
+        executeInitResult = calculateSequencePastPawn(startRow, startCol, 
+            stopRow, stopCol, straightMove,
+            dropCaptureSide , dropCaptureRow, dropCaptureCol);
+        if (executeInitResult) {
+            setMachineState(MACHINE_EXECUTE_COMMAND);
+        }
         break;
     case MOVE_CASTLE:
-        calculateSequenceCastle(startCol, startRow, stopCol, stopRow);
+        executeInitResult = calculateSequenceCastle(startRow, startCol, 
+            stopRow, stopCol, straightMove);
+        if (executeInitResult) {
+            setMachineState(MACHINE_EXECUTE_COMMAND);
+        }
         break;
     case MOVE_PROMOTE:
-        calculateSequencePromotePiece(startCol, startRow, stopCol, stopRow, promotePiece);
+        executeInitResult = calculateSequencePromotePiece(startRow, startCol, 
+            stopRow, stopCol, 
+            promoteSide, promoteRow, promoteCol, 
+            dropPawnPromoteSide, dropPawnToPromoteRow, dropPawnToPromoteCol,
+            dropCaptureSide, dropCaptureRow, dropCaptureCol);
+        if (executeInitResult) {
+            setMachineState(MACHINE_EXECUTE_COMMAND);
+        }
         break;
     }
 
-    setMachineState(MACHINE_EXECUTE_COMMAND);
+    
     m_commandSequenceState = COMMAND_SEQUENCE_STATE_INIT;
+    return executeInitResult;
 }
 
-void ApplicationController::calculateSequenceMoveStraight(int startCol, int startRow,int stopCol, int stopRow)
+bool ApplicationController::calculateSequenceMoveStraight(uint8_t startRow, uint8_t startCol, uint8_t stopRow, uint8_t stopCol)
 {
-    Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
-    Point endPoint = m_chessBoard->convertPoint(stopRow,stopCol);
+    Point startPoint = m_chessBoard->convertChessBoardPoint(startRow,startCol);
+    Point endPoint = m_chessBoard->convertChessBoardPoint(stopRow,stopCol);
     clearSequenceMove();
 //    float upAngles[2] = {0,0};
 //    Point position[2] = {startPoint,endPoint};
@@ -706,102 +1036,167 @@ void ApplicationController::calculateSequenceMoveStraight(int startCol, int star
     m_commandSequenceState = COMMAND_SEQUENCE_STATE_INIT;
 }
 
-void ApplicationController::calculateSequenceMove(int startCol, int startRow, int upAngleInDegree, bool isCapture)
+#define DEBUG_COMMAND
+bool ApplicationController::calculateSequenceMoveTest(uint8_t targetRow, uint8_t targetCol)
 {
-    printf("ApplicationController::calculateSequenceMove\r\n");
-    Point targetPoint = m_chessBoard->convertPoint(startRow,startCol);
-    int jointSteps[MAX_MOTOR];
+    // Check for valid coordinates
+    if (targetCol < 0 || targetCol > 7 || targetRow < 0 || targetRow > 7) {
+        return false;
+    }
+    // append move to target location
+    Point targetPoint = m_chessBoard->convertChessBoardPoint(targetRow,targetCol);
+#ifdef DEBUG_COMMAND
+    printf("target[%d,%d] to Point(%d,%d)\r\n",
+           targetRow,targetCol,
+           (int)(targetPoint.x*10), (int)(targetPoint.y*10));
+#endif
     clearSequenceMove();
-    
-    jointSteps[MOTOR_CAPTURE] = isCapture?415:0;
-    // Inverse axis Oxy -> Oyx
-    calculateJoints(targetPoint.y, targetPoint.x, upAngleInDegree, jointSteps);
-
-    m_robot->setMoveTarget(jointSteps);
-    m_robot->moveToTarget(MAX_MOTOR);
-    setMachineState(MACHINE_EXECUTE_POSITION);
+    float upAngles[1] = {m_robot->maxAngle(MOTOR_ARM5)};
+    Point position[1] = {targetPoint};
+    int captureStep[1] = {m_robot->minStep(MOTOR_CAPTURE)};
+    int numStep = 1;
+    for(int seqStep = 0; seqStep < numStep; seqStep++)
+    {
+        m_sequenceCommand[m_numCommand].x = position[seqStep].x;
+        m_sequenceCommand[m_numCommand].y = position[seqStep].y;
+        m_sequenceCommand[m_numCommand].updownAngle = upAngles[seqStep];
+        m_sequenceCommand[m_numCommand].captureStep = captureStep[seqStep];
+        m_sequenceCommand[m_numCommand].type = COMMAND_NORMAL;
+        m_numCommand++;
+    }
+    return true;
 }
 
-void ApplicationController::calculateSequenceMoveNormal(int startCol, int startRow,
-                     int stopCol, int stopRow)
+bool ApplicationController::calculateSequenceMoveNormal(uint8_t startRow, uint8_t startCol,
+                     uint8_t stopRow, uint8_t stopCol, bool straightMove)
 {
+    // Check for valid coordinates
+    if (startCol < 0 || startCol > 7 || startRow < 0 || startRow > 7 ||
+        stopCol < 0 || stopCol > 7 || stopRow < 0 || stopRow > 7) {
+        return false;
+    }
+    bool sequenceValid = true;
     // append move from start -> stop -> standy
-    Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
+    m_startPoint = m_chessBoard->convertChessBoardPoint(startRow,startCol);
+#ifdef DEBUG_COMMAND
     printf("start[%d,%d] to Point(%d,%d)\r\n",
            startRow,startCol,
-           (int)(startPoint.x*10), (int)(startPoint.y*10));
-    Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
+           (int)(m_startPoint.x*10), (int)(m_startPoint.y*10));
+#endif
+    m_stopPoint = m_chessBoard->convertChessBoardPoint(stopRow,stopCol);
     clearSequenceMove();
-    appendSequenceMove(startPoint, stopPoint);
-    setMachineState(MACHINE_EXECUTE_COMMAND);
-    m_commandSequenceState = COMMAND_SEQUENCE_STATE_INIT;
+    sequenceValid = sequenceValid && appendSequenceMove(m_startPoint, m_stopPoint, straightMove);
+    return sequenceValid;
 }
 
-void ApplicationController::calculateSequenceAttack(int startCol, int startRow,
-                     int stopCol, int stopRow)
+bool ApplicationController::calculateSequenceAttack(uint8_t startRow, uint8_t startCol,
+                     uint8_t stopRow, uint8_t stopCol, bool straightMove,
+                     uint8_t dropCaptureSide, uint8_t dropCaptureRow, uint8_t dropCaptureCol)
 {
+    // Check for valid coordinates
+    if (startCol > 7 || startRow > 7 ||
+        stopCol > 7 || stopRow > 7 ||
+        dropCaptureRow > 7 || dropCaptureCol > 1) {
+        return false;
+    }
+    bool sequenceValid = true;
+    m_dropCapturePoint = m_chessBoard->convertDropPoint(dropCaptureRow, dropCaptureCol, 
+        dropCaptureSide == 'b'? ZONE_BOT:ZONE_PLAYER);
     // get free drop point
     // append move from stop -> drop -> start -> stop -> standby
-    Point dropPoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
-    Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
-    Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
+    m_startPoint = m_chessBoard->convertChessBoardPoint(startRow,startCol);
+    m_stopPoint = m_chessBoard->convertChessBoardPoint(stopRow,stopCol);
 
     clearSequenceMove();
-    appendSequenceMove(stopPoint, dropPoint);
-    appendSequenceMove(startPoint, stopPoint);
+    sequenceValid = sequenceValid && appendSequenceMove(m_stopPoint, m_dropCapturePoint);
+    sequenceValid = sequenceValid && appendSequenceMove(m_startPoint, m_stopPoint, straightMove);
+    return sequenceValid;
 }
 
-void ApplicationController::calculateSequencePastPawn(int startCol, int startRow,
-                     int stopCol, int stopRow)
+bool ApplicationController::calculateSequencePastPawn(uint8_t startRow, uint8_t startCol,
+                     uint8_t stopRow, uint8_t stopCol, bool straightMove,
+                     uint8_t dropCaptureSide, uint8_t dropCaptureRow, uint8_t dropCaptureCol)
 {
+    // Check for valid coordinates
+    if (startCol > 7 || startRow > 7 ||
+        stopCol > 7 || stopRow > 7 ||
+        stopRow - startRow != 1 ||
+        abs(stopCol - startCol)!= 1 ||
+        dropCaptureRow > 7 || dropCaptureCol > 1) {
+        return false;
+    }
+    bool sequenceValid = true;
     // append move from attack pawn -> drop -> start -> stop -> standby
-    Point dropPoint = m_chessBoard->getFreeDropPoint(ZONE_PLAYER);
-    Point pawnPoint = m_chessBoard->convertPoint(startRow,stopCol);
-    Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
-    Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
+    m_dropCapturePoint = m_chessBoard->convertDropPoint(dropCaptureRow, dropCaptureCol, 
+        dropCaptureSide == 'b'? ZONE_BOT:ZONE_PLAYER);
+    m_pawnPoint = m_chessBoard->convertChessBoardPoint(startRow,stopCol);
+    m_startPoint = m_chessBoard->convertChessBoardPoint(startRow,startCol);
+    m_stopPoint = m_chessBoard->convertChessBoardPoint(stopRow,stopCol);
     clearSequenceMove();
-    appendSequenceMove(pawnPoint, dropPoint);
-    appendSequenceMove(startPoint, stopPoint);
+    sequenceValid = sequenceValid && appendSequenceMove(m_pawnPoint, m_dropCapturePoint);
+    sequenceValid = sequenceValid && appendSequenceMove(m_startPoint, m_stopPoint, straightMove);
+    return sequenceValid;
 }
 
-void ApplicationController::calculateSequencePromotePiece(int startCol, int startRow,
-                     int stopCol, int stopRow, char promotePiece)
+bool ApplicationController::calculateSequencePromotePiece(uint8_t startRow, uint8_t startCol,
+                         uint8_t stopRow, uint8_t stopCol,
+                         uint8_t promoteSide, uint8_t promoteRow, uint8_t promoteCol,
+                         uint8_t dropPawnPromoteSide, uint8_t dropPawnToPromoteRow, uint8_t dropPawnToPromoteCol,
+                         uint8_t dropCaptureSide, uint8_t dropCaptureRow, uint8_t dropCaptureCol)
 {
+    if(startCol > 7 || stopCol > 7 ||
+       startRow != 6 || stopRow != 7 ||
+       abs(startCol-stopCol)>1 ||
+       promoteRow > 7 || promoteCol > 1 ||
+       dropPawnToPromoteRow > 7 || dropPawnToPromoteCol > 1 ||
+       dropCaptureRow > 7 || dropCaptureCol > 1) {
+        return false;
+    }
+    bool sequenceValid = true;
     // append move from attack piece -> drop -> promote -> stop -> start -> drop -> standby
-    Point promotePiecePoint = m_chessBoard->getFreeDropPoint(ZONE_BOT,promotePiece);
-    Point dropPiecePoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
-    Point startPoint = m_chessBoard->convertPoint(startRow,startCol);
-    Point stopPoint = m_chessBoard->convertPoint(stopRow,stopCol);
+    m_promotePiecePoint = m_chessBoard->convertDropPoint(promoteRow, promoteCol, 
+        promoteSide == 'b'? ZONE_BOT:ZONE_PLAYER);
+    m_dropPieceBotPoint = m_chessBoard->convertDropPoint(dropPawnToPromoteRow, dropPawnToPromoteCol, 
+        dropPawnPromoteSide == 'b'? ZONE_BOT:ZONE_PLAYER);
+    m_startPoint = m_chessBoard->convertChessBoardPoint(startRow,startCol);
+    m_stopPoint = m_chessBoard->convertChessBoardPoint(stopRow,stopCol);
 
     clearSequenceMove();
     if(startCol != stopCol){
         // pawn attack piece, move attack piece -> drop
-        Point dropPoint = m_chessBoard->getFreeDropPoint(ZONE_BOT);
-        appendSequenceMove(stopPoint, dropPoint);
+        m_dropCapturePoint = m_chessBoard->convertDropPoint(dropCaptureRow, dropCaptureCol, 
+            dropCaptureSide == 'b'? ZONE_BOT:ZONE_PLAYER);
+        sequenceValid = sequenceValid && appendSequenceMove(m_stopPoint, m_dropCapturePoint);
     }
-    appendSequenceMove(promotePiecePoint, stopPoint);
-    appendSequenceMove(startPoint, dropPiecePoint);
+    sequenceValid = sequenceValid && appendSequenceMove(m_promotePiecePoint, m_stopPoint);
+    sequenceValid = sequenceValid && appendSequenceMove(m_startPoint, m_dropPieceBotPoint);
+    return sequenceValid;
 }
 
-void ApplicationController::calculateSequenceCastle(int kingCol, int kingRow,
-                                                    int rookCol, int rookRow)
+bool ApplicationController::calculateSequenceCastle(uint8_t kingRow, uint8_t kingCol,
+                                                    uint8_t rookRow, uint8_t rookCol, bool straightMove)
 {
-
+    if( kingCol > 7 || rookCol > 7 ||
+        (kingRow != 0 && kingRow != 7) || kingRow != rookRow) {
+        return false;
+    }
+    bool sequenceValid = true;
     // append move king -> new point -> rook -> new point
-    Point kingPoint = m_chessBoard->convertPoint(kingRow,kingCol);
-    Point rookPoint = m_chessBoard->convertPoint(rookRow,rookCol);
+    Point kingPoint = m_chessBoard->convertChessBoardPoint(kingRow,kingCol);
+    Point rookPoint = m_chessBoard->convertChessBoardPoint(rookRow,rookCol);
     Point kingNewPoint;
     Point rookNewPoint;
     if(kingCol > rookCol) {
-        kingNewPoint = m_chessBoard->convertPoint(kingRow,kingCol-2);
-        rookNewPoint = m_chessBoard->convertPoint(kingRow,kingCol-1);
+        kingNewPoint = m_chessBoard->convertChessBoardPoint(kingRow,kingCol-2);
+        rookNewPoint = m_chessBoard->convertChessBoardPoint(kingRow,kingCol-1);
     } else {
-        kingNewPoint = m_chessBoard->convertPoint(kingRow,kingCol+2);
-        rookNewPoint = m_chessBoard->convertPoint(kingRow,kingCol+1);
+        kingNewPoint = m_chessBoard->convertChessBoardPoint(kingRow,kingCol+2);
+        rookNewPoint = m_chessBoard->convertChessBoardPoint(kingRow,kingCol+1);
     }
     clearSequenceMove();
-    appendSequenceMove(rookPoint, rookNewPoint);
-    appendSequenceMove(kingPoint, kingNewPoint);
+    sequenceValid = sequenceValid && appendSequenceMove(kingPoint, kingNewPoint, straightMove);
+    sequenceValid = sequenceValid && appendSequenceMove(rookPoint, rookNewPoint);
+    return sequenceValid;
 }
 
 float ApplicationController::distance(float x1, float y1, float x2, float y2)
@@ -816,14 +1211,22 @@ void ApplicationController::clearSequenceMove() {
     m_numCommand = 0;
     m_curCommandId = 0;
 }
-void ApplicationController::appendSequenceMove(Point start, Point stop, bool straightMove) {
+bool ApplicationController::appendSequenceMove(Point start, Point stop, bool straightMove) {
+    int jointSteps[MAX_MOTOR];
+    jointSteps[MOTOR_CAPTURE] = 0;
+    // Validation input
+    if(!calculateJoints(start.x, start.y, m_robot->homeAngle(MOTOR_ARM5), jointSteps) ||
+       !calculateJoints(stop.x, stop.y, m_robot->homeAngle(MOTOR_ARM5), jointSteps)) {
+        return false;
+    }
+
     if(!straightMove) {
-        float upAngles[6] = {0.0f,40.0f,0.0f,
-                              0.0f,40.0f,0.0f};
+        float upAngles[6] = {m_robot->homeAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),m_robot->homeAngle(MOTOR_ARM5),
+                             m_robot->homeAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),m_robot->homeAngle(MOTOR_ARM5)};
         Point position[6] = {start,start,start,
                               stop,stop,stop};
-        int captureStep[6] = {0,490,490,
-                               490,0,0};
+        int captureStep[6] = {m_robot->maxStep(MOTOR_CAPTURE),m_robot->minStep(MOTOR_CAPTURE),m_robot->minStep(MOTOR_CAPTURE),
+                                m_robot->minStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE)};
         int numStep = 6;
         for(int seqStep = 0; seqStep < numStep; seqStep++)
         {
@@ -835,10 +1238,11 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
             m_numCommand++;
         }
     } else {
-        float upAngles[4] = {0.0f,40.0f,40.0f,
-                              0.0f};
+        float upAngles[4] = {m_robot->homeAngle(MOTOR_ARM5),m_robot->maxAngle(MOTOR_ARM5),
+                              m_robot->maxAngle(MOTOR_ARM5),m_robot->homeAngle(MOTOR_ARM5)};
         Point position[4] = {start,start,stop,stop};
-        int captureStep[4] = {0,415,0,0};
+        int captureStep[4] = {m_robot->maxStep(MOTOR_CAPTURE),m_robot->minStep(MOTOR_CAPTURE),
+                                m_robot->maxStep(MOTOR_CAPTURE),m_robot->maxStep(MOTOR_CAPTURE)};
         int numStep = 4;
         for(int seqStep = 0; seqStep < numStep; seqStep++)
         {
@@ -846,11 +1250,11 @@ void ApplicationController::appendSequenceMove(Point start, Point stop, bool str
             m_sequenceCommand[m_numCommand].y = position[seqStep].y;
             m_sequenceCommand[m_numCommand].updownAngle = upAngles[seqStep];
             m_sequenceCommand[m_numCommand].captureStep = captureStep[seqStep];
-            m_sequenceCommand[m_numCommand].type = seqStep != 2 ?
-                        COMMAND_NORMAL : COMMAND_LINE;
+            m_sequenceCommand[m_numCommand].type = COMMAND_NORMAL;
             m_numCommand++;
         }
     }
+    return true;
 }
 
 void ApplicationController::initSequenceMove(int numberOfJoints) {
@@ -860,5 +1264,27 @@ void ApplicationController::initSequenceMove(int numberOfJoints) {
 void ApplicationController::executeSmoothMotionLoop(int motorID)
 {
     m_robot->executeSmoothMotion(motorID);
+}
+
+
+Point ApplicationController::calculateCellCenter(int row, int col, Point c00, Point c70, Point c77, Point c07) {
+    Point center;
+
+    // Normalize coordinates to a 0.0 to 1.0 range
+    float u = (float)row / 7.0;
+    float v = (float)col / 7.0;
+
+    // Bilinear interpolation formula
+    center.x = (1.0 - u) * (1.0 - v) * c00.x +
+               u * (1.0 - v) * c70.x +
+               u * v * c77.x +
+               (1.0 - u) * v * c07.x;
+
+    center.y = (1.0 - u) * (1.0 - v) * c00.y +
+               u * (1.0 - v) * c70.y +
+               u * v * c77.y +
+               (1.0 - u) * v * c07.y;
+
+    return center;
 }
 

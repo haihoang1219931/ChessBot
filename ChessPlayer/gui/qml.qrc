@@ -14,5 +14,12 @@
         <file>qml/MenuBotIcon.qml</file>
         <file>qml/MenuSettingIcon.qml</file>
         <file>qml/SettingCalibChessBoard.qml</file>
+        <file>qml/SettingCalibrationPoints.qml</file>
+        <file>qml/SettingsMenu.qml</file>
+        <file>qml/DownloadProgress.qml</file>
+        <file>qml/PromotionPieces.qml</file>
+        <file>qml/HomeOption.qml</file>
+        <file>qml/ConfirmPlay.qml</file>
+        <file>qml/SettingTestCommand.qml</file>
     </qresource>
 </RCC>

@@ -27,37 +27,36 @@ ApplicationSim::~ApplicationSim()
 #define FREQUENCY_TIMER1 1250.0f
 void ApplicationSim::initRobot()
 {
-    m_chessBoard->setChessBoardPosX(31-31*8/2);
-    m_chessBoard->setChessBoardPosY(100);
-    m_chessBoard->setChessBoardSize(31*8);
-    m_chessBoard->setDropZoneSpace(31);
+    m_chessBoard->setChessBoardPosX(30+7+45); // R + wall + space X
+    m_chessBoard->setChessBoardPosY(30+7+44); // R + wall + space Y
+    m_chessBoard->setChessBoardSize(35.25f*8);
+    m_chessBoard->setDropZoneSpace(35.25f);
+    m_chessBoard->setChessBoardSideSpace(0);
     m_minSpace = 2;
 
     JointParam armPrams[MAX_MOTOR] = {
     // active|   scale=gear_ratio/resolution   |length|init angle|home angle|home step time|min angle|max angle|min pulse/step|frequency | step accel
-        {true,  100.0f*(20.0f/360.0f),                0,      10,        0,         2,           0,       250,       2,   FREQUENCY_TIMER1,     50},
-        {true,  1.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -17,         8,         -17,       150,       2,   FREQUENCY_TIMER1,    150},
-        {true,  1.0f*70.0f/20.0f*(200.0f/360.0f),    85,     140,       50,         8,          50,       210,       2,   FREQUENCY_TIMER1,    150},
-        {false,  1.0f/1.0f,                          15,     130,      130,         1,         130,       130,       1,   FREQUENCY_TIMER1,      0},
-        {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       1,   FREQUENCY_TIMER1,      0},
-        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,      10,        0,         2,           0,        45,       2,   FREQUENCY_TIMER1,     50}
+        {true,                                 1,     0,       0,        0,        36,          10,        85,      16,   FREQUENCY_TIMER1,      0},
+        {true,  4.0f*18.0f/01.0f*(200.0f/360.0f),   255,       0,      -19,         8,         -17,       150,       2,   FREQUENCY_TIMER1,    500},
+        {true, 16.0f*70.0f/20.0f*(200.0f/360.0f),    72,     140,       48,         8,          48,       210,       2,   FREQUENCY_TIMER1,    250},
+        {false,  1.0f/1.0f,                          26,     130,      130,         1,         130,       130,       6,   FREQUENCY_TIMER1,      0},
+        {false,  1.0f/1.0f,                         120,     180,      180,         1,         180,       180,       6,   FREQUENCY_TIMER1,      0},
+        {true,  50.0f/14.0f*100.0f*(20.0f/360.0f),    0,       0,      -32,        36,         -36,         0,       6,   FREQUENCY_TIMER1,    100}
     };
+
     for(int motor= MOTOR_CAPTURE; motor<= MOTOR_ARM5; motor++) {
-        printf("ApplicationSim::initRobot[%d] param maxSpeed[%d]\r\n",
-               motor,armPrams[motor].minPulsePerStep);
         m_robot->setMotorParam(motor,armPrams[motor]);
         m_robot->updateInitAngle(motor,armPrams[motor].initAngle);
     }
 }
 
-void ApplicationSim::specificPlatformGohome(int motorID)
+void ApplicationSim::specificPlatformGohome(int motorID, bool stopOtherStepper)
 {
     m_mainProcess->changeTimerPeriodMotion(1);
-    m_mainProcess->changeTimerPeriodCommand(1000);
     m_mainProcess->changeTimerPeriodInput(1000);
 }
 
-void ApplicationSim::harwareStop(int motorID)
+void ApplicationSim::hardwareStop(int motorID)
 {
     //@todo: consider to optimize code
 }
@@ -118,12 +117,12 @@ bool ApplicationSim::isLimitReached(int motorID,
 
     if(limitType == MOTOR_LIMIT_MIN)
         result = m_robot->currentStep(motorID)
-                == m_robot->minStep(motorID);
+                <= m_robot->minStep(motorID);
     else if(limitType == MOTOR_LIMIT_MAX)
         result = m_robot->currentStep(motorID)
-                == m_robot->maxStep(motorID);
+                >= m_robot->maxStep(motorID);
     else result = m_robot->currentStep(motorID)
-            == m_robot->homeStep(motorID);
+            <= m_robot->homeStep(motorID);
 #ifdef DEBUG_SIM
     char strLimit[3][8] = {
         {"MIN"},

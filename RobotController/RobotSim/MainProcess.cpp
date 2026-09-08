@@ -16,7 +16,6 @@ MainProcess::MainProcess(QObject *parent) :
     changeSleepTime(30);
     changeTimerPeriodMotion(90);
     changeTimerPeriodInput(90);
-    changeTimerPeriodCommand(90);
     for(int i=0; i< MAX_MOTOR; i++)
     {
         m_listAngle.append(0);
@@ -106,7 +105,6 @@ void MainProcess::taskLoop() {
 void MainProcess::startService() {
     printf("Start\r\n");
     m_timer->start();
-    m_hardwareTimer->enableTaskCommand(true);
     m_hardwareTimer->enableTaskInput(true);
 }
 
@@ -114,7 +112,6 @@ void MainProcess::stopService() {
     printf("Stop\r\n");
     m_timer->stop();
     m_hardwareTimer->enableTaskMotion(false);
-    m_hardwareTimer->enableTaskCommand(false);
     m_hardwareTimer->enableTaskInput(false);
 }
 void MainProcess::setRender(VideoRender* render)
@@ -153,14 +150,12 @@ void MainProcess::changeTimerPeriodMotion(int sleepTime)
 {
     m_hardwareTimer->setIntervalMotion(sleepTime);
 }
+
 void MainProcess::changeTimerPeriodInput(int sleepTime)
 {
     m_hardwareTimer->setIntervalInput(sleepTime);
 }
-void MainProcess::changeTimerPeriodCommand(int sleepTime)
-{
-    m_hardwareTimer->setIntervalCommand(sleepTime);
-}
+
 QVariantList MainProcess::listAngle()
 {
     return m_listAngle;

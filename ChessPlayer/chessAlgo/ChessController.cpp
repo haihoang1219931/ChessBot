@@ -1,7 +1,7 @@
 #include "ChessController.h"
 
 #include <QString>
-
+#include <QDebug>
 #include "MagicMoves.hpp"
 #include "MoveGen.hpp"
 #include "Pawn.hpp"
@@ -9,6 +9,34 @@
 #include "TT.hpp"
 #include "Tables.hpp"
 #include "Utils.hpp"
+#include "Piece.hpp"
+#include "Eval.hpp"
+
+
+// Global speech phrase configurations for kids
+const QStringList BLUNDER_PHRASES = {
+    "Oh no! That is a major blunder!",
+    "Be careful! You left a piece hanging!",
+    "Ouch! That move hurts your position."
+};
+
+const QStringList MISTAKE_PHRASES = {
+    "Hmm, that's okay, but watch your defenses.",
+    "An interesting choice, but you missed a safer square.",
+    "Be cautious! The engine sees an opening there."
+};
+
+const QStringList BRILLIANT_PHRASES = {
+    "Wow! That move is absolutely brilliant!",
+    "Incredible play! Are you a grandmaster?",
+    "Excellent tactical vision!"
+};
+
+const QStringList GOOD_PHRASES = {
+    " is a very solid move.",
+    " helps you control the board.",
+    " is a nice strategic development."
+};
 
 ChessController::ChessController(QObject* parent)
     : QObject(parent)
@@ -17,7 +45,7 @@ ChessController::ChessController(QObject* parent)
     , m_status("Ready")
     , m_promotionPending(false)
     , m_checkedKingSquare(-1)
-    , m_engineDepth(3)
+    , m_engineElo(700)
     , m_playerColor(0)
 {
     MagicMoves::initmagicmoves();
@@ -25,9 +53,6 @@ ChessController::ChessController(QObject* parent)
     ZK::initZobristKeys();
     Pawn::initPawnTable();
     globalTT.init_TT_size(TT::TEST_MB_SIZE);
-
-    refreshBoardModel();
-    refreshCheckState();
 }
 
 QStringList ChessController::board() const
@@ -50,9 +75,13 @@ QString ChessController::status() const
     return m_status;
 }
 
-QStringList ChessController::moveHistory() const
+void ChessController::setStatus(QString status)
 {
-    return m_moveHistory;
+    qDebug("ChessController::setStatus %s",status.toStdString().c_str());
+    if(m_status != status) {
+        m_status = status;
+        Q_EMIT statusChanged();
+    }
 }
 
 bool ChessController::promotionPending() const
@@ -65,9 +94,14 @@ int ChessController::checkedKingSquare() const
     return m_checkedKingSquare;
 }
 
-int ChessController::engineLevel() const
+QString ChessController::engineLevel() const
 {
-    return m_engineDepth;
+    return m_engineLevel;
+}
+
+int ChessController::engineElo() const
+{
+    return m_engineElo;
 }
 
 int ChessController::playerColor() const
@@ -75,13 +109,14 @@ int ChessController::playerColor() const
     return m_playerColor;
 }
 
-void ChessController::setEngineLevel(int level)
+void ChessController::setEngineElo(QString level, int elo)
 {
-    if (level < 1) level = 1;
-    if (level > 5) level = 5;
-    if (m_engineDepth == level) return;
-    m_engineDepth = level;
-    Q_EMIT engineLevelChanged();
+    if(m_engineElo != elo || m_engineLevel != level) {
+        m_engineElo = elo;
+        m_engineLevel = level;
+        Q_EMIT engineEloChanged();
+        Q_EMIT engineLevelChanged();
+    }
 }
 
 void ChessController::setPlayerColor(int color)
@@ -92,31 +127,59 @@ void ChessController::setPlayerColor(int color)
     Q_EMIT playerColorChanged();
 }
 
-void ChessController::newGame()
+void ChessController::undoMove()
 {
-    m_board = std::make_shared<Board>();
+
+}
+
+const std::string whiteCatsling1 = "1nbqk2r/pppp1ppp/8/2p1bn2/5N2/1B1Q4/P1rPPPPP/R3K2R w KQkq -";
+const std::string whiteCatsling2 = "4k3/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+const std::string blackCatsling2 = "r3k2r/8/8/8/8/8/8/4K3 w kq - 0 1";
+const std::string whitePawnPromotion = "8/2P1k3/8/3K4/8/8/8/8 w - - 0 1";
+const std::string whitePawnPromotion2 = "1q6/2P1k3/8/3K4/8/8/8/8 w - - 0 1";
+const std::string blackPawnPromotion = "7K/8/8/8/8/3k4/p7/8 w - - 0 1";
+const std::string blackPawnPromotion2 = "1k5K/8/8/8/8/8/Np6/RN6 w - - 0 1";
+const std::string whiteMateFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
+const std::string blackMateFen = "7K/6q1/6k1/8/8/8/8/8 w - - 0 1";
+const std::string staleMateFen = "7k/5Q2/7K/8/8/8/8/8 b - - 0 1";
+const std::string ongoingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+const std::string whitePawnPromotionCapture = "1r6/2P1k3/8/3K4/8/8/8/8 w - - 0 1";
+const std::string whitePawnDoubleCapture = "3r1r2/4P3/8/k7/8/8/8/1K6 w - - 0 1";
+const std::string blackPrePromotion = "k7/8/8/8/8/8/2p5/4K3 w - - 0 1";
+const std::string blackCapturePromotion = "k7/8/8/8/8/8/1p6/2R1K3 w - - 0 1";
+const std::string crashMove = "r3k2r/p1p3pp/1p6/2K2p2/8/2N1n3/PP5P/1R6 w kq - 39 20";
+const std::string hangPromote = "rn6/ppp1kp1p/3r4/5p2/1PPb4/P1N4P/K4pbR/RN6 w - - 42 22";
+void ChessController::updateBoard()
+{
+    refreshBoardModel();
+    for(int row = 0; row < 8; row++) {
+        for(int col = 0; col < 8; col ++) {
+            printf("%s ",m_boardModel[row*8+col].toStdString().c_str());
+        }
+        printf("\r\n");
+    }
+    refreshCheckState();
+    Q_EMIT sideToMoveChanged();
+}
+
+void ChessController::newGame(QString lastMove)
+{
+    printf("new game\r\n");
+    if(lastMove != "")
+        m_board = std::make_shared<Board>(lastMove.toStdString());
+    else
+        m_board = std::make_shared<Board>();
     globalTT.clearTT();
-    m_moveHistory.clear();
-    Q_EMIT moveHistoryChanged();
     m_promotionPending = false;
     m_pendingPromotionMoves.clear();
     Q_EMIT promotionPendingChanged();
-    m_status = "New game";
     clearSelection();
-    refreshBoardModel();
-    refreshCheckState();
-    Q_EMIT statusChanged();
-    Q_EMIT sideToMoveChanged();
-
-    if (m_playerColor == 1) // player is Black — engine plays White's first move
-    {
-        playEngineMove();
-        Q_EMIT boardChanged();
-    }
+    updateBoard();
+    setStatus("NEW_GAME");
 }
 
 void ChessController::clickSquare(int uiIndex)
-{
+{    
     if (uiIndex < 0 || uiIndex >= 64)
     {
         return;
@@ -132,50 +195,82 @@ void ChessController::clickSquare(int uiIndex)
     if (m_selectedUiSquare < 0)
     {
         QString piece = pieceCodeAtSquare(square);
+        QString pieceName =  convertPieceText(piece);
+        qDebug("Click at %s",pieceName.toStdString().c_str());
         if (piece.isEmpty())
         {
             return;
         }
 
-        const bool isWhitePiece = piece.startsWith("w");
+        const bool isWhitePiece = piece.isUpper();;
         if ((isWhitePiece && m_board->getColorToPlay() != WHITE) || (!isWhitePiece && m_board->getColorToPlay() != BLACK))
         {
-            m_status = "Select your own piece";
-            Q_EMIT statusChanged();
+            setStatus("OWN_PIECE_SELECTED");
             return;
         }
 
         m_selectedUiSquare = uiIndex;
         refreshSelectionMoves();
         Q_EMIT selectedSquareChanged();
-        Q_EMIT boardChanged();
         return;
     }
-
-    if (!moveByUiSquares(m_selectedUiSquare, uiIndex))
-    {
-        clearSelection();
-        Q_EMIT boardChanged();
-        return;
-    }
-
-    Q_EMIT boardChanged();
 }
 
-bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex)
+bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex, Move& chosenMove)
 {
     if (startUiIndex < 0 || startUiIndex >= 64 || stopUiIndex < 0 || stopUiIndex >= 64)
     {
         return false;
     }
-
+    if (m_playerColor == Color::BLACK) {
+        startUiIndex = 63 - startUiIndex;
+        stopUiIndex = 63 - stopUiIndex;
+    }
     if (m_promotionPending)
     {
-        m_status = "Promotion pending";
-        Q_EMIT statusChanged();
+        setStatus("PROMOTION_PENDING");
         return false;
     }
 
+    const int originSquare = uiIndexToSquare(startUiIndex);
+    const int destinationSquare = uiIndexToSquare(stopUiIndex);
+
+    const QString piece = pieceCodeAtSquare(originSquare);
+    if (piece == ".")
+    {
+        return false;
+    }
+
+    const bool isWhitePiece = piece.isUpper();
+    if ((isWhitePiece && m_board->getColorToPlay() != WHITE) || (!isWhitePiece && m_board->getColorToPlay() != BLACK))
+    {
+        setStatus("OWN_PIECE_SELECTED");
+        return false;
+    }
+
+    if (!tryFindLegalMove(originSquare, destinationSquare, chosenMove))
+    {
+        return false;
+    }
+    m_board->executeMove(chosenMove);
+//    m_moveHistory.push_back(chosenMove);
+    clearSelection();
+    updateBoard();
+
+    const QString resultAfterPlayer = buildResultText();
+    if (!resultAfterPlayer.isEmpty())
+    {
+        setStatus(resultAfterPlayer);
+    }
+
+    return true;
+}
+
+bool ChessController::moveByUiIndex(int startUiIndex,
+                                    int stopUiIndex,
+                                    Move& chosenMove,
+                                    QChar promotionSuffix)
+{
     const int originSquare = uiIndexToSquare(startUiIndex);
     const int destinationSquare = uiIndexToSquare(stopUiIndex);
 
@@ -185,89 +280,71 @@ bool ChessController::moveByUiSquares(int startUiIndex, int stopUiIndex)
         return false;
     }
 
-    const bool isWhitePiece = piece.startsWith("w");
+    const bool isWhitePiece = piece.isUpper();;
     if ((isWhitePiece && m_board->getColorToPlay() != WHITE) || (!isWhitePiece && m_board->getColorToPlay() != BLACK))
     {
-        m_status = "Select your own piece";
-        Q_EMIT statusChanged();
+        setStatus("OWN_PIECE_SELECTED");
         return false;
     }
 
-    Move chosenMove;
-    if (!tryFindLegalMove(originSquare, destinationSquare, chosenMove))
+    if (!tryFindLegalMove(originSquare, destinationSquare, chosenMove, promotionSuffix))
     {
-        Q_EMIT boardChanged();
         return false;
     }
 
     m_board->executeMove(chosenMove);
-    m_moveHistory.append(QString::fromStdString(chosenMove.toShortString()));
-    Q_EMIT moveHistoryChanged();
+//    m_moveHistory.push_back(chosenMove);
     clearSelection();
-    refreshBoardModel();
-    refreshCheckState();
-    Q_EMIT sideToMoveChanged();
+    updateBoard();
 
     const QString resultAfterPlayer = buildResultText();
     if (!resultAfterPlayer.isEmpty())
     {
-        m_status = resultAfterPlayer;
-        Q_EMIT statusChanged();
-        Q_EMIT boardChanged();
-        return true;
+        setStatus(resultAfterPlayer);
     }
-
-    playEngineMove();
     return true;
 }
 
-bool ChessController::moveByCoordinates(const QString& startSquare, const QString& stopSquare)
+bool ChessController::isValidMoveByCoordinates(const QString& startSquare,
+                                        const QString& stopSquare,
+                                        Move& chosenMove,
+                                        QChar promotionSuffix)
 {
     int startUiIndex = -1;
+    printf("[%s] L[%d] from[%s] to[%s] promotionSuffix[%c]\r\n",
+           __FUNCTION__,__LINE__,
+           startSquare.toStdString().c_str(),
+           stopSquare.toStdString().c_str(),
+           promotionSuffix.toLatin1());
     if (!tryParseCoordinate(startSquare, startUiIndex))
     {
-        m_status = "Invalid coordinate";
-        Q_EMIT statusChanged();
+        printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
         return false;
     }
 
     const QString stopTrimmed = stopSquare.trimmed().toLower();
     if (stopTrimmed.size() != 2 && stopTrimmed.size() != 3)
     {
-        m_status = "Invalid coordinate";
-        Q_EMIT statusChanged();
+        printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
         return false;
     }
 
     int stopUiIndex = -1;
     if (!tryParseCoordinate(stopTrimmed.left(2), stopUiIndex))
     {
-        m_status = "Invalid coordinate";
-        Q_EMIT statusChanged();
+        printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
         return false;
-    }
-
-    QChar promotionSuffix;
-    if (stopTrimmed.size() == 3)
-    {
-        promotionSuffix = stopTrimmed.at(2);
-        if (promotionSuffix != 'q' && promotionSuffix != 'r' && promotionSuffix != 'b' && promotionSuffix != 'n')
-        {
-            m_status = "Invalid promotion piece";
-            Q_EMIT statusChanged();
-            return false;
-        }
     }
 
     if (startUiIndex < 0 || startUiIndex >= 64 || stopUiIndex < 0 || stopUiIndex >= 64)
     {
+        printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
         return false;
     }
 
     if (m_promotionPending)
     {
-        m_status = "Promotion pending";
-        Q_EMIT statusChanged();
+        printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
         return false;
     }
 
@@ -277,49 +354,102 @@ bool ChessController::moveByCoordinates(const QString& startSquare, const QStrin
     const QString piece = pieceCodeAtSquare(originSquare);
     if (piece.isEmpty())
     {
+        printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
         return false;
     }
 
-    const bool isWhitePiece = piece.startsWith("w");
+    const bool isWhitePiece = piece.isUpper();
     if ((isWhitePiece && m_board->getColorToPlay() != WHITE) || (!isWhitePiece && m_board->getColorToPlay() != BLACK))
     {
-        m_status = "Select your own piece";
-        Q_EMIT statusChanged();
+        printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
         return false;
     }
 
-    Move chosenMove;
-    if (!tryFindLegalMove(originSquare, destinationSquare, chosenMove, promotionSuffix))
+    // check if the move is legal
+    MoveGen moveGen(m_board);
+    const auto legalMoves = moveGen.generateMoves();
+
+    m_pendingPromotionMoves.clear();
+    bool hasMatchingPromotion = false;
+
+    for (const Move& move : legalMoves)
     {
-        Q_EMIT boardChanged();
+        if (move.getOrigin() == originSquare && move.getDestination() == destinationSquare)
+        {
+            if (move.isPromotion())
+            {
+                hasMatchingPromotion = true;
+                printf("[%s] L[%d] hasMatchingPromotion\r\n",__FUNCTION__,__LINE__);
+                if (!promotionSuffix.isNull())
+                {
+                    const QString moveText = QString::fromStdString(move.toShortString());
+                    printf("[%s] L[%d] moveText[%s]\r\n",
+                           __FUNCTION__,__LINE__,moveText.toStdString().c_str());
+                    if (moveText.endsWith(promotionSuffix))
+                    {
+                        chosenMove = move;
+                        return true;
+                    }
+                }
+                else
+                {
+                    m_pendingPromotionMoves.push_back(move);
+                }
+            }
+            else
+            {
+                chosenMove = move;
+                return true;
+            }
+        }
+    }
+    printf("[%s] L[%d]\r\n",__FUNCTION__,__LINE__);
+    return false;
+}
+
+bool ChessController::moveByCoordinates(const QString& startSquare,
+                                        const QString& stopSquare,
+                                        Move& chosenMove,
+                                        QChar promotionSuffix)
+{
+    int startUiIndex = -1;
+    if (!tryParseCoordinate(startSquare, startUiIndex))
+    {
+        setStatus("INVALID_COORDINATE");
         return false;
     }
 
-    m_board->executeMove(chosenMove);
-    m_moveHistory.append(QString::fromStdString(chosenMove.toShortString()));
-    Q_EMIT moveHistoryChanged();
-    clearSelection();
-    refreshBoardModel();
-    refreshCheckState();
-    Q_EMIT sideToMoveChanged();
-
-    const QString resultAfterPlayer = buildResultText();
-    if (!resultAfterPlayer.isEmpty())
+    const QString stopTrimmed = stopSquare.trimmed().toLower();
+    if (stopTrimmed.size() != 2 && stopTrimmed.size() != 3)
     {
-        m_status = resultAfterPlayer;
-        Q_EMIT statusChanged();
-        Q_EMIT boardChanged();
-        return true;
+        setStatus("INVALID_COORDINATE");
+        return false;
     }
 
-    playEngineMove();
-    return true;
+    int stopUiIndex = -1;
+    if (!tryParseCoordinate(stopTrimmed.left(2), stopUiIndex))
+    {
+        setStatus("INVALID_COORDINATE");
+        return false;
+    }
+
+    if (startUiIndex < 0 || startUiIndex >= 64 || stopUiIndex < 0 || stopUiIndex >= 64)
+    {
+        return false;
+    }
+
+    if (m_promotionPending)
+    {
+        setStatus("PROTOMTION_PENDING");
+        return false;
+    }
+    return moveByUiIndex(startUiIndex,stopUiIndex,chosenMove,promotionSuffix);
 }
 
 QStringList ChessController::findBestMoveCoordinates() const
 {
     Search search(m_board);
-    search.negaMaxRoot(m_engineDepth);
+    search.negaMaxRoot(m_engineElo/500);
 
     const QString bestMoveText = QString::fromStdString(Utils::Move16ToShortString(search.myBestMove));
     if (bestMoveText.size() < 4)
@@ -376,30 +506,26 @@ void ChessController::choosePromotion(const QString& pieceLetter)
 
     if (!found)
     {
-        m_status = "Promotion selection failed";
-        Q_EMIT statusChanged();
+        setStatus("PROMOTION_SELECTION_FAILED");
         return;
     }
 
     m_board->executeMove(chosenMove);
-    m_moveHistory.append(QString::fromStdString(chosenMove.toShortString()));
-    Q_EMIT moveHistoryChanged();
+//    m_moveHistory.push_back(chosenMove);
     clearSelection();
-    refreshBoardModel();
-    refreshCheckState();
-    Q_EMIT sideToMoveChanged();
+    updateBoard();
 
     const QString resultAfterPlayer = buildResultText();
     if (!resultAfterPlayer.isEmpty())
     {
-        m_status = resultAfterPlayer;
-        Q_EMIT statusChanged();
-        Q_EMIT boardChanged();
-        return;
+        setStatus(resultAfterPlayer);
     }
+}
 
-    playEngineMove();
-    Q_EMIT boardChanged();
+void ChessController::cancelPromotion()
+{
+    m_promotionPending = false;
+    m_pendingPromotionMoves.clear();
 }
 
 void ChessController::refreshBoardModel()
@@ -410,7 +536,8 @@ void ChessController::refreshBoardModel()
         m_boardModel.append(pieceCodeAtSquare(uiIndexToSquare(uiIndex)));
     }
 
-    Q_EMIT boardChanged();
+    QStringList boardModelEmit(m_boardModel);
+    Q_EMIT boardChanged(boardModelEmit);
 }
 
 void ChessController::refreshSelectionMoves()
@@ -458,35 +585,96 @@ void ChessController::clearSelection()
 
 void ChessController::playEngineMove()
 {
+    qDebug("ChessController::playEngineMove m_engineDepth[%d]",m_engineElo/500);
+    bool foundBestMove = false;
+    Move chosenMove;
     Search search(m_board);
-    search.negaMaxRoot(m_engineDepth);
-
-    const QString bestMoveText = QString::fromStdString(Utils::Move16ToShortString(search.myBestMove));
-
-    MoveGen moveGen(m_board);
-    const auto legalMoves = moveGen.generateMoves();
-    for (Move move : legalMoves)
-    {
-        if (QString::fromStdString(move.toShortString()) == bestMoveText)
-        {
-            m_board->executeMove(move);
-            m_moveHistory.append(bestMoveText);
-            Q_EMIT moveHistoryChanged();
-            refreshBoardModel();
-            refreshCheckState();
-            Q_EMIT sideToMoveChanged();
-
-            const QString result = buildResultText();
-            m_status = result.isEmpty() ? QString("Engine played ") + bestMoveText : result;
-            Q_EMIT statusChanged();
-            return;
+    search.negaMaxRoot(m_engineElo/500);
+    Move bestMove = search.myBestMove;
+    qDebug("ChessController::playEngineMove bestmove %s",
+           bestMove.toShortString().c_str());
+    if (tryFindLegalMove(bestMove.getOrigin(), bestMove.getDestination(), chosenMove)) {
+        foundBestMove = true;
+    } else if(m_promotionPending) {
+        chosenMove = bestMove;
+        foundBestMove = true;
+        m_promotionPending = false;
+    } else {
+        MoveGen moveGen(m_board);
+        std::vector<Move> moveList = moveGen.generateMoves();
+        if(moveList.size() > 0) {
+            int randomMove = rand()%moveList.size();
+            if(randomMove < 0) randomMove = 0;
+            qDebug("ChessController::playEngineMove random move %s",
+                   moveList[randomMove].toShortString().c_str());
+            if (tryFindLegalMove(moveList[randomMove].getOrigin(), moveList[randomMove].getDestination(), chosenMove)) {
+                foundBestMove = true;
+            }
         }
     }
-
-    m_status = "No legal engine move";
-    Q_EMIT statusChanged();
+    if(foundBestMove) {
+        m_botMove = chosenMove;
+        m_board->executeMove(chosenMove);
+        qDebug("ChessController::playEngineMove execute bot move done");
+        updateBoard();
+        qDebug("ChessController::playEngineMove playEngineMove done");
+    } else {
+        setStatus("NO_LEGAL_ENGINE_MOVE_FOUND");
+    }
 }
 
+QString ChessController::convertPieceText(QString pieceShortName)
+{
+    if (pieceShortName == "P") return "White Pawn";
+    else if (pieceShortName == "N") return "White Knight";
+    else if (pieceShortName == "B") return "White Bishop";
+    else if (pieceShortName == "R") return "White Rook";
+    else if (pieceShortName == "Q") return "White Queen";
+    else if (pieceShortName == "K") return "White King";
+    else if (pieceShortName == "p") return "Black Pawn";
+    else if (pieceShortName == "n") return "Black Knight";
+    else if (pieceShortName == "b") return "Black Bishop";
+    else if (pieceShortName == "r") return "Black Rook";
+    else if (pieceShortName == "Q") return "Black Queen";
+    else if (pieceShortName == "k") return "Black King";
+    else if (pieceShortName == ".") return "Empty Square";
+    else return "Unknown Piece ID";
+}
+
+QString ChessController::pieceType(QString square)
+{
+    int uiIndex = -1;
+    if(!tryParseCoordinate(square,uiIndex)) return "Unknown Piece ID";
+    if (uiIndex < 0 || uiIndex >= 64)
+    {
+        return "";
+    }
+    int squareIndex = uiIndexToSquare(uiIndex);
+    QString piece = pieceCodeAtSquare(squareIndex);
+    QString pieceName =  convertPieceText(piece);
+    return pieceName;
+}
+
+QString ChessController::extractFEN()
+{
+    return QString::fromStdString(m_board->extractFen());
+}
+
+bool ChessController::isFENValid(std::string fenString)
+{
+    return m_board->isValidFEN(fenString);
+}
+
+bool ChessController::areFENPositionsEqualDefault(const std::string& fen)
+{
+    const std::string& fenCompare = m_board->extractFen();
+    // Extract the substring up to the first space for both FENs
+    std::string pos1 = fen.substr(0, fen.find(' '));
+    std::string pos2 = fenCompare.substr(0, fenCompare.find(' '));
+
+    // Directly compare the piece placement substrings
+    return pos1 == pos2;
+}
 bool ChessController::tryFindLegalMove(int originSquare, int destinationSquare, Move& outMove, QChar promotionSuffix)
 {
     MoveGen moveGen(m_board);
@@ -526,17 +714,15 @@ bool ChessController::tryFindLegalMove(int originSquare, int destinationSquare, 
 
     if (!promotionSuffix.isNull() && hasMatchingPromotion)
     {
-        m_status = "Invalid promotion piece for move";
-        Q_EMIT statusChanged();
+        setStatus("INVALID_PROMOTION_PIECE_FOR_MOVE");
         return false;
     }
 
     if (!m_pendingPromotionMoves.empty())
     {
         m_promotionPending = true;
-        m_status = "Choose promotion piece";
         Q_EMIT promotionPendingChanged();
-        Q_EMIT statusChanged();
+        setStatus("CHOOSE_PROMOTION_PIECE");
         return false;
     }
 
@@ -547,21 +733,21 @@ QString ChessController::pieceCodeAtSquare(int square) const
 {
     const U64 mask = 1ULL << square;
 
-    if (m_board->getWhitePawns() & mask) return "wP";
-    if (m_board->getWhiteKnights() & mask) return "wN";
-    if (m_board->getWhiteBishops() & mask) return "wB";
-    if (m_board->getWhiteRooks() & mask) return "wR";
-    if (m_board->getWhiteQueens() & mask) return "wQ";
-    if (m_board->getWhiteKing() & mask) return "wK";
+    if (m_board->getWhitePawns() & mask) return "P";
+    if (m_board->getWhiteKnights() & mask) return "N";
+    if (m_board->getWhiteBishops() & mask) return "B";
+    if (m_board->getWhiteRooks() & mask) return "R";
+    if (m_board->getWhiteQueens() & mask) return "Q";
+    if (m_board->getWhiteKing() & mask) return "K";
 
-    if (m_board->getBlackPawns() & mask) return "bP";
-    if (m_board->getBlackKnights() & mask) return "bN";
-    if (m_board->getBlackBishops() & mask) return "bB";
-    if (m_board->getBlackRooks() & mask) return "bR";
-    if (m_board->getBlackQueens() & mask) return "bQ";
-    if (m_board->getBlackKing() & mask) return "bK";
+    if (m_board->getBlackPawns() & mask) return "p";
+    if (m_board->getBlackKnights() & mask) return "n";
+    if (m_board->getBlackBishops() & mask) return "b";
+    if (m_board->getBlackRooks() & mask) return "r";
+    if (m_board->getBlackQueens() & mask) return "q";
+    if (m_board->getBlackKing() & mask) return "k";
 
-    return "";
+    return ".";
 }
 
 QString ChessController::buildResultText() const
@@ -577,6 +763,12 @@ QString ChessController::buildResultText() const
             return m_board->getColorToPlay() == WHITE ? "BLACK_WIN" : "WHITE_WIN";
         }
         return "DRAW_STALEMATE";
+    } else {
+        m_board->updateKingAttackers();
+        if (m_board->isCheck())
+        {
+            return m_board->getColorToPlay() == WHITE ? "BLACK_CHECK" : "WHITE_CHECK";
+        }
     }
 
     Search search(m_board);
@@ -586,6 +778,11 @@ QString ChessController::buildResultText() const
     }
 
     return "";
+}
+
+Move ChessController::botMove() const
+{
+    return m_botMove;
 }
 
 int ChessController::uiIndexToSquare(int uiIndex)
@@ -604,6 +801,35 @@ int ChessController::squareToUiIndex(int square)
     return rankFromTop * 8 + file;
 }
 
+QString ChessController::uiIndexToPieceType(int uiIndex)
+{
+    int squareIndex = uiIndexToSquare(m_playerColor == Color::WHITE?uiIndex:63-uiIndex);
+    QString piece = pieceCodeAtSquare(squareIndex);
+    QString pieceName = convertPieceText(piece);
+    return pieceName;
+}
+
+QString ChessController::uiIndexToSquareNotation(int uiIndex)
+{
+    int squareIndex = uiIndexToSquare(uiIndex);
+    return QString::fromStdString(coordToNotation(squareIndex));
+}
+
+std::string ChessController::coordToNotation(int squareIndex)
+{
+    int row = squareIndex/8;
+    int col = squareIndex%8;
+    if (row < 0 || row > 7 || col < 0 || col > 7) return "";
+    char file, rank;
+    if (m_playerColor == Color::WHITE) {
+        file = 'a' + col;
+        rank = '1' + row;
+    } else { // black at bottom
+        file = 'h' - col;
+        rank = '8' - row;
+    }
+    return std::string(1, file) + std::string(1, rank);
+}
 bool ChessController::tryParseCoordinate(const QString& coordinate, int& uiIndex)
 {
     const QString trimmed = coordinate.trimmed().toLower();
@@ -625,3 +851,46 @@ bool ChessController::tryParseCoordinate(const QString& coordinate, int& uiIndex
     uiIndex = squareToUiIndex(square);
     return true;
 }
+
+QString ChessController::processRobotCommentary(const QString fen, const int color,
+                                                const QString pieceType, const QString pieceNotation,
+                                                Move playerMove) {
+    std::shared_ptr<Board> cloneBoard = std::make_shared<Board>(fen.toStdString());
+    Eval eval(cloneBoard);
+    // 1. Get score before execution
+    int scoreBefore = eval.evaluate();
+
+    // 2. Play the move using Deepov's internal transition function
+    cloneBoard->executeMove(playerMove);
+    int scoreAfter = eval.evaluate();
+
+    // 4. Score drop calculation (Delta)
+    // Note: Since turn flipped, adjust delta relative to who just moved
+    std::cout << "scoreBefore: " << scoreBefore << " scoreAfter:" << scoreAfter << std::endl;
+    QString speechText = "";
+    QString moveNotation = pieceType+" to "+pieceNotation + " ";
+    // Seed random selection
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
+
+    // 5. Categorize score change
+//    int delta = scoreAfter - scoreBefore;
+//    if (delta >= 15) { // Loss of 1 whole pawn or more
+//        speechText = BLUNDER_PHRASES[std::rand() % BLUNDER_PHRASES.size()];
+//    }
+//    else if (delta >= 3) { // Slight loss of positional advantage
+//        speechText = MISTAKE_PHRASES[std::rand() % MISTAKE_PHRASES.size()];
+//    }
+//    else if (delta <= 15) { // Huge unexpected strategic gain
+//        speechText = BRILLIANT_PHRASES[std::rand() % BRILLIANT_PHRASES.size()];
+//    }
+//    else
+    { // Safe, standard development choice
+        speechText = moveNotation + GOOD_PHRASES[std::rand() % GOOD_PHRASES.size()];
+    }
+
+    // 6. Direct command execution to offline Text-to-Speech Engine
+    std::cout << "[Robot Voice Engine]: " << speechText.toStdString() << std::endl;
+
+    return speechText;
+}
+

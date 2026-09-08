@@ -1,3 +1,4 @@
+
 #include "src/ApplicationArduino.h"
 #include "src/SAL/Robot.h"
 extern ApplicationArduino app;
@@ -6,7 +7,6 @@ void setup() {
   Serial.println("======Arduino Serial======");
   app.printf("APP Arduino Init done\r\n");
   delay(100);
-  app.initHardwareTimer(TIMER_ID_CHECK_COMMAND, 100.0f);
   // delay(2900);
   // app.enableEngine(true);
   // int jointSteps[MAX_MOTOR] = {0,1200,273,0,0,0};
@@ -20,7 +20,7 @@ void setup() {
   //   app.executeSmoothMotionLoop(MOTOR_ARM2);
   //   app.executeSmoothMotionLoop(MOTOR_ARM5);
   //   app.executeSmoothMotionLoop(MOTOR_CAPTURE);
-  //   endTime = micros();
+  //   endTime = micros(); 
   //   duration = endTime - startTime;
   //   // if(duration > 500) {
   //   //   Serial.print("i[");
@@ -35,5 +35,5 @@ void setup() {
 }
 void loop() {
   app.loop();
-  delay(1);
+  delay(30);
 }

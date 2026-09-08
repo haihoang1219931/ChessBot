@@ -1,7 +1,9 @@
 #include "SmoothMotion.h"
 #include "Robot.h"
+#if defined(DEBUG_COMMAND)
 #include "../ApplicationArduino.h"
 extern ApplicationArduino app;
+#endif
 SmoothMotion::SmoothMotion(uint8_t id, Robot* robot):
   m_robot(robot),
   m_id(id),
@@ -33,6 +35,7 @@ void SmoothMotion::setupTarget(
   resetCruiseSteps();
   resetDecelSteps();
   changeStateControl(m_moveType);
+#if defined(DEBUG_COMMAND)
   app.printf("Setup target M[%d]",m_id);
   app.printf(" stepsAccel=%d", (int)m_numStepAccel);
   app.printf(" stepsCruise=%d", (int)m_numStepCruise);
@@ -41,6 +44,7 @@ void SmoothMotion::setupTarget(
   app.printf(" moveType=%d", (int)m_moveType);
   app.printf(" m_numWaitPulse=%d", (int)m_numWaitPulse);
   app.printf(" minWaitPulse=%d\r\n", (int)m_minWaitPulse);
+#endif
 }
 // #define DEBUG_COUNT_STEP
 float SmoothMotion::delayAccel(float stepCount, float delayCur) {
@@ -144,6 +148,11 @@ void SmoothMotion::cruiseSpeed() {
 }
 
 void SmoothMotion::decreaseSpeed() {
+#ifdef DEBUG_COUNT_STEP
+  app.printf(" M[%d]", m_id);
+  app.printf(" Decel stepCount=%d", m_stepCountDecel);
+  app.printf(" delay=%d\r\n", (int)m_numWaitPulse);
+#endif
   if(m_stepCountDecel >= m_numStepDecel) {
     changeStateControl(MOTOR_EXECUTE_DONE);
     return;

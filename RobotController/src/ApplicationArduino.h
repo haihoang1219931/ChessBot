@@ -10,9 +10,8 @@ typedef enum {
 } TIMER_ID;
 typedef enum {
   STATE_CHECK_SENSOR,
-  STATE_SET_DIR,
-  STATE_GO_HOME,
-  STATE_GO_TO_TARGET,
+  STATE_GO_TO_HOME,
+  STATE_GO_TO_MAX_POSITION,
   STATE_HOME_DONE,
 } STATE_HOMING;
 
@@ -22,8 +21,8 @@ public:
 	ApplicationArduino();
   ~ApplicationArduino();
   void initRobot() override;
-  void specificPlatformGohome(int motorID = MAX_MOTOR) override;
-  void harwareStop(int motorID = MAX_MOTOR) override;
+  void specificPlatformGohome(int motorID = MAX_MOTOR, bool stopOtherStepper = true) override;
+  void hardwareStop(int motorID = MAX_MOTOR) override;
   void checkInput() override;
   int printf(const char *fmt, ...) override;
   void msleep(int millis) override;
@@ -39,7 +38,7 @@ public:
   void resetPulse(int motorID) override;
   uint8_t executePulseStepper2Wires(uint8_t statePulse, uint32_t countPulse, uint32_t numWaitPulse, volatile uint8_t* portRegister, int bit);
   void initHardwareTimer(int timerID, float samplerate = 40000.0f);
-  int16_t readA13();
+
 private:
   va_list m_args;
   char m_buffer[256];    
@@ -47,6 +46,7 @@ private:
   uint8_t m_incomingByte;
   // uint8_t m_buttonPin[MAX_BUTTON];
   int16_t m_limitGripperValue;
+
 };
 
 #endif // APPLICATIONARDUINO_H

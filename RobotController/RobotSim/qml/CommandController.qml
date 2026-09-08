@@ -116,7 +116,7 @@ Item {
                             id: txtRawCommand
                             width: 200
                             height: 40
-                            text: "p0 0050 0001 a"
+                            text: "pm6273b71p71p71"
                         }
 
                         Button {
@@ -388,8 +388,8 @@ Item {
                             id: sldArmAngle
                             width: 300
                             height: 40
-                            from: 0
-                            to: 45
+                            from: -45
+                            to: 0
                         }
                         Label {
                             width: 40

@@ -91,6 +91,7 @@ typedef enum{
     ROBOT_EXECUTE_GO_HOME,
     ROBOT_EXECUTE_POSITION,
     ROBOT_EXECUTE_SEQUENCE,
+    ROBOT_STOP_MOTORS,
     ROBOT_EXECUTE_DONE,
 }ROBOT_STATE;
 
@@ -109,6 +110,8 @@ typedef enum {
     MACHINE_EXECUTE_HOME,
     MACHINE_EXECUTE_POSITION,
     MACHINE_EXECUTE_POSITION_STANDBY,
+    MACHINE_EXECUTE_POSITION_HOME_TO_CALIB,
+    MACHINE_EXECUTE_TEST,
     MACHINE_EXECUTE_COMMAND,
     MACHINE_EXECUTE_COMMAND_DONE,
 }MACHINE_STATE;
@@ -119,6 +122,7 @@ typedef enum {
 }MOTION_SPACES;
 
 typedef enum {
+    MOVE_TEST,
     MOVE_NORMAL,
     MOVE_ATTACK,
     MOVE_PASTPAWN,
@@ -157,12 +161,36 @@ typedef enum {
     CALIB_SEQUENCE_STATE_DONE,
 }CALIB_SEQUENCE_STATE;
 
+typedef enum {
+    COMMAND_STANDBY_INIT,
+    COMMAND_STANDBY_EXECUTE,
+    COMMAND_STANDBY_PREDONE,
+    COMMAND_STANDBY_DONE,
+}COMMAND_STANDBY_STATE;
+
+typedef enum {
+    COMMAND_HOME_TO_CALIB_INIT,
+    COMMAND_HOME_TO_CALIB_PHASE1,
+    COMMAND_HOME_TO_CALIB_PHASE2,
+    COMMAND_HOME_TO_CALIB_DONE,
+}COMMAND_HOME_TO_CALIB_STATE;
+
 typedef struct{
     float x;
     float y;
     float z;
     bool calibbed;
 }Point;
+
+typedef struct{
+    int rowID;
+    int colID;
+    int zoneType;
+    Point location;
+    bool valid;
+}DropPoint;
+
+
 
 typedef struct {
     double length;
