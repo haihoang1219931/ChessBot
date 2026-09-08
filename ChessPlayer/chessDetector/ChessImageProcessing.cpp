@@ -883,7 +883,7 @@ void ChessImageProcessing::checkPieceColor(const cv::Mat& imageRGB,
     std::string pieceColor = "unknown";
     if(grayPixels > 3 * goldPixels / 2 && grayPixels > 1500) pieceColor = "black";
     else if((goldPixels > 3 * grayPixels / 2 && goldPixels > 1500) ||
-            goldPixels > 5000) {
+            goldPixels > 2000) {
         pieceColor = "white";
         pieceClass.className = std::toupper(pieceClass.className);
     } else if(goldPixels + grayPixels < 2000){
@@ -1544,7 +1544,7 @@ bool ChessImageProcessing::isCastleMove(const cv::Mat& warpedGray1, const cv::Ma
 bool ChessImageProcessing::isCastleMove(char* prevBoard, char* currBoard,
                                         cv::Point& startCell, cv::Point& endCell,
                                         bool whiteMove) {
-    int r = whiteMove?0:7;
+    int r = 0;
     startCell.x = -1;
     startCell.y = -1;
     endCell.x = -1;
@@ -1915,7 +1915,7 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
 
 #ifdef DEBUG_ROI
     cv::Mat scaledWarped;
-    cv::resize(warpedBoard, scaledWarped, cv::Size(WARP_SMALL_WIDTH, WARP_SMALL_HEIGHT), 0, 0, cv::INTER_NEAREST);
+    cv::resize(warpedBoard,scaledWarped, cv::Size(WARP_SMALL_WIDTH, WARP_SMALL_HEIGHT), 0, 0, cv::INTER_NEAREST);
     cv::imshow("classification", scaledWarped);
 #endif
 
@@ -2069,12 +2069,12 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
     std::vector<cv::Point> listStartCell;
     std::vector<cv::Point> listChangedCell;
     // 1. Check board status
-//    cv::Mat warpImage;
-//    cv::Mat homographyMatrix = getFullTranformMatrix();
-//    cv::Mat warpedBoard;
-//    cv::warpPerspective(imgCurrent, warpedBoard, homographyMatrix, cv::Size(WARP_WIDTH, WARP_HEIGHT));
-//    printf("warpedBoard[%dx%d]\r\n",warpedBoard.cols,warpedBoard.rows);
-//    classsifyChessBoardImage(warpedBoard);
+    cv::Mat warpImage;
+    cv::Mat homographyMatrix = getFullTranformMatrix();
+    cv::Mat warpedBoard;
+    cv::warpPerspective(imgCurrent, warpedBoard, homographyMatrix, cv::Size(WARP_WIDTH, WARP_HEIGHT));
+    printf("warpedBoard[%dx%d]\r\n",warpedBoard.cols,warpedBoard.rows);
+    classsifyChessBoardImage(warpedBoard);
     char currentBoard[NUM_ROW][NUM_ROW];
     char convertedPrevBoard[NUM_ROW][NUM_ROW];
     for(int row = 0; row < NUM_ROW; row++) {

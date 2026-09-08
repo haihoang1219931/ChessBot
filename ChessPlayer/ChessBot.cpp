@@ -1402,8 +1402,8 @@ bool ChessBot::saveCalibrationData(QString fileName)
 
     // 1. Store ai models
     QJsonObject childrenObj;
-    childrenObj["chess_detector"] = "";
-    childrenObj["class_list"] = "";
+    childrenObj["chess_detector"] = "chess_piece_resnet18_20260828_100epoch.onnx";
+    childrenObj["class_list"] = "b,.,k,n,p,q,r";
     childrenObj["voice_detector"] = "";
     childrenObj["speaker"] = "";
 
