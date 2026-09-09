@@ -1766,17 +1766,19 @@ ClassificationResult ChessImageProcessing::classifyImage(const cv::Mat& input_ma
     return result;
 }
 
-void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) {
+void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard,
+    int targetWidth, int targetHeight, int channels) {
     int cellSize = CELL_SIZE;
-    printf("classsifyChessBoardImage (BATCH INF MODE ACTIVE):\r\n");
+    printf("classsifyChessBoardImage (BATCH INF MODE: %dx%d, %d Channel(s)):\r\n", targetWidth, targetHeight, channels);
     auto start = std::chrono::steady_clock::now();
+
     // Pre-allocate containers to eliminate memory thrashing inside the core loop
     std::vector<cv::Mat> batchImages;
     std::vector<std::pair<int, int>> validCellPositions; // Stores tracking mappings: {row, col}
     batchImages.reserve(NUM_ROW * NUM_COL);
     validCellPositions.reserve(NUM_ROW * NUM_COL);
 
-    // Phase 1: Rapidly parse coordinates and batch process structural cells
+    // Phase 1: Rapidly parse coordinates and preprocess structural cells
     for(int row = 0; row < NUM_ROW; row++) {
         for(int col = 0; col < NUM_COL; col++) {
             if(m_mapExcludedCell[row][col] == 0) {
@@ -1796,9 +1798,23 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
             if (cropY + cropH > warpedBoard.rows) cropH = warpedBoard.rows - cropY;
 
             cv::Rect tallCellROI(cropX, cropY, cropW, cropH);
+            cv::Mat croppedCellBGR = warpedBoard(tallCellROI);
+            cv::Mat preparedCell;
 
-            // Collect references safely without forcing local copies
-            batchImages.push_back(warpedBoard(tallCellROI));
+            // Handle channel mapping dynamically based on input parameter
+            if (channels == 1) {
+                // Convert 3-channel BGR to 1-channel Grayscale
+                cv::cvtColor(croppedCellBGR, preparedCell, cv::COLOR_BGR2GRAY);
+            } else if (channels == 3) {
+                // Keep original BGR channels (blobFromImages will handle the RGB swap later)
+                preparedCell = croppedCellBGR;
+            } else {
+                std::cerr << "Error: Supported channels configuration are 1 or 3. Received: " << channels << "\n";
+                return;
+            }
+
+            // Collect processed references safely
+            batchImages.push_back(preparedCell);
             validCellPositions.push_back({row, col});
         }
     }
@@ -1810,28 +1826,40 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
     }
 
     // Phase 2: Create a 4D Tensor Batch Blob using 'blobFromImages'
-    cv::Size target_size(240, 240);
-    double scale_factor = 1.0 / 255.0;
-    cv::Scalar mean(0.485 * 255.0, 0.456 * 255.0, 0.406 * 255.0);
-    cv::Scalar std_dev(0.229, 0.224, 0.225);
+    cv::Size target_size(targetWidth, targetHeight);
+    double scale_factor = 1.0 / 255.0; // Scale pixels to [0.0, 1.0]
 
     cv::Mat batchBlob;
-    cv::dnn::blobFromImages(
-        batchImages,
-        batchBlob,
-        scale_factor,
-        target_size,
-        mean,
-        true,  // swapRB = true (Converts BGR to RGB)
-        false  // crop = false
-    );
+    bool swapChannels = (channels == 3); // Swap R and B channels only if we are feeding a 3-channel model
 
-    // Apply standard deviation correction across the 4D blob matrix elements
-    cv::divide(batchBlob, std_dev, batchBlob);
+    if (channels == 1) {
+        // Grayscale 1-channel custom weights normalization parity: (pixel - 127.5) * (1/255) / 0.5
+        cv::Scalar mean_grayscale(127.5);
+        double std_dev_grayscale = 0.5;
+
+        cv::dnn::blobFromImages(
+            batchImages, batchBlob, scale_factor, target_size,
+            mean_grayscale, swapChannels, false
+        );
+        cv::divide(batchBlob, std_dev_grayscale, batchBlob);
+
+    } else {
+        // Legacy Multi-channel standard ImageNet weights normalization parity:
+        // PyTorch applies: (pixel / 255.0 - mean) / std.
+        // OpenCV subtracts the raw mean BEFORE applying scale_factor, so raw_mean = target_mean * 255.0
+        cv::Scalar mean_rgb(0.485 * 255.0, 0.456 * 255.0, 0.406 * 255.0);
+        cv::Scalar std_dev_rgb(0.229, 0.224, 0.225);
+
+        cv::dnn::blobFromImages(
+            batchImages, batchBlob, scale_factor, target_size,
+            mean_rgb, swapChannels, false
+        );
+        cv::divide(batchBlob, std_dev_rgb, batchBlob);
+    }
 
     // Phase 3: Execute full batch processing in a single forward pass
-    m_dnnNetAllPieces.setInput(batchBlob);
-    cv::Mat outputs = m_dnnNetAllPieces.forward(); // Output matrix size: [totalValidPieces x num_classes]
+    m_dnnNetAllPieces.setInput(batchBlob, "input"); // "input" explicitly maps to the layer name set in torch.onnx.export
+    cv::Mat outputs = m_dnnNetAllPieces.forward("output"); // "output" matches your exported ONNX configuration graph node
 
     int num_classes = outputs.cols;
 
@@ -1839,7 +1867,13 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
     for (size_t i = 0; i < totalValidPieces; ++i) {
         int row = validCellPositions[i].first;
         int col = validCellPositions[i].second;
-        cv::Mat croppedCell = batchImages[i];
+
+        // Re-extract the local BGR crop version purely for your legacy checkPieceColor overlay function
+        int cropX = col * cellSize;
+        int cropY = row * cellSize;
+        cv::Rect tallCellROI(cropX, cropY, cellSize, cellSize);
+        tallCellROI &= cv::Rect(0, 0, warpedBoard.cols, warpedBoard.rows);
+        cv::Mat croppedCellBGR = warpedBoard(tallCellROI);
 
         // Fetch scores vector array pointer for item 'i'
         float* data_ptr = outputs.ptr<float>(static_cast<int>(i));
@@ -1881,32 +1915,26 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
         piece.className2 = m_dnnAllPiecesNames[predicted2_idx];
         piece.probability2 = max2_prob * 100.0f;
 
-        // Execute background color checks locally
-        checkPieceColor(croppedCell, piece, row, col);
+        // Execute background color checks locally (Uses original color matrix mapping rules)
+        checkPieceColor(croppedCellBGR, piece, row, col);
         m_mapClassifiedCell[row][col] = piece.className;
 
-        // CRITICAL NOTE: Debug I/O commands ('cv::imwrite') removed from main loop logic
-        // to prevent hard-disk read/write latency throttling. Only run when forced.
 #ifdef DEBUG_ROI
-        int cropX = col * cellSize;
-        int cropY = row * cellSize;
-        cv::Rect tallCellROI(cropX, cropY, croppedCell.cols, croppedCell.rows);
-        cv::rectangle(warpedBoard,tallCellROI,cv::Scalar(0,255,255),2);
-        cv::putText(warpedBoard,std::string{piece.className} + " :" +std::to_string((int)piece.probability),
-                    cv::Point(cropX + 20,cropY+ 60),
-                     cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
-        cv::putText(warpedBoard,std::string{piece.className2} + " :" +std::to_string((int)piece.probability2),
-                    cv::Point(cropX + 20,cropY+ 90),
-                     cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+        cv::rectangle(warpedBoard, tallCellROI, cv::Scalar(0,255,255), 2);
+        cv::putText(warpedBoard, std::string{piece.className} + ":" + std::to_string((int)piece.probability),
+                    cv::Point(cropX + 0, cropY + 30),
+                    cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+        cv::putText(warpedBoard, std::string{piece.className2} + ":" + std::to_string((int)piece.probability2),
+                    cv::Point(cropX + 0, cropY + 60),
+                    cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
         cv::putText(warpedBoard,
-                    "Gray: "+std::to_string(piece.grayPixels),
-                    cv::Point(cropX + 20,cropY+ 120),
-                     cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+                    "GR:" + std::to_string(piece.grayPixels),
+                    cv::Point(cropX + 0, cropY + 90),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.75, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
         cv::putText(warpedBoard,
-                    "Gold: "+std::to_string(piece.goldPixels),
-                    cv::Point(cropX + 20,cropY+ 150),
-                     cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
-
+                    "GO:" + std::to_string(piece.goldPixels),
+                    cv::Point(cropX + 0, cropY + 110),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.75, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
 #endif
     }
     auto end = std::chrono::steady_clock::now();
@@ -1915,7 +1943,7 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
 
 #ifdef DEBUG_ROI
     cv::Mat scaledWarped;
-    cv::resize(warpedBoard,scaledWarped, cv::Size(WARP_SMALL_WIDTH, WARP_SMALL_HEIGHT), 0, 0, cv::INTER_NEAREST);
+    cv::resize(warpedBoard, scaledWarped, cv::Size(WARP_SMALL_WIDTH, WARP_SMALL_HEIGHT), 0, 0, cv::INTER_NEAREST);
     cv::imshow("classification", scaledWarped);
 #endif
 
@@ -1927,6 +1955,7 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
         printf("\r\n");
     }
 }
+
 void ChessImageProcessing::classsifyChessBoardImage2(const cv::Mat& warpedBoard) {
     int cellSize = CELL_SIZE;
     printf("classsifyChessBoardImage:\r\n");
