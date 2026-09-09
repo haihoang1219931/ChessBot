@@ -20,7 +20,7 @@
 
 const int NUM_COL = 14;
 const int NUM_ROW = 8;
-const int CELL_SIZE = 120;
+const int CELL_SIZE = 240;
 const int IMAGE_WIDTH = 1920;
 const int IMAGE_HEIGHT = 1080;
 const int WARP_WIDTH = CELL_SIZE*NUM_COL;
@@ -118,7 +118,8 @@ public:
     void checkPieceColor(const cv::Mat& imageRGB, ClassificationResult& pieceClass, int row, int col);
     bool detectMovePhase3Classification();
     ClassificationResult classifyImage(const cv::Mat& input_mat, int row, int col);
-    void classsifyChessBoardImage(const cv::Mat& warpedBoard, int targetWidth = 120, int targetHeight = 120, int channels = 1);
+    void classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard, int targetWidth = WARP_WIDTH, int targetHeight = WARP_HEIGHT, int channels = 3);
+    void classsifyChessBoardImage(const cv::Mat& warpedBoard, int targetWidth = CELL_SIZE, int targetHeight = CELL_SIZE, int channels = 3);
     void classsifyChessBoardImage2(const cv::Mat& warpedBoard);
     void excludeCellList(std::vector<cv::Point> listCell);
     std::string coordToNotation(cv::Point pt, const std::string& playerSide);
@@ -183,6 +184,12 @@ private:
     std::vector<char> m_dnnBishopPawnNames;
     uint8_t m_mapExcludedCell[NUM_ROW][NUM_COL];
     char m_mapClassifiedCell[NUM_ROW][NUM_COL];
+    // Internal layer parameters mapped from training weights file
+    cv::Mat m_fcWeightsMat; // Size: [7 x 512]
+    cv::Mat m_fcBiasMat;    // Size: [7 x 1]
+    bool m_isFcLayersInitialized = false;
+    // Internal helper initialization method
+    void initializeManualClassificationHead();
 };
 
 #endif // CHESSIMAGEPROCESSING_H
