@@ -2324,7 +2324,7 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
     cv::Mat warpedBoard;
     cv::warpPerspective(imgCurrent, warpedBoard, homographyMatrix, cv::Size(WARP_WIDTH, WARP_HEIGHT));
     printf("warpedBoard[%dx%d]\r\n",warpedBoard.cols,warpedBoard.rows);
-    classsifyChessBoardImage(warpedBoard,120,120,1);
+    classsifyChessBoardImage(warpedBoard,64,64,1);
     char currentBoard[NUM_ROW][NUM_ROW];
     char convertedPrevBoard[NUM_ROW][NUM_ROW];
     for(int row = 0; row < NUM_ROW; row++) {
