@@ -231,7 +231,7 @@ void classification() {
 //    cv::GaussianBlur(warpedBoard, blurred, cv::Size(0, 0), 3.0);
 //    cv::addWeighted(warpedBoard, 1.5, blurred, -0.5, 0, warpedBoard);
 //    chessDetector.classsifyWholeBoardAtOnce((const cv::Mat&)warpedBoard,3360, 1920, 3);
-    chessDetector.classsifyChessBoardImage((const cv::Mat&)warpedBoard,120,120,1);
+    chessDetector.classsifyChessBoardImage((const cv::Mat&)warpedBoard,240,240,3);
 }
 void onTrackbar(int, void*) {
     updateProjection();

@@ -55,11 +55,13 @@ void ChessImageProcessing::setDnnNetAllPieces(char* source, const std::vector<ch
     for (const auto& name : layer_names) {
         std::cout << "Layer available in ONNX graph: " << name << std::endl;
     }
+#if defined (DEBUG_CNN_LAYER)
     printf("setDnnNetAllPieces [%s] ",source);
     for(char className: dnnClassNames) {
         printf("%c ",className);
     }
     printf("\r\n");
+#endif
 }
 
 void ChessImageProcessing::setDnnNetSpecial(char* source, const std::vector<char>& dnnClassNames)
@@ -2311,10 +2313,32 @@ bool ChessImageProcessing::findPromotePiece(cv::Point& promoteCell, char piece) 
     return foundPromotePiece;
 }
 
+void ChessImageProcessing::warpChessBoardImage(const cv::Mat& imgCurrent,
+                                               cv::Mat& imgWarped)
+{
+    // 1. Check board status
+    cv::Mat homographyMatrix = getFullTranformMatrix();
+    cv::warpPerspective(imgCurrent, imgWarped, homographyMatrix, cv::Size(WARP_WIDTH, WARP_HEIGHT));
+    printf("warpedBoard[%dx%d]\r\n",imgWarped.cols,imgWarped.rows);
+}
+void ChessImageProcessing::getAnalyzeResult(std::vector<std::string>& analyzeResult)
+{
+    analyzeResult.clear();
+    for(int row = 0; row < NUM_ROW; row++) {
+        for(int col = 0; col < NUM_COL; col++) {
+            std::string cellInfo;
+            std::string pieceType(1, m_mapClassifiedCell[row][col]);
+            cellInfo += pieceType;
+            analyzeResult.push_back(cellInfo);
+        }
+    }
+}
+
 std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
         const cv::Mat& imgCurrent,
         const char* prevBoard,
-        const MoveDetectParams& params) {
+        const MoveDetectParams& params,
+        int imageSize, int channels) {
     std::vector<std::string> listMoves;
     std::vector<cv::Point> listStartCell;
     std::vector<cv::Point> listChangedCell;
@@ -2324,7 +2348,7 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
     cv::Mat warpedBoard;
     cv::warpPerspective(imgCurrent, warpedBoard, homographyMatrix, cv::Size(WARP_WIDTH, WARP_HEIGHT));
     printf("warpedBoard[%dx%d]\r\n",warpedBoard.cols,warpedBoard.rows);
-    classsifyChessBoardImage(warpedBoard,64,64,1);
+    classsifyChessBoardImage(warpedBoard,imageSize,imageSize,channels);
     char currentBoard[NUM_ROW][NUM_ROW];
     char convertedPrevBoard[NUM_ROW][NUM_ROW];
     for(int row = 0; row < NUM_ROW; row++) {

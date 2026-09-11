@@ -61,6 +61,9 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     QQmlApplicationEngine engine;
     // Hide the cursor globally across the entire application
+    // Expose the executable directory path to QML
+    QString appDir = QCoreApplication::applicationDirPath();
+    engine.rootContext()->setContextProperty("applicationDirPath", appDir);
     QGuiApplication::setOverrideCursor(QCursor(Qt::BlankCursor));
     MasterChessBot masterBot; // Instantiate your class
     engine.rootContext()->setContextProperty("masterBot", &masterBot);

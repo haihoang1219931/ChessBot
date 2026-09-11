@@ -451,10 +451,17 @@ void ChessBot::configureLoop()
 void ChessBot::testLoop()
 {
     switch (m_stateTest) {
+    case TEST_CLASSIFICATION: {
+        if(analyzeChessBoard()!=STATE_PENDING){
+            m_stateTest = TEST_DONE;
+        }
+        break;
+    }
     case TEST_ROBOT: {
         if(testRobot() == STATE_DONE_SUCCESS){
             m_stateTest = TEST_CHECK_RESULT;
         }
+        break;
     }
     case TEST_CHECK_RESULT: {
         if(testCheckResult() != STATE_PENDING){
@@ -592,7 +599,7 @@ uint8_t ChessBot::playDetectMove()
             }
         }
         std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves2(imageAfter,prevBoardArr,
-            *m_detectParams);
+            *m_detectParams,240,3);
         std::string possibleMove = "";
         int numPossibleMove = 0;
         for(std::string move:chessMoves) {
@@ -954,6 +961,54 @@ uint8_t ChessBot::testCheckResult()
         } while(retry < 25);
     }
     return cmdResult;
+}
+
+uint8_t ChessBot::analyzeChessBoard()
+{
+    cv::Mat currentImage, warpedImage;
+    QString warpedImagePath = "warpedImage.jpg";
+    std::vector<std::string> analyzeResult;
+    if(!readFrame(currentImage)) return STATE_DONE_FAIL;
+    m_moveDetector->warpChessBoardImage(currentImage, warpedImage);
+    // Get current system time
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+
+    // Format time as a string
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&now_c), "%Y-%m-%d %H:%M:%S");
+    std::string timestamp = ss.str();
+
+    // Define text properties
+    cv::Point org(30, 50); // Bottom-left corner of the text string in the image
+    int fontFace = cv::FONT_HERSHEY_SIMPLEX;
+    double fontScale = 1.0;
+    cv::Scalar color(0, 255, 0); // Green color in BGR
+    int thickness = 2;
+    int lineType = cv::LINE_AA;
+
+    // Put timestamp on the image
+    cv::putText(warpedImage, timestamp, org, fontFace, fontScale, color, thickness, lineType);
+
+    cv::imwrite(warpedImagePath.toStdString(),warpedImage);
+    Q_EMIT preprocessDone(warpedImagePath);
+    m_moveDetector->classsifyChessBoardImage(warpedImage,240,240,3);
+    m_moveDetector->getAnalyzeResult(analyzeResult);
+    for(std::string piece: analyzeResult) {
+        m_analyzeChessBoardResult.push_back(QString::fromStdString(std::string(1,piece[0])));
+    }
+    if(m_analyzeChessBoardResult.size() != NUM_COL * NUM_ROW) return STATE_DONE_FAIL;
+    std::reverse_copy(m_analyzeChessBoardResult.begin(),
+                      m_analyzeChessBoardResult.end(),
+                      std::back_inserter(m_analyzeChessBoardRevertedResult));
+    Q_EMIT classificationDone(m_analyzeChessBoardResult,
+                              m_analyzeChessBoardRevertedResult);
+    return STATE_DONE_SUCCESS;
+}
+
+bool ChessBot::isClassificationDone()
+{
+    return m_stateClassification != STATE_PENDING;
 }
 
 bool ChessBot::readCalibrationPoint(const QString &command,QPoint& point)
@@ -1699,6 +1754,16 @@ void ChessBot::sendTestCommand(QString command)
     m_state = STATE_TEST;
     m_stateTest = TEST_ROBOT;
     m_commandTest = command;
+    togglePause(false);
+}
+void ChessBot::classifyImage()
+{
+    if(m_state != STATE_EXIT) {
+        qDebug("Previous move is not finished");
+        return;
+    }
+    m_state = STATE_TEST;
+    m_stateTest = TEST_CLASSIFICATION;
     togglePause(false);
 }
 

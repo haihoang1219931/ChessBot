@@ -23,8 +23,9 @@ FocusScope {
         ListModel {
             id: settingsModel
             ListElement { name: "Calibrate Camera Trapezoid"; type: "camera" }
-            ListElement { name: "Calibrate Chess Board & Drop Zones"; type: "chessboard" }
+//            ListElement { name: "Calibrate Chess Board & Drop Zones"; type: "chessboard" }
             ListElement { name: "Send test command"; type: "command" }
+            ListElement { name: "Test Bot Vision"; type: "vision" }
             ListElement { name: "Back"; type: "back" }
         }
 

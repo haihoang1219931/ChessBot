@@ -27,6 +27,10 @@ MasterChessBot::MasterChessBot(QObject *parent) : QObject(parent)
             this, &MasterChessBot::showPromotionPieces);
     connect(m_workerChessbot, &ChessBot::foundLastFEN,
             this, &MasterChessBot::foundLastFEN);
+    connect(m_workerChessbot, &ChessBot::classificationDone,
+            this, &MasterChessBot::classificationDone);
+    connect(m_workerChessbot, &ChessBot::preprocessDone,
+            this, &MasterChessBot::preprocessDone);
 }
 
 ChessBot* MasterChessBot::chessbot()
@@ -133,6 +137,16 @@ void MasterChessBot::sendTestCommand(QString command)
 int MasterChessBot::playerColor()
 {
     return m_workerChessbot->chessController()->playerColor();
+}
+
+void MasterChessBot::classifyImage()
+{
+    m_workerChessbot->classifyImage();
+}
+
+bool MasterChessBot::isClassificationDone()
+{
+    return m_workerChessbot->isClassificationDone();
 }
 
 QString MasterChessBot::getCalibrationJson() const

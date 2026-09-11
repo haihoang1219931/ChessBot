@@ -45,6 +45,7 @@ typedef enum {
     STATE_PLAY,
     STATE_CONFIGURE,
     STATE_TEST,
+    STATE_CLASSIFICATION,
     STATE_EXIT,
 } STATE_CHESBOT;
 
@@ -86,6 +87,7 @@ typedef enum{
 } STATE_INIT_PHASE;
 
 typedef enum{
+    TEST_CLASSIFICATION,
     TEST_ROBOT,
     TEST_CHECK_RESULT,
     TEST_DONE
@@ -136,6 +138,8 @@ public:
     void playInputMove(int startIndex, int stopIndex, int promotePiece = -1);
     void playInputCancelPromotion();
     void stopGame(QString comment);
+    void classifyImage();
+    bool isClassificationDone();
 
 Q_SIGNALS:
     void boardChanged(QStringList boardModel);
@@ -148,6 +152,8 @@ Q_SIGNALS:
     void foundLastFEN();
     void newCommentAdded(QString text);
     void newMoveAdded(QString fen, QString playColor, QString move);
+    void preprocessDone(QString imagePath);
+    void classificationDone(QStringList boardModel,QStringList boardModelReverted);
 
 private:
     void playLoop();
@@ -166,6 +172,7 @@ private:
     uint8_t configureLevel();
     uint8_t testRobot();
     uint8_t testCheckResult();
+    uint8_t analyzeChessBoard();
     void initRobot();
     bool detectArduinoPort(int baudRate = 38400);
     bool readCalibrationPoint(const QString &command, QPoint& point);
@@ -209,6 +216,7 @@ private:
     int m_stateConfigure;
     int m_stateTest;
     int m_stateInit;
+    int m_stateClassification;
     int m_width;
     int m_height;
 #ifdef IMAGE_PROCESS_MOVE
@@ -227,6 +235,8 @@ private:
     char m_robotCommand[32];
     GameInfo m_lastGame;
     QString m_timeoutComment;
+    QStringList m_analyzeChessBoardResult;
+    QStringList m_analyzeChessBoardRevertedResult;
 };
 
 #endif // CHESSBOT_H

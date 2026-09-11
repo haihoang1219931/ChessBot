@@ -135,7 +135,7 @@ public:
                                     const MoveDetectParams& params);
 
     std::vector<std::string> findPossibleMoves2(const cv::Mat& imgCurrent,const char* prevBoard,
-                                    const MoveDetectParams& params);
+                                    const MoveDetectParams& params, int imageSize, int channels);
 
     // GUI helpers: create a shared Controls window (main should call) and read current params
     void createControlsWindow(const MoveDetectParams& defaults);
@@ -165,6 +165,9 @@ public:
                        bool whiteMove);
     bool findDropCells(std::vector<cv::Point>& dropCells);
     bool findPromotePiece(cv::Point& promoteCell, char piece);
+    void warpChessBoardImage(const cv::Mat& imgCurrent, cv::Mat& imgWarped);
+    void getAnalyzeResult(std::vector<std::string>& analyzeResult);
+
 private:
     bool m_sourceConnected;
     bool m_isBlackSide;

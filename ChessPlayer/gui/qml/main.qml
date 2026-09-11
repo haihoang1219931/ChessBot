@@ -74,6 +74,8 @@ ApplicationWindow {
                     stack.push(calibrationPointsPanel)
                 } else if (calibType === "command") {
                     stack.push(testCommandPanel)
+                } else if (calibType === "vision") {
+                    stack.push(testBotVision)
                 }
             }
         }
@@ -102,6 +104,16 @@ ApplicationWindow {
     Component {
         id: testCommandPanel
         SettingTestCommand {
+            onExitPressed: {
+                stack.pop()
+                stack.push(settingsMenu)
+            }
+        }
+    }
+
+    Component {
+        id: testBotVision
+        BotVision {
             onExitPressed: {
                 stack.pop()
                 stack.push(settingsMenu)
