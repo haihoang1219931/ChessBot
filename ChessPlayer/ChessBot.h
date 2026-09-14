@@ -10,6 +10,7 @@
 #include <QVariant>
 #include <QVariantList>
 #include <QPoint>
+#include <QSize>
 #include <QVector>
 
 #define CONFIGURE_CHESSBOARD_CALIB_FILE "calib_data.json"
@@ -116,6 +117,7 @@ public:
     ChessController* chessController();
     QVariantList chessboardCorners() const;
     QString getCalibrationJson() const;
+    QSize getImageSize() const;
     bool saveCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
     bool loadCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
     void updateCorners(QVariantList corners);
@@ -237,6 +239,12 @@ private:
     QString m_timeoutComment;
     QStringList m_analyzeChessBoardResult;
     QStringList m_analyzeChessBoardRevertedResult;
+    QString m_chessDetectorModel;
+    QString m_chessDetectorClassList;
+    int m_chessDetectorImageSize;
+    int m_chessDetectorImageChannels = 3;
+    QString m_voiceModel;
+    QString m_speakerModel;
 };
 
 #endif // CHESSBOT_H

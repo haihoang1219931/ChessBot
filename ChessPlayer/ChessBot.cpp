@@ -65,6 +65,20 @@ ChessBot::ChessBot(QThread *parent) :
     m_validCalibFileFound = loadCalibrationData();
     connect(m_chessController,&ChessController::boardChanged,
             this,&ChessBot::boardChanged);
+    if(!loadCalibrationData()) {
+        m_chessDetectorModel = "chess_piece_resnet18_20260828_100epoch.onnx";
+        m_chessDetectorClassList = "b,.,k,n,p,q,r";
+        m_chessDetectorImageSize = 240;
+        m_chessDetectorImageChannels = 3;
+        m_voiceModel = "";
+        m_speakerModel = "";
+        m_chessboardConners.clear();
+        m_chessboardConners.push_back(QPoint(234, 159));
+        m_chessboardConners.push_back(QPoint(1716, 174));
+        m_chessboardConners.push_back(QPoint(1878, 1032));
+        m_chessboardConners.push_back(QPoint(84, 1032));
+        saveCalibrationData();
+    }
 }
 
 ChessBot::~ChessBot()
@@ -145,8 +159,8 @@ void ChessBot::updateCorners(QVariantList corners)
     m_chessboardConners.clear();
     for (const QVariant &val : corners) {
         QVariantMap map = val.toMap();
-        int x = map["x"].toInt()*m_width/640;
-        int y = map["y"].toInt()*m_height/360;
+        int x = map["x"].toInt();
+        int y = map["y"].toInt();
 
         m_chessboardConners.append(QPoint(map["x"].toInt(),map["y"].toInt()));
     }
@@ -599,7 +613,7 @@ uint8_t ChessBot::playDetectMove()
             }
         }
         std::vector<std::string> chessMoves = m_moveDetector->findPossibleMoves2(imageAfter,prevBoardArr,
-            *m_detectParams,240,3);
+            *m_detectParams);
         std::string possibleMove = "";
         int numPossibleMove = 0;
         for(std::string move:chessMoves) {
@@ -992,7 +1006,7 @@ uint8_t ChessBot::analyzeChessBoard()
 
     cv::imwrite(warpedImagePath.toStdString(),warpedImage);
     Q_EMIT preprocessDone(warpedImagePath);
-    m_moveDetector->classsifyChessBoardImage(warpedImage,240,240,3);
+    m_moveDetector->classsifyChessBoardImage(warpedImage);
     m_moveDetector->getAnalyzeResult(analyzeResult);
     for(std::string piece: analyzeResult) {
         m_analyzeChessBoardResult.push_back(QString::fromStdString(std::string(1,piece[0])));
@@ -1457,10 +1471,12 @@ bool ChessBot::saveCalibrationData(QString fileName)
 
     // 1. Store ai models
     QJsonObject childrenObj;
-    childrenObj["chess_detector"] = "chess_piece_resnet18_20260828_100epoch.onnx";
-    childrenObj["class_list"] = "b,.,k,n,p,q,r";
-    childrenObj["voice_detector"] = "";
-    childrenObj["speaker"] = "";
+    childrenObj["chess_detector"] = m_chessDetectorModel;
+    childrenObj["class_list"] = m_chessDetectorClassList;
+    childrenObj["input_size"] = m_chessDetectorImageSize;
+    childrenObj["input_channel"] = m_chessDetectorImageChannels;
+    childrenObj["voice_detector"] = m_voiceModel;
+    childrenObj["speaker"] = m_speakerModel;
 
     root["ai_model"] = childrenObj;
 
@@ -1577,8 +1593,8 @@ bool ChessBot::loadCalibrationData(QString fileName)
     QJsonArray calibArr = root.value("camera_calibration").toArray();
     for (const QJsonValue &val : calibArr) {
         QJsonObject obj = val.toObject();
-        m_chessboardConners.append(QPoint(obj.value("x").toInt()*m_width/640,
-                                          obj.value("y").toInt()*m_height/360));
+        m_chessboardConners.append(QPoint(obj.value("x").toInt(),
+                                          obj.value("y").toInt()));
     }
     qDebug("m_chessboardConners.size() %d",m_chessboardConners.size());
 #if defined(IMAGE_PROCESS_MOVE)
@@ -1602,22 +1618,27 @@ bool ChessBot::loadCalibrationData(QString fileName)
     if(root.contains("ai_model")) {
         QJsonObject aiModelObj = root["ai_model"].toObject();
 
-        QString chessPath = aiModelObj["chess_detector"].toString();
-        QString classList = aiModelObj["class_list"].toString();
-        QString voicePath = aiModelObj["voice_detector"].toString();
-        QString speakerPath = aiModelObj["speaker"].toString();
+        m_chessDetectorModel = aiModelObj["chess_detector"].toString();
+        m_chessDetectorClassList = aiModelObj["class_list"].toString();
+        m_chessDetectorImageSize = aiModelObj["input_size"].toInt();
+        m_chessDetectorImageChannels = aiModelObj["input_channel"].toInt();
+        m_voiceModel = aiModelObj["voice_detector"].toString();
+        m_speakerModel = aiModelObj["speaker"].toString();
 
         // Print the values to verify
-        qDebug() << "Chess Detector Path:" << chessPath;
-        qDebug() << "Class List:" << classList;
-        qDebug() << "Voice Detector Path:" << voicePath;
-        qDebug() << "Speaker Path:" << speakerPath;
+        qDebug() << "Chess Detector Path:" << m_chessDetectorModel;
+        qDebug() << "Class List:" << m_chessDetectorClassList;
+        qDebug() << "Voice Detector Path:" << m_voiceModel;
+        qDebug() << "Speaker Path:" << m_speakerModel;
         std::vector<char> dnnClassNames;
-        QStringList dnnClassArr = classList.split(",");
+        QStringList dnnClassArr = m_chessDetectorClassList.split(",");
         for(QString className:dnnClassArr) {
             dnnClassNames.push_back(className.toStdString()[0]);
         }
-        m_moveDetector->setDnnNetAllPieces((char*)chessPath.toStdString().c_str(),dnnClassNames);
+        m_moveDetector->setDnnNetAllPieces((char*)m_chessDetectorModel.toStdString().c_str(),
+                                           dnnClassNames,
+                                           m_chessDetectorImageSize,
+                                           m_chessDetectorImageChannels);
         std::vector<cv::Point> listCell {
             cv::Point(0,0),cv::Point(1,0),cv::Point(2,0),cv::Point(11,0),
             cv::Point(0,1),cv::Point(1,1),cv::Point(2,1),cv::Point(11,1),
@@ -1634,6 +1655,11 @@ bool ChessBot::loadCalibrationData(QString fileName)
 #endif
 
     return true;
+}
+
+QSize ChessBot::getImageSize() const
+{
+    return QSize(m_width,m_height);
 }
 
 QString ChessBot::getCalibrationJson() const
@@ -1825,9 +1851,10 @@ QVariantList ChessBot::chessboardCorners() const {
     qDebug("Number of m_chessboardConners %d",m_chessboardConners.size());
     for (const QPoint &corner : m_chessboardConners) {
         QVariantMap pointMap;
-        pointMap["x"] = corner.x()*640/m_width;
-        pointMap["y"] = corner.y()*360/m_height;
+        pointMap["x"] = corner.x();
+        pointMap["y"] = corner.y();
         rootList.append(pointMap);
+        qDebug("Corner x,y=(%d,%d)",pointMap["x"].toInt(),pointMap["y"].toInt());
     }
     return rootList;
 }

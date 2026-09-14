@@ -73,8 +73,8 @@ class ChessImageProcessing
 {
 public:
     ChessImageProcessing();
-    void setDnnNetAllPieces(char* source, const std::vector<char>& dnnClassNames);
-    void setDnnNetSpecial(char* source, const std::vector<char>& dnnClassNames);
+    void setDnnNetAllPieces(char* source, const std::vector<char>& dnnClassNames,
+                            int size, int channels);
     void connectSource(char* source);
     cv::Mat getNewImageSide();
     bool detectSide(cv::Mat image);
@@ -118,8 +118,8 @@ public:
     void checkPieceColor(const cv::Mat& imageRGB, ClassificationResult& pieceClass, int row, int col);
     bool detectMovePhase3Classification();
     ClassificationResult classifyImage(const cv::Mat& input_mat, int row, int col);
-    void classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard, int targetWidth = WARP_WIDTH, int targetHeight = WARP_HEIGHT, int channels = 3);
-    void classsifyChessBoardImage(const cv::Mat& warpedBoard, int targetWidth = CELL_SIZE, int targetHeight = CELL_SIZE, int channels = 3);
+    void classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard);
+    void classsifyChessBoardImage(const cv::Mat& warpedBoard);
     void classsifyChessBoardImage2(const cv::Mat& warpedBoard);
     void excludeCellList(std::vector<cv::Point> listCell);
     std::string coordToNotation(cv::Point pt, const std::string& playerSide);
@@ -135,7 +135,7 @@ public:
                                     const MoveDetectParams& params);
 
     std::vector<std::string> findPossibleMoves2(const cv::Mat& imgCurrent,const char* prevBoard,
-                                    const MoveDetectParams& params, int imageSize, int channels);
+                                    const MoveDetectParams& params);
 
     // GUI helpers: create a shared Controls window (main should call) and read current params
     void createControlsWindow(const MoveDetectParams& defaults);
@@ -183,8 +183,8 @@ private:
     int m_detectState;
     cv::dnn::Net m_dnnNetAllPieces;
     std::vector<char> m_dnnAllPiecesNames;
-    cv::dnn::Net m_dnnNetBishopPawn;
-    std::vector<char> m_dnnBishopPawnNames;
+    int m_dnnAllPiecesImageSize;
+    int m_dnnAllPiecesImageChannels;
     uint8_t m_mapExcludedCell[NUM_ROW][NUM_COL];
     char m_mapClassifiedCell[NUM_ROW][NUM_COL];
     // Internal layer parameters mapped from training weights file

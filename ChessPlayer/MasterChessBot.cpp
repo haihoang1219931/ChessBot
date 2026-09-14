@@ -149,6 +149,11 @@ bool MasterChessBot::isClassificationDone()
     return m_workerChessbot->isClassificationDone();
 }
 
+QSize MasterChessBot::getImageSize() const
+{
+    return m_workerChessbot->getImageSize();
+}
+
 QString MasterChessBot::getCalibrationJson() const
 {
     return m_workerChessbot->getCalibrationJson();

@@ -13,6 +13,8 @@ FocusScope {
     ]
     property int activeIndex: 0
     property bool isEditing: false
+    property var scaleWidth
+    property var scaleHeight
     focus: true
     // 1. Set up the camera
     Camera {
@@ -34,6 +36,9 @@ FocusScope {
     Component.onCompleted: {
         var corners = masterBot.chessboardCorners();
         if(corners.length === 4) {
+            var imageSize = masterBot.getImageSize();
+            scaleWidth = canvas.width/imageSize.width;
+            scaleHeight = canvas.height/imageSize.height;
             root.points = corners;
         }
         canvas.requestPaint();
@@ -48,10 +53,17 @@ FocusScope {
             var ctx = getContext("2d");
             ctx.reset();
 
+            var scaledPoints = [
+                {"x": points[0].x*scaleWidth, "y": points[0].y*scaleHeight},
+                {"x": points[1].x*scaleWidth, "y": points[1].y*scaleHeight},
+                {"x": points[2].x*scaleWidth, "y": points[2].y*scaleHeight},
+                {"x": points[3].x*scaleWidth, "y": points[3].y*scaleHeight},
+            ]
+
             // 1. Draw Trapezoid
             ctx.beginPath();
-            ctx.moveTo(points[0].x, points[0].y);
-            for (var i = 1; i < 4; i++) ctx.lineTo(points[i].x, points[i].y);
+            ctx.moveTo(scaledPoints[0].x, scaledPoints[0].y);
+            for (var i = 1; i < 4; i++) ctx.lineTo(scaledPoints[i].x, scaledPoints[i].y);
             ctx.closePath();
             ctx.fillStyle = "#330000FF";
             ctx.fill();
@@ -65,7 +77,7 @@ FocusScope {
                 var radius = isActive ? 12 : 6; // Bigger if selected
 
                 ctx.beginPath();
-                ctx.arc(points[j].x, points[j].y, radius, 0, 2 * Math.PI);
+                ctx.arc(scaledPoints[j].x, scaledPoints[j].y, radius, 0, 2 * Math.PI);
 
                 // Color logic: Red if editing, Yellow if just selected, White otherwise
                 ctx.fillStyle = isActive ? (isEditing ? "#88FF0000" : "#8800FF00") : "white";
@@ -77,7 +89,7 @@ FocusScope {
         }
 
         Keys.onPressed: (event) => {
-            var step = 2;
+            var step = 6;
             if (event.key === Qt.Key_Space) {
                 masterBot.updateCorners(root.points);
             }

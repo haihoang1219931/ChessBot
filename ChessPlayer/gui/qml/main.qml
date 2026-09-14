@@ -7,7 +7,7 @@ import QtQml 2.0
 ApplicationWindow {
     id: wroot
     visible: true
-    visibility: Window.FullScreen
+//    visibility: Window.FullScreen
     title: qsTr("ChessPlayer")
     color: "#050505"
     width: 800

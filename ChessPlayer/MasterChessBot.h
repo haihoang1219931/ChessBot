@@ -39,6 +39,7 @@ public:
     Q_INVOKABLE void classifyImage();
     Q_INVOKABLE bool isClassificationDone();
     Q_INVOKABLE QString getCalibrationJson() const;
+    Q_INVOKABLE QSize getImageSize() const;
     Q_INVOKABLE QVariantList chessboardCorners() const;
     Q_INVOKABLE void stopGame(QString comment);
 

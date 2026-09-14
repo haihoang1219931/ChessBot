@@ -42,12 +42,15 @@ ChessImageProcessing::ChessImageProcessing()
 //    findPossibleMoves2(cv::Mat(),(const char*)testBoardPrev,params);
 }
 
-void ChessImageProcessing::setDnnNetAllPieces(char* source, const std::vector<char>& dnnClassNames)
+void ChessImageProcessing::setDnnNetAllPieces(char* source, const std::vector<char>& dnnClassNames,
+                                              int size, int channels)
 {
     m_dnnNetAllPieces = cv::dnn::readNetFromONNX(source);
     m_dnnAllPiecesNames = dnnClassNames;
     m_dnnNetAllPieces.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
     m_dnnNetAllPieces.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+    m_dnnAllPiecesImageSize = size;
+    m_dnnAllPiecesImageChannels = channels;
     // 2. Set parallel processing worker threads to match your CPU capacity
     cv::setNumThreads(cv::getNumberOfCPUs());
     // Add this temporarily inside setDnnNetAllPieces to list all available layers
@@ -62,12 +65,6 @@ void ChessImageProcessing::setDnnNetAllPieces(char* source, const std::vector<ch
     }
     printf("\r\n");
 #endif
-}
-
-void ChessImageProcessing::setDnnNetSpecial(char* source, const std::vector<char>& dnnClassNames)
-{
-    m_dnnNetBishopPawn = cv::dnn::readNetFromONNX(source);
-    m_dnnBishopPawnNames = dnnClassNames;
 }
 
 static void printMatrix(const std::string & name,
@@ -1811,7 +1808,7 @@ void ChessImageProcessing::initializeManualClassificationHead() {
     printf("Manual Classification Linear Head successfully initialized with trained parameters!\n");
 }
 
-void ChessImageProcessing::classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard, int targetWidth, int targetHeight, int channels) {
+void ChessImageProcessing::classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard) {
     int cellSize = CELL_SIZE; // Matches the legacy layout constant tracker properties (e.g., 240)
     printf("classsifyWholeBoardAtOnce (HYBRID FULLY CONVOLUTIONAL INTERPRETATION ENGINE ACTIVE):\r\n");
     auto start = std::chrono::steady_clock::now();
@@ -1821,22 +1818,22 @@ void ChessImageProcessing::classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard,
 
     // Phase 1: Handle input color routing configuration dynamically
     cv::Mat preparedBoard;
-    if (channels == 1) {
+    if (m_dnnAllPiecesImageChannels == 1) {
         cv::cvtColor(warpedBoard, preparedBoard, cv::COLOR_BGR2GRAY);
-    } else if (channels == 3) {
+    } else if (m_dnnAllPiecesImageChannels == 3) {
         preparedBoard = warpedBoard.clone(); // Preserves raw frame parameters clean
     } else {
-        std::cerr << "Error: Supported channels specification are 1 or 3. Received: " << channels << "\n";
+        std::cerr << "Error: Supported channels specification are 1 or 3. Received: " << m_dnnAllPiecesImageChannels << "\n";
         return;
     }
 
     // Phase 2: Create a single 4D Tensor Blob capturing the entire chessboard image context at once
-    cv::Size target_size(targetWidth, targetHeight);
+    cv::Size target_size(m_dnnAllPiecesImageSize, m_dnnAllPiecesImageSize);
     double scale_factor = 1.0 / 255.0;
-    bool swapChannels = (channels == 3); // Swap R and B lanes if processing your native 3-channel RGB model setup
+    bool swapChannels = (m_dnnAllPiecesImageChannels == 3); // Swap R and B lanes if processing your native 3-channel RGB model setup
     cv::Mat wholeBoardBlob;
 
-    if (channels == 1) {
+    if (m_dnnAllPiecesImageChannels == 1) {
         cv::Scalar mean_grayscale(127.5);
         double std_dev_grayscale = 0.5;
 
@@ -1989,10 +1986,10 @@ void ChessImageProcessing::classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard,
     }
 }
 
-void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard,
-    int targetWidth, int targetHeight, int channels) {
+void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) {
     int cellSize = CELL_SIZE;
-    printf("classsifyChessBoardImage (BATCH INF MODE: %dx%d, %d Channel(s)):\r\n", targetWidth, targetHeight, channels);
+    printf("classsifyChessBoardImage (BATCH INF MODE: %dx%d, %d Channel(s)):\r\n",
+           m_dnnAllPiecesImageSize, m_dnnAllPiecesImageSize, m_dnnAllPiecesImageChannels);
     auto start = std::chrono::steady_clock::now();
 
     // Pre-allocate containers to eliminate memory thrashing inside the core loop
@@ -2025,14 +2022,14 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard,
             cv::Mat preparedCell;
 
             // Handle channel mapping dynamically based on input parameter
-            if (channels == 1) {
+            if (m_dnnAllPiecesImageChannels == 1) {
                 // Convert 3-channel BGR to 1-channel Grayscale
                 cv::cvtColor(croppedCellBGR, preparedCell, cv::COLOR_BGR2GRAY);
-            } else if (channels == 3) {
+            } else if (m_dnnAllPiecesImageChannels == 3) {
                 // Keep original BGR channels (blobFromImages will handle the RGB swap later)
                 preparedCell = croppedCellBGR;
             } else {
-                std::cerr << "Error: Supported channels configuration are 1 or 3. Received: " << channels << "\n";
+                std::cerr << "Error: Supported channels configuration are 1 or 3. Received: " << m_dnnAllPiecesImageChannels << "\n";
                 return;
             }
 
@@ -2049,13 +2046,13 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard,
     }
 
     // Phase 2: Create a 4D Tensor Batch Blob using 'blobFromImages'
-    cv::Size target_size(targetWidth, targetHeight);
+    cv::Size target_size(m_dnnAllPiecesImageSize, m_dnnAllPiecesImageSize);
     double scale_factor = 1.0 / 255.0; // Scale pixels to [0.0, 1.0]
 
     cv::Mat batchBlob;
-    bool swapChannels = (channels == 3); // Swap R and B channels only if we are feeding a 3-channel model
+    bool swapChannels = (m_dnnAllPiecesImageChannels == 3); // Swap R and B channels only if we are feeding a 3-channel model
 
-    if (channels == 1) {
+    if (m_dnnAllPiecesImageChannels == 1) {
         // Grayscale 1-channel custom weights normalization parity: (pixel - 127.5) * (1/255) / 0.5
         cv::Scalar mean_grayscale(127.5);
         double std_dev_grayscale = 0.5;
@@ -2337,8 +2334,7 @@ void ChessImageProcessing::getAnalyzeResult(std::vector<std::string>& analyzeRes
 std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
         const cv::Mat& imgCurrent,
         const char* prevBoard,
-        const MoveDetectParams& params,
-        int imageSize, int channels) {
+        const MoveDetectParams& params) {
     std::vector<std::string> listMoves;
     std::vector<cv::Point> listStartCell;
     std::vector<cv::Point> listChangedCell;
@@ -2348,7 +2344,7 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
     cv::Mat warpedBoard;
     cv::warpPerspective(imgCurrent, warpedBoard, homographyMatrix, cv::Size(WARP_WIDTH, WARP_HEIGHT));
     printf("warpedBoard[%dx%d]\r\n",warpedBoard.cols,warpedBoard.rows);
-    classsifyChessBoardImage(warpedBoard,imageSize,imageSize,channels);
+    classsifyChessBoardImage(warpedBoard);
     char currentBoard[NUM_ROW][NUM_ROW];
     char convertedPrevBoard[NUM_ROW][NUM_ROW];
     for(int row = 0; row < NUM_ROW; row++) {
