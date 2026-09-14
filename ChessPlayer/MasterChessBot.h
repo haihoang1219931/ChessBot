@@ -42,6 +42,8 @@ public:
     Q_INVOKABLE QSize getImageSize() const;
     Q_INVOKABLE QVariantList chessboardCorners() const;
     Q_INVOKABLE void stopGame(QString comment);
+    Q_INVOKABLE int timerLimit() const;
+    Q_INVOKABLE void setTimeLimit(int timeout) const;
 
 Q_SIGNALS:
     void boardChanged(QStringList boardModel);

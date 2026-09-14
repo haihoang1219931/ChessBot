@@ -721,6 +721,7 @@ uint8_t ChessBot::playCalculateNextMove()
                                                 m_chessController->playerColor() != 0?"white":"black");
     toCoord = notationToCoord(to.toStdString(),
                                                 m_chessController->playerColor() != 0?"white":"black");
+#if defined (IMAGE_PROCESS_MOVE)
     qDebug("Bot move %s->%s",
            from.toStdString().c_str(),
            to.toStdString().c_str());
@@ -865,6 +866,7 @@ uint8_t ChessBot::playCalculateNextMove()
     qDebug("playCalculateNextMove %s to cmd[%s]\r\n",
            lastMoveStr.toStdString().c_str(),
            m_robotCommand);
+#endif
     return STATE_DONE_SUCCESS;
 }
 
@@ -898,8 +900,12 @@ QString ChessBot::readRobotResponse(int waitTime)
 }
 uint8_t ChessBot::playExecuteNextMove()
 {
+#if defined (IMAGE_PROCESS_MOVE)
     // TODO: Send command to robot and wait until execution is done
     return executeCommand(m_robotCommand);
+#else
+    return STATE_DONE_SUCCESS;
+#endif
 }
 
 uint8_t ChessBot::playInformResult()
@@ -979,6 +985,7 @@ uint8_t ChessBot::testCheckResult()
 
 uint8_t ChessBot::analyzeChessBoard()
 {
+#if defined(IMAGE_PROCESS_MOVE)
     cv::Mat currentImage, warpedImage;
     QString warpedImagePath = "warpedImage.jpg";
     std::vector<std::string> analyzeResult;
@@ -1017,12 +1024,23 @@ uint8_t ChessBot::analyzeChessBoard()
                       std::back_inserter(m_analyzeChessBoardRevertedResult));
     Q_EMIT classificationDone(m_analyzeChessBoardResult,
                               m_analyzeChessBoardRevertedResult);
+#endif
     return STATE_DONE_SUCCESS;
 }
 
 bool ChessBot::isClassificationDone()
 {
     return m_stateClassification != STATE_PENDING;
+}
+
+int ChessBot::timerLimit()
+{
+    return m_timeOut;
+}
+
+void ChessBot::setTimeLimit(int timeOut)
+{
+    m_timeOut = timeOut;
 }
 
 bool ChessBot::readCalibrationPoint(const QString &command,QPoint& point)

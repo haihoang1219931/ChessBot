@@ -168,3 +168,13 @@ void MasterChessBot::stopGame(QString comment)
 {
     m_workerChessbot->stopGame(comment);
 }
+
+int MasterChessBot::timerLimit() const
+{
+    return m_workerChessbot->timerLimit();
+}
+
+void MasterChessBot::setTimeLimit(int timeout) const
+{
+    m_workerChessbot->setTimeLimit(timeout);
+}

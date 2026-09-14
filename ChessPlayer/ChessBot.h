@@ -142,6 +142,8 @@ public:
     void stopGame(QString comment);
     void classifyImage();
     bool isClassificationDone();
+    int timerLimit();
+    void setTimeLimit(int timeOut);
 
 Q_SIGNALS:
     void boardChanged(QStringList boardModel);
@@ -245,6 +247,7 @@ private:
     int m_chessDetectorImageChannels = 3;
     QString m_voiceModel;
     QString m_speakerModel;
+    int m_timeOut;
 };
 
 #endif // CHESSBOT_H

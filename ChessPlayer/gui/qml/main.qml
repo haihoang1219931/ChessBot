@@ -136,7 +136,7 @@ ApplicationWindow {
         LevelSelection {
             onItemSelected: {
                 stack.pop()
-                stack.push(sideSelection)
+                stack.push(timeSelection)
                 masterBot.setEngineElo(rank,score)
             }
             onExitPressed: {
@@ -147,20 +147,38 @@ ApplicationWindow {
     }
 
     Component {
+        id: timeSelection
+        GameTypeSelection{
+            onExitPressed: {
+                stack.pop()
+                stack.push(levelSelection)
+            }
+            onItemSelected: {
+                if(expireTime === "30 mins")
+                    masterBot.setTimeLimit(30*60);
+                else if(expireTime === "10 mins")
+                    masterBot.setTimeLimit(10*60);
+                else
+                    masterBot.setTimeLimit(0);
+                stack.pop();
+                stack.push(sideSelection);
+            }
+        }
+    }
+
+    Component {
         id: sideSelection
         SideSelection{
             onGoback: {
                 stack.pop()
-                stack.push(levelSelection)
+                stack.push(timeSelection)
             }
             onSideConfirmed: {
                 stack.pop();
                 stack.push(timer, {
                                "side":side==="White"?0:1,
                                "gameTurn":side==="White"?0:1,
-                               "playTime": 600,
-                               "player1Time": 600,
-                               "player2Time": 600,
+                               "playTime": masterBot.timerLimit(),
                            });
                 masterBot.setPlayerColor(side==="White"?0:1);
                 masterBot.resetGame()
