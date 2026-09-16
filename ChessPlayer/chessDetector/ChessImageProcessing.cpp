@@ -2461,6 +2461,7 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
 #ifdef DEBUG_ROI
     cv::Mat scaledWarped;
     cv::resize(warpedBoard, scaledWarped, cv::Size(WARP_SMALL_WIDTH, WARP_SMALL_HEIGHT), 0, 0, cv::INTER_NEAREST);
+    cv::imwrite("scaledWarped.jpg",scaledWarped);
     cv::imshow("classification", scaledWarped);
 #endif
 

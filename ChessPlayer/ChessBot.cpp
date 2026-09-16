@@ -77,6 +77,19 @@ ChessBot::ChessBot(QThread *parent) :
         m_chessboardConners.push_back(QPoint(1716, 174));
         m_chessboardConners.push_back(QPoint(1878, 1032));
         m_chessboardConners.push_back(QPoint(84, 1032));
+        m_moveDetector->setCorners(m_chessboardConners[0].x(),m_chessboardConners[0].y(),
+                m_chessboardConners[1].x(),m_chessboardConners[1].y(),
+                m_chessboardConners[2].x(),m_chessboardConners[2].y(),
+                m_chessboardConners[3].x(),m_chessboardConners[3].y());
+        std::vector<char> dnnClassNames;
+        QStringList dnnClassArr = m_chessDetectorClassList.split(",");
+        for(QString className:dnnClassArr) {
+            dnnClassNames.push_back(className.toStdString()[0]);
+        }
+        m_moveDetector->setDnnNetAllPieces((char*)m_chessDetectorModel.toStdString().c_str(),
+                                           dnnClassNames,
+                                           m_chessDetectorImageSize,
+                                           m_chessDetectorImageChannels);
         saveCalibrationData();
     }
 }
@@ -132,7 +145,7 @@ bool ChessBot::readFrame(cv::Mat& outImg)
     // 3. Get the elapsed time
     qint64 milliSeconds = timer.elapsed();
     if(readResult) {
-        qDebug() << "Read frame success " << milliSeconds << "milliseconds.";
+        qDebug() << "Read frame success " << milliSeconds << "milliseconds. ["<<outImg.cols << "," << outImg.rows << "]";
     } else {
         qDebug() << "Read frame failed " << milliSeconds << "milliseconds.";
     }
