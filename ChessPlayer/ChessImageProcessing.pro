@@ -1,5 +1,5 @@
 TEMPLATE = app
-CONFIG += console c++11
+CONFIG += console c++17
 CONFIG -= app_bundle
 CONFIG -= qt
 
@@ -11,6 +11,35 @@ DEFINES += DEBUG_CLASSIFICATION
 DEFINES += DEBUG_ROI
 #DEFINES += GEN_CHESSBOARD_DATA
 DEFINES += GEN_DROPZONE_DATA
+use_openmp {
+DEFINES += USE_OPENMP
+# Enable the OpenMP multi-threading compiler flags
+QMAKE_CXXFLAGS += -fopenmp
+QMAKE_LFLAGS   += -fopenmp
+
+# Link the OpenMP runtime system library
+LIBS += -lgomp
+}
+use_openvino {
+DEFINES += USE_OPENVINO
+unix:!macx: INCLUDEPATH += /usr/local/runtime/include
+unix:!macx: DEPENDPATH += /usr/local/runtime/include
+unix:!macx: LIBS += -L/usr/local/runtime/3rdparty/tbb/lib/ -ltbb
+unix:!macx: LIBS += -L/usr/local/runtime/lib/intel64/ \
+    -lopenvino \
+    -lopenvino_tensorflow_lite_frontend \
+    -lopenvino_tensorflow_frontend \
+    -lopenvino_pytorch_frontend \
+    -lopenvino_paddle_frontend \
+    -lopenvino_onnx_frontend \
+    -lopenvino_hetero_plugin \
+    -lopenvino_intel_cpu_plugin \
+    -lopenvino_intel_gpu_plugin \
+    -lopenvino_intel_npu_plugin \
+    -lopenvino_gguf_frontend \
+    -lopenvino_auto_plugin \
+    -lopenvino_auto_batch_plugin
+}
 unix:!macx: INCLUDEPATH += /usr/local/include/opencv4
 unix:!macx: DEPENDPATH += /usr/local/include/opencv4
 unix:!macx: LIBS += -L/usr/local/lib/  \
@@ -65,6 +94,7 @@ HEADERS += chessDetector/ChessImageProcessing.h
 
 SOURCES += \
     main_3d_construction.cpp \
+    main_benchmark_openvino.cpp \
     main_gen_dataset.cpp \
     main_hough_circle.cpp
 

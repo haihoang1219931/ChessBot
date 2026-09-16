@@ -16,6 +16,8 @@ std::vector<cv::Point2f> srcCorners;
 cv::Mat base_rvec, base_tvec;
 double base_tilt_deg = 0.0;
 bool is_pnp_initialized = false;
+int g_dnnInputSize =  240;
+int g_dnnChannel = 3;
 
 // Trackbar variables (scaled to integers for OpenCV)
 // These now serve purely as structural adjustments (+/- offsets) relative to the PnP base values
@@ -231,7 +233,7 @@ void classification() {
 //    cv::GaussianBlur(warpedBoard, blurred, cv::Size(0, 0), 3.0);
 //    cv::addWeighted(warpedBoard, 1.5, blurred, -0.5, 0, warpedBoard);
 //    chessDetector.classsifyWholeBoardAtOnce((const cv::Mat&)warpedBoard,3360, 1920, 3);
-    chessDetector.classsifyChessBoardImage((const cv::Mat&)warpedBoard,120,120,1);
+    chessDetector.classsifyChessBoardImage((const cv::Mat&)warpedBoard,g_dnnInputSize,g_dnnInputSize,g_dnnChannel);
 }
 void onTrackbar(int, void*) {
     updateProjection();
@@ -251,7 +253,11 @@ int main(int argc, char** argv) {
     std::vector<char> print_names = {
         'b', '.', 'k', 'n', 'p', 'q', 'r'
     };
-
+    if(argc >=5) {
+        g_dnnInputSize = atoi(argv[3]);
+        g_dnnChannel = atoi(argv[4]);
+    }
+    setenv("OPENCV_DNN_CACHE_DIR", "./dnn_cache", 1);
     chessDetector.setDnnNetAllPieces(argv[1],print_names);
     std::vector<cv::Point> listCell {
         cv::Point(0,0),cv::Point(1,0),cv::Point(2,0),cv::Point(11,0),
