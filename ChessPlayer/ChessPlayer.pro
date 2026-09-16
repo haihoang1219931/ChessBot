@@ -7,6 +7,7 @@ CONFIG += use_chess_algo
 #CONFIG += use_ai_assistant
 CONFIG += use_image_processing
 CONFIG += use_system_voice
+CONFIG += use_openmp
 #CONFIG += use_sanitize
 use_system_voice {
     QT += texttospeech
@@ -14,6 +15,15 @@ use_system_voice {
 use_sanitize {
 QMAKE_CXXFLAGS += -fsanitize=address -fno-omit-frame-pointer
 QMAKE_LFLAGS += -fsanitize=address
+}
+use_openmp {
+DEFINES += USE_OPENMP
+# Enable the OpenMP multi-threading compiler flags
+QMAKE_CXXFLAGS += -fopenmp
+QMAKE_LFLAGS   += -fopenmp
+
+# Link the OpenMP runtime system library
+LIBS += -lgomp
 }
 #DEFINES += TEST_RANDOM_MOVE
 use_image_processing {

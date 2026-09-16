@@ -65,7 +65,7 @@ ChessBot::ChessBot(QThread *parent) :
     m_validCalibFileFound = loadCalibrationData();
     connect(m_chessController,&ChessController::boardChanged,
             this,&ChessBot::boardChanged);
-    if(!loadCalibrationData()) {
+    if(!m_validCalibFileFound) {
         m_chessDetectorModel = "chess_piece_resnet18_20260828_100epoch.onnx";
         m_chessDetectorClassList = "b,.,k,n,p,q,r";
         m_chessDetectorImageSize = 240;
@@ -86,7 +86,6 @@ ChessBot::~ChessBot()
     stopService();
 }
 #ifdef IMAGE_PROCESS_MOVE
-bool openFirstTime = false;
 bool ChessBot::readFrame(cv::Mat& outImg)
 {
     QElapsedTimer timer;
@@ -99,42 +98,26 @@ bool ChessBot::readFrame(cv::Mat& outImg)
         qint64 milliSeconds = timer.elapsed();
 
         qDebug() << "Open took" << milliSeconds << "milliseconds.";
-//        if(!openFirstTime)
-        {
-            QElapsedTimer timer;
-            timer.start();
-            cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
+        QElapsedTimer timerSetProp;
+        timerSetProp.start();
+        cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
 
-            // Set your target resolution
-            cap.set(cv::CAP_PROP_FRAME_WIDTH, m_width);
-            cap.set(cv::CAP_PROP_FRAME_HEIGHT, m_height);
+        // Set your target resolution
+        cap.set(cv::CAP_PROP_FRAME_WIDTH, m_width);
+        cap.set(cv::CAP_PROP_FRAME_HEIGHT, m_height);
 
-            // Set your target frame rate
-            cap.set(cv::CAP_PROP_FPS, 30);
+        // Set your target frame rate
+        cap.set(cv::CAP_PROP_FPS, 30);
 
-            // Verify what the hardware actually set (some cameras fallback if unsupported)
-            double actual_width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
-            double actual_height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
-            double actual_fps = cap.get(cv::CAP_PROP_FPS);
+        // Verify what the hardware actually set (some cameras fallback if unsupported)
+        double actual_width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
+        double actual_height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
+        double actual_fps = cap.get(cv::CAP_PROP_FPS);
 
-            std::cout << "Capture initialized: " << actual_width << "x" << actual_height
-                      << " @ " << actual_fps << " FPS" << std::endl;
+        std::cout << "Capture initialized: " << actual_width << "x" << actual_height
+                  << " @ " << actual_fps << " FPS" << std::endl;
 
-            qint64 milliSeconds = timer.elapsed();
-
-            qDebug() << "Set property took" << milliSeconds << "milliseconds.";
-            openFirstTime = true;
-            timer.start();
-            for(int i=0; i< 0;i++) {
-//                cap.read(outImg);
-                cap.grab();
-//                QThread::msleep(30);
-                printf(".");
-            }
-            milliSeconds = timer.elapsed();
-
-            qDebug() << "grap 2 images took" << milliSeconds << "milliseconds.";
-        }
+        qDebug() << "Set property took" << timerSetProp.elapsed() << "milliseconds.";
     }
     if (cap.isOpened()) {
         QElapsedTimer timer;

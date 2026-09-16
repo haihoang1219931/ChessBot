@@ -153,6 +153,14 @@ FocusScope {
                     }
                 }
             }
+            Rectangle {
+                anchors.centerIn: parent
+                implicitWidth: 50 * 8
+                implicitHeight: 50 * 8
+                color: "transparent"
+                border.color: "gray"
+                border.width: 1
+            }
         }
     }
     Connections {

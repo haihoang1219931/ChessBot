@@ -54,11 +54,11 @@ void ChessImageProcessing::setDnnNetAllPieces(char* source, const std::vector<ch
     // 2. Set parallel processing worker threads to match your CPU capacity
     cv::setNumThreads(cv::getNumberOfCPUs());
     // Add this temporarily inside setDnnNetAllPieces to list all available layers
+#if defined (DEBUG_CNN_LAYER)
     std::vector<std::string> layer_names = m_dnnNetAllPieces.getLayerNames();
     for (const auto& name : layer_names) {
         std::cout << "Layer available in ONNX graph: " << name << std::endl;
     }
-#if defined (DEBUG_CNN_LAYER)
     printf("setDnnNetAllPieces [%s] ",source);
     for(char className: dnnClassNames) {
         printf("%c ",className);
