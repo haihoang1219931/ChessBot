@@ -95,7 +95,7 @@ bool ChessBot::readFrame(cv::Mat& outImg)
     if (!cap.isOpened()) {
         QElapsedTimer timer;
         timer.start();
-        cap.open(0);
+        cap.open(0, cv::CAP_V4L);
         qint64 milliSeconds = timer.elapsed();
 
         qDebug() << "Open took" << milliSeconds << "milliseconds.";
@@ -148,8 +148,11 @@ bool ChessBot::readFrame(cv::Mat& outImg)
     }
     // 3. Get the elapsed time
     qint64 milliSeconds = timer.elapsed();
-
-    qDebug() << "The read frame took" << milliSeconds << "milliseconds.";
+    if(readResult) {
+        qDebug() << "Read frame success " << milliSeconds << "milliseconds.";
+    } else {
+        qDebug() << "Read frame failed " << milliSeconds << "milliseconds.";
+    }
     return readResult;
 }
 #endif
@@ -989,7 +992,9 @@ uint8_t ChessBot::analyzeChessBoard()
     cv::Mat currentImage, warpedImage;
     QString warpedImagePath = "warpedImage.jpg";
     std::vector<std::string> analyzeResult;
-    if(!readFrame(currentImage)) return STATE_DONE_FAIL;
+    if(!readFrame(currentImage)) {
+        return STATE_DONE_FAIL;
+    }
     m_moveDetector->warpChessBoardImage(currentImage, warpedImage);
     // Get current system time
     auto now = std::chrono::system_clock::now();
@@ -1015,13 +1020,20 @@ uint8_t ChessBot::analyzeChessBoard()
     Q_EMIT preprocessDone(warpedImagePath);
     m_moveDetector->classsifyChessBoardImage(warpedImage);
     m_moveDetector->getAnalyzeResult(analyzeResult);
+    m_analyzeChessBoardResult.clear();
+    m_analyzeChessBoardRevertedResult.clear();
     for(std::string piece: analyzeResult) {
         m_analyzeChessBoardResult.push_back(QString::fromStdString(std::string(1,piece[0])));
     }
-    if(m_analyzeChessBoardResult.size() != NUM_COL * NUM_ROW) return STATE_DONE_FAIL;
+    if(m_analyzeChessBoardResult.size() != NUM_COL * NUM_ROW) {
+        qDebug("m_analyzeChessBoardResult.size()[%d] != (NUM_COL * NUM_ROW)%d",
+               m_analyzeChessBoardResult.size(),NUM_COL * NUM_ROW);
+        return STATE_DONE_FAIL;
+    }
     std::reverse_copy(m_analyzeChessBoardResult.begin(),
                       m_analyzeChessBoardResult.end(),
                       std::back_inserter(m_analyzeChessBoardRevertedResult));
+    qDebug("classificationDone");
     Q_EMIT classificationDone(m_analyzeChessBoardResult,
                               m_analyzeChessBoardRevertedResult);
 #endif

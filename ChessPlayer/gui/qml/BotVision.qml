@@ -6,7 +6,8 @@ FocusScope {
     id: root
     width: 800
     height: 480
-    property var board
+    property var botBoard: []
+    property var playerBoard: []
     property int viewId: 0
     property var viewList: ["Bot view","Player view"]
     signal exitPressed()
@@ -23,6 +24,7 @@ FocusScope {
         viewId = (viewId+1)%2;
     }
     function analyzeChessboard() {
+        console.log("analyzeChessboard")
         masterBot.classifyImage();
     }
 
@@ -138,11 +140,16 @@ FocusScope {
 
                         Text {
                             anchors.centerIn: parent
-                            text: pieceText(board ? board[viewId][index] : "")
-                            color: pieceColor(board ? board[viewId][index] : ".")
+
+                            // Choose the correct 1D array depending on viewId (0 for Bot, 1 for Player)
+                            property var activeBoard: root.viewId === 0 ? root.botBoard : root.playerBoard
+
+                            text: pieceText(activeBoard && activeBoard[index] ? activeBoard[index] : "")
+                            color: pieceColor(activeBoard && activeBoard[index] ? activeBoard[index] : ".")
                             font.pixelSize: chessGrid.cellHeight
                             font.bold: true
                         }
+
                     }
                 }
             }
@@ -157,7 +164,9 @@ FocusScope {
 //        }
 
         onClassificationDone: {
-            root.board = [boardModel,boardModelReverted];
+            console.log("BotVision update classification result");
+            root.botBoard = boardModel;
+            root.playerBoard = boardModelReverted;
         }
     }
 }
