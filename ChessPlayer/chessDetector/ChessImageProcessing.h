@@ -127,7 +127,7 @@ public:
     ClassificationResult classifyImage(const cv::Mat& input_mat, int row, int col);
     void classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard);
 #if defined (USE_OPENVINO)
-    void classsifyWholeBoardAtOnce2(const cv::Mat& warpedBoard);
+    void classifyWholeBoardNativeOpenVINO(const cv::Mat& warpedBoard);
 #endif
     void classsifyChessBoardImage(const cv::Mat& warpedBoard);
     void classsifyChessBoardImage2(const cv::Mat& warpedBoard);
@@ -207,6 +207,7 @@ private:
     ov::Core m_ovCore;
     ov::CompiledModel m_ovCompiledModel;
     ov::InferRequest m_ovInferRequest;
+    std::vector<ov::InferRequest> m_ovInferRequestPool;
 #endif
 };
 

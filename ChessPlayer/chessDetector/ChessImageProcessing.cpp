@@ -52,7 +52,7 @@ void ChessImageProcessing::setDnnNetAllPieces(char* source, const std::vector<ch
     m_dnnAllPiecesImageSize = size;
     m_dnnAllPiecesImageChannels = channels;
     // 2. Set parallel processing worker threads to match your CPU capacity
-    cv::setNumThreads(cv::getNumberOfCPUs());
+//    cv::setNumThreads(1);
     // Add this temporarily inside setDnnNetAllPieces to list all available layers
 #if defined (DEBUG_CNN_LAYER)
     std::vector<std::string> layer_names = m_dnnNetAllPieces.getLayerNames();
@@ -66,50 +66,6 @@ void ChessImageProcessing::setDnnNetAllPieces(char* source, const std::vector<ch
     printf("\r\n");
 #endif
 }
-#if defined (USE_OPENVINO)
-void ChessImageProcessing::setDnnNetAllPieces2(char* source, const std::vector<char>& dnnClassNames)
-{
-    m_dnnAllPiecesNames = dnnClassNames;
-
-    std::string sourcePath(source);
-    size_t lastDot = sourcePath.find_last_of(".");
-    std::string basePath = (lastDot != std::string::npos) ? sourcePath.substr(0, lastDot) : sourcePath;
-
-    std::string xmlPath = basePath + ".xml";
-
-    std::cout << "[OPENVINO NATIVE] Reading Model Graph: " << xmlPath << "\n";
-    try {
-        // 1. Read the network graph topology from the XML file
-        std::shared_ptr<ov::Model> model = m_ovCore.read_model(xmlPath);
-
-        // =========================================================================
-        // FORCE MODEL INTERNAL LAYERS TO BE 100% STATIC (ELIMINATES 1460ms JIT DELAY)
-        // =========================================================================
-        std::cout << "[OPENVINO NATIVE] Forcing static dimension shapes [1, 3, "
-                  << WARP_HEIGHT << ", " << WARP_WIDTH << "] onto internal network paths...\n";
-
-        // Lock the primary input node's partial shape properties to unyielding static bounds
-        model->reshape({{"input", ov::Shape({1, 3, WARP_HEIGHT, WARP_WIDTH})}});
-        // =========================================================================
-
-        // 2. Compile the locked, static model graph natively for your Intel CPU
-        // Because the shape is now fully static, OpenVINO compiles optimized
-        // AVX/SIMD instructions once right here at boot time!
-        m_ovCompiledModel = m_ovCore.compile_model(model, "CPU");
-
-        // 3. Create the optimized inference request pipeline
-        m_ovInferRequest = m_ovCompiledModel.create_infer_request();
-
-        // 4. Trigger one initial warm-up execution to prime the hardware cache registers
-        std::cout << "[OPENVINO NATIVE] Triggering hardware cache compilation warmup pass...\n";
-        m_ovInferRequest.infer();
-
-        std::cout << "[OPENVINO NATIVE] System fully accelerated and ready for sub-25ms runs!\n";
-    } catch (const std::exception& e) {
-        std::cerr << "[OPENVINO ERROR] Native compiler failed: " << e.what() << std::endl;
-    }
-}
-#endif
 
 static void printMatrix(const std::string & name,
                         const std::vector < std::vector < int >> & mat) {
@@ -2056,223 +2012,148 @@ void ChessImageProcessing::classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard)
         printf("\r\n");
     }
 }
-
 #if defined (USE_OPENVINO)
-void ChessImageProcessing::classsifyWholeBoardAtOnce2(const cv::Mat& warpedBoard) {
-    int cellSize = CELL_SIZE;
-    printf("classsifyWholeBoardAtOnce (OPENVINO ZERO-COPY INTEGRAL ENGINE ACTIVE):\r\n");
-    auto start = std::chrono::steady_clock::now();
+void ChessImageProcessing::setDnnNetAllPieces2(char* source, const std::vector<char>& dnnClassNames, int size, int channels)
+{
+    m_dnnAllPiecesNames = dnnClassNames;
+    m_dnnAllPiecesImageSize = size;
+    m_dnnAllPiecesImageChannels = channels;
 
-    initializeManualClassificationHead();
+    std::string xmlPath(source);
+    std::cout << "[OPENVINO] Boot Initializer Reading: " << xmlPath << "\n";
 
-    // =========================================================================
-    // 1. HIGH-SPEED DIRECT CACHE STRIDE WRITING (FIXES 1734ms BOOT & WRONG PIECES)
-    // =========================================================================
-    // Retrieve a direct reference to the pre-compiled static input memory block
-    ov::Tensor inputTensor = m_ovInferRequest.get_input_tensor(0);
-    float* inputBufferPtr = inputTensor.data<float>();
+    try {
+        std::shared_ptr<ov::Model> model = m_ovCore.read_model(xmlPath);
 
-    // Constants for ImageNet normalization matching your PyTorch script model rules
-    float mean_vals[3] = {0.485f, 0.456f, 0.406f};
-    float std_vals[3]  = {0.229f, 0.224f, 0.225f};
+        // HARD FIX: Force a static shape profile matching your exact PyTorch trace shape [1, 3, 240, 240]
+        // This eliminates dynamic graph restructuring during runtime execution passes!
+        ov::Shape strictStaticShape = { 1, 3, (size_t)size, (size_t)size };
+        model->reshape({{"input", strictStaticShape}});
 
-    int totalPixelsPerChannel = WARP_HEIGHT * WARP_WIDTH;
-    int r_offset = 0;
-    int g_offset = totalPixelsPerChannel;
-    int b_offset = totalPixelsPerChannel * 2;
+        // Compile model natively optimizing for single-pass performance latency targets
+        m_ovCompiledModel = m_ovCore.compile_model(model, "CPU",
+            ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)
+        );
 
-    // Direct single-pass cache-friendly loop to format Interleaved BGR straight into Planar RGB
-    for (int y = 0; y < WARP_HEIGHT; ++y) {
-        const cv::Vec3b* rowPtr = warpedBoard.ptr<cv::Vec3b>(y);
-        int pixelRowIdx = y * WARP_WIDTH;
-
-        for (int x = 0; x < WARP_WIDTH; ++x) {
-            int writeIndex = pixelRowIdx + x;
-            cv::Vec3b bgrPixel = rowPtr[x];
-
-            // Normalize, convert channel lanes, and copy directly into OpenVINO memory space
-            inputBufferPtr[r_offset + writeIndex] = ((static_cast<float>(bgrPixel[2]) / 255.0f) - mean_vals[0]) / std_vals[0]; // Red
-            inputBufferPtr[g_offset + writeIndex] = ((static_cast<float>(bgrPixel[1]) / 255.0f) - mean_vals[1]) / std_vals[1]; // Green
-            inputBufferPtr[b_offset + writeIndex] = ((static_cast<float>(bgrPixel[0]) / 255.0f) - mean_vals[2]) / std_vals[2]; // Blue
-        }
+        m_ovInferRequest = m_ovCompiledModel.create_infer_request();
+        std::cout << "[OPENVINO] Success: Architecture graph fully optimized at boot time!\n";
+    } catch (const std::exception& e) {
+        std::cerr << "[OPENVINO ERROR] Initializer setup failed: " << e.what() << std::endl;
     }
-
-    // 2. Execute Zero-Copy Hardware Inference
-    m_ovInferRequest.infer();
-
-    // 3. Extract Accelerated Outputs from locked hardware memory registers
-    ov::Tensor featTensor  = m_ovInferRequest.get_output_tensor(0);
-    ov::Tensor logitTensor = m_ovInferRequest.get_output_tensor(1);
-
-    auto featShape = featTensor.get_shape();
-    int featChannels = static_cast<int>(featShape[1]); // 512 channels
-    int featHeight   = static_cast<int>(featShape[2]); // 60
-    int featWidth    = static_cast<int>(featShape[3]); // 105
-
-    int sizes[] = {1, featChannels, featHeight, featWidth};
-    float* rawFeatDataPtr = static_cast<float*>(featTensor.data());
-    cv::Mat featMap(4, sizes, CV_32F, rawFeatDataPtr);
-
-    std::cout << "[OPENVINO NATIVE] Feature Map Geometry resolved: Channels="
-              << featChannels << ", H=" << featHeight << ", W=" << featWidth << "\n";
-
-    float stepRow = static_cast<float>(featHeight) / static_cast<float>(NUM_ROW);
-    float stepCol = static_cast<float>(featWidth) / static_cast<float>(NUM_COL);
-    int num_classes = static_cast<int>(m_dnnAllPiecesNames.size());
-    int totalCells = NUM_ROW * NUM_COL;
-
-    // 4. Packed Feature Extraction Matrix Generation
-    cv::Mat packedFeatures(featChannels, totalCells, CV_32F);
-    std::vector<std::pair<int, int>> spatialMap(totalCells);
-
-    float* featMapPtr = featMap.ptr<float>(0);
-    int planeStride = featHeight * featWidth;
-
-    int cellIdx = 0;
-    for(int row = 0; row < NUM_ROW; row++) {
-        for(int col = 0; col < NUM_COL; col++) {
-            spatialMap[cellIdx] = {row, col};
-
-            int featY = cvRound((row + 0.5f) * stepRow - 0.5f);
-            int featX = cvRound((col + 0.5f) * stepCol - 0.5f);
-            featY = std::max(0, std::min(featY, featHeight - 1));
-            featX = std::max(0, std::min(featX, featWidth - 1));
-
-            int pixelOffset = featY * featWidth + featX;
-            for (int c = 0; c < featChannels; ++c) {
-                int tensorOffset = (c * planeStride) + pixelOffset;
-                packedFeatures.ptr<float>(c)[cellIdx] = featMapPtr[tensorOffset];
-            }
-            cellIdx++;
-        }
-    }
-
-    // 5. High-speed Batch Linear Layer Matrix Multiplication (GEMM)
-    cv::Mat batchLogits;
-    cv::gemm(m_fcWeightsMat, packedFeatures, 1.0, cv::Mat(), 0.0, batchLogits);
-
-    for (int r = 0; r < batchLogits.rows; ++r) {
-        float* rowPtr = batchLogits.ptr<float>(r);
-        float biasVal = m_fcBiasMat.at<float>(r);
-        for (int c = 0; c < batchLogits.cols; ++c) {
-            rowPtr[c] += biasVal;
-        }
-    }
-
-    // 6. Global Integral Image Color Pass for Backdrops
-    cv::Mat globalHSV;
-    cv::cvtColor(warpedBoard, globalHSV, cv::COLOR_BGR2HSV);
-
-    cv::Mat globalGrayMask = cv::Mat::zeros(globalHSV.size(), CV_8UC1);
-    cv::Mat globalGoldMask = cv::Mat::zeros(globalHSV.size(), CV_8UC1);
-
-    int gray_hsv[3][3] = {{20,8,91}, {0,0,156}, {95,35,167}};
-    int gray_tols[3][3] = {{50,40,40}, {50,40,40}, {10,40,40}};
-    int gold_hsv[3][3] = {{18,190,185}, {21,98,243}, {15,204,80}};
-    int gold_tols[3][3] = {{50,40,40}, {50,40,40}, {10,40,40}};
-
-    cv::Mat tempMask;
-    for (int k = 0; k < 3; ++k) {
-        cv::Scalar lowGray(std::max(0, gray_hsv[k][0]-gray_tols[k][0]), std::max(0, gray_hsv[k][1]-gray_tols[k][1]), std::max(0, gray_hsv[k][2]-gray_tols[k][2]));
-        cv::Scalar highGray(std::min(180, gray_hsv[k][0]+gray_tols[k][0]), std::min(255, gray_hsv[k][1]+gray_tols[k][1]), std::min(255, gray_hsv[k][2]+gray_tols[k][2]));
-        cv::inRange(globalHSV, lowGray, highGray, tempMask);
-        cv::bitwise_or(globalGrayMask, tempMask, globalGrayMask);
-
-        cv::Scalar lowGold(std::max(0, gold_hsv[k][0]-gold_tols[k][0]), std::max(0, gold_hsv[k][1]-gold_tols[k][1]), std::max(0, gold_hsv[k][2]-gold_tols[k][2]));
-        cv::Scalar highGold(std::min(180, gold_hsv[k][0]+gold_tols[k][0]), std::min(255, gold_hsv[k][1]+gold_tols[k][1]), std::min(255, gold_hsv[k][2]+gold_tols[k][2]));
-        cv::inRange(globalHSV, lowGold, highGold, tempMask);
-        cv::bitwise_or(globalGoldMask, tempMask, globalGoldMask);
-    }
-
-    cv::Mat integralGray, integralGold;
-    cv::integral(globalGrayMask, integralGray, CV_32S);
-    cv::integral(globalGoldMask, integralGold, CV_32S);
-
-    // Phase 7: Evaluate classifications mapping spatial cells directly
-    for (int i = 0; i < totalCells; ++i) {
-        int row = spatialMap[i].first;
-        int col = spatialMap[i].second;
-
-        if(m_mapExcludedCell[row][col] == 0) {
-            m_mapClassifiedCell[row][col] = '.';
-            continue;
-        }
-
-        std::vector<float> exp_scores(num_classes);
-        float max_score = -FLT_MAX;
-
-        for(int c = 0; c < num_classes; ++c) {
-            float score = batchLogits.at<float>(c, i);
-            if(score > max_score) max_score = score;
-        }
-
-        float sum_exp = 0.0f;
-        for (int c = 0; c < num_classes; ++c) {
-            exp_scores[c] = std::exp(batchLogits.at<float>(c, i) - max_score);
-            sum_exp += exp_scores[c];
-        }
-
-        int predicted_idx = 0;
-        float max_prob = 0.0f;
-
-        for (int c = 0; c < num_classes; ++c) {
-            float prob = exp_scores[c] / sum_exp;
-            if (prob > max_prob) {
-                max_prob = prob;
-                predicted_idx = c;
-            }
-        }
-
-        char finalClassName = m_dnnAllPiecesNames[predicted_idx];
-        int cropX = col * cellSize;
-        int cropY = row * cellSize;
-
-        cv::Rect cropRect;
-        if(col <= 3) {
-            cropRect.width = cellSize * 2 / 3;
-            cropRect.height = cellSize * 2 / 3;
-            cropRect.x = cropX + cellSize - cropRect.width;
-            cropRect.y = cropY + cellSize - cropRect.height;
-        } else if(col >= 10) {
-            cropRect.width = cellSize * 2 / 3;
-            cropRect.height = cellSize * 2 / 3;
-            cropRect.x = cropX;
-            cropRect.y = cropY + cellSize - cropRect.height;
-        } else {
-            cropRect.width = cellSize;
-            cropRect.height = cellSize / 2;
-            cropRect.x = cropX;
-            cropRect.y = cropY + cellSize - cropRect.height;
-        }
-        cropRect &= cv::Rect(0, 0, warpedBoard.cols, warpedBoard.rows);
-
-        int x1 = cropRect.x; int y1 = cropRect.y;
-        int x2 = cropRect.x + cropRect.width; int y2 = cropRect.y + cropRect.height;
-
-        int grayPixels = (integralGray.at<int>(y2, x2) - integralGray.at<int>(y1, x2) - integralGray.at<int>(y2, x1) + integralGray.at<int>(y1, x1)) / 255;
-        int goldPixels = (integralGold.at<int>(y2, x2) - integralGold.at<int>(y1, x2) - integralGold.at<int>(y2, x1) + integralGold.at<int>(y1, x1)) / 255;
-
-        if(grayPixels > 3 * goldPixels / 2 && grayPixels > 1500) {
-            finalClassName = std::tolower(finalClassName); // Black Side Piece mapping
-        } else if((goldPixels > 3 * grayPixels / 2 && goldPixels > 1500) || goldPixels > 2000) {
-            finalClassName = std::toupper(finalClassName); // White Side Piece mapping
-        } else if(goldPixels + grayPixels < 2000){
-            finalClassName = '.';
-        }
-
-        m_mapClassifiedCell[row][col] = finalClassName;
-    }
-
-    auto end = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    std::cout << "Fully Vectorized Whole-board processing loop complete in: " << elapsed << " ms" << std::endl;
-#ifdef DEBUG_ROI
-    cv::Mat scaledWarped;
-    cv::resize(warpedBoard, scaledWarped, cv::Size(WARP_SMALL_WIDTH, WARP_SMALL_HEIGHT), 0, 0, cv::INTER_NEAREST);
-    cv::imshow("classification", scaledWarped);
+}
 #endif
 
-    printf("Mapped Board State Layout:\r\n");
+#if defined (USE_OPENVINO)
+void ChessImageProcessing::classifyWholeBoardNativeOpenVINO(const cv::Mat& warpedBoard) {
+    if (warpedBoard.empty()) return;
+
+    auto startTotal = std::chrono::steady_clock::now();
+
+    // 1. Fetch direct input tensor tracking properties layout
+    ov::Tensor inputTensor = m_ovInferRequest.get_input_tensor();
+    float* inputBufferPtr = inputTensor.data<float>();
+
+    const int targetWidth = m_dnnAllPiecesImageSize;   // 240
+    const int targetHeight = m_dnnAllPiecesImageSize;  // 240
+    const size_t channelStride = (size_t)targetWidth * (size_t)targetHeight;
+
+    float srcCellWidth = static_cast<float>(warpedBoard.cols) / NUM_COL;
+    float srcCellHeight = static_cast<float>(warpedBoard.rows) / NUM_ROW;
+
+    std::vector<std::pair<int, int>> spatialCoords;
+    spatialCoords.reserve(112);
+
+    int totalInferPassesCount = 0;
+    double cumulativeInferTimeMs = 0.0;
+
+    // Phase 1: Allocation-Free Iteration
+    for(int row = 0; row < NUM_ROW; row++) {
+        for(int col = 0; col < NUM_COL; col++) {
+            if(m_mapExcludedCell[row][col] == 0) {
+                m_mapClassifiedCell[row][col] = '.';
+                continue;
+            }
+
+            spatialCoords.push_back({row, col});
+
+            int startX = cvRound(col * srcCellWidth);
+            int startY = cvRound(row * srcCellHeight);
+
+            float scaleX = srcCellWidth / targetWidth;
+            float scaleY = srcCellHeight / targetHeight;
+
+            // ⚡ CACHE FIX: Write pointers sequentially in memory to prevent RAM thrashing
+            float* rPlane = inputBufferPtr;
+            float* gPlane = inputBufferPtr + channelStride;
+            float* bPlane = inputBufferPtr + (2 * channelStride);
+
+            int destIdx = 0;
+            for (int dy = 0; dy < targetHeight; ++dy) {
+                int srcY = std::max(0, std::min(startY + static_cast<int>(dy * scaleY), warpedBoard.rows - 1));
+                const cv::Vec3b* srcRowPtr = warpedBoard.ptr<cv::Vec3b>(srcY);
+
+                for (int dx = 0; dx < targetWidth; ++dx) {
+                    int srcX = std::max(0, std::min(startX + static_cast<int>(dx * scaleX), warpedBoard.cols - 1));
+                    cv::Vec3b bgrPixel = srcRowPtr[srcX];
+
+                    // Writing sequentially sequentially forces your i5 L3 cache to burst pipeline data smoothly
+                    rPlane[destIdx] = static_cast<float>(bgrPixel[2]) * (1.0f / 255.0f);
+                    gPlane[destIdx] = static_cast<float>(bgrPixel[1]) * (1.0f / 255.0f);
+                    bPlane[destIdx] = static_cast<float>(bgrPixel[0]) * (1.0f / 255.0f);
+                    destIdx++;
+                }
+            }
+
+            // ⚡ SPEED FIX: Synchronous Execution pass running on static hardcoded layout paths
+            auto startInfer = std::chrono::steady_clock::now();
+
+            m_ovInferRequest.infer(); // Spawns optimized vector instructions directly on your i5 CPU
+
+            auto endInfer = std::chrono::steady_clock::now();
+            cumulativeInferTimeMs += std::chrono::duration_cast<std::chrono::microseconds>(endInfer - startInfer).count() / 1000.0;
+            totalInferPassesCount++;
+
+            // Phase 2: Read Back predictions maps cleanly
+            ov::Tensor outputTensor = m_ovInferRequest.get_output_tensor();
+            const float* outputBufferPtr = outputTensor.data<const float>();
+
+            // Safe array boundary size checks mapping [1, 7] shapes
+            int numClasses = static_cast<int>(outputTensor.get_shape()[1]);
+
+            int predictedIdx = 0;
+            float maxScore = outputBufferPtr[0];
+            for (int c = 1; c < numClasses; ++c) {
+                if (outputBufferPtr[c] > maxScore) {
+                    maxScore = outputBufferPtr[c];
+                    predictedIdx = c;
+                }
+            }
+
+            ClassificationResult piece;
+            piece.row = row;
+            piece.col = col;
+            piece.className = m_dnnAllPiecesNames[predictedIdx];
+
+            // Core legacy compatibility patches tracking overlays configurations variables
+            int fallbackX = cvRound(col * srcCellWidth);
+            int fallbackY = cvRound(row * srcCellHeight);
+            cv::Rect cellRect(fallbackX, fallbackY, cvRound(srcCellWidth), cvRound(srcCellHeight));
+            cellRect &= cv::Rect(0, 0, warpedBoard.cols, warpedBoard.rows);
+
+            cv::Mat croppedCellBGR = warpedBoard(cellRect);
+            checkPieceColor(croppedCellBGR, piece, row, col);
+
+            m_mapClassifiedCell[row][col] = piece.className;
+        }
+    }
+
+    auto endTotal = std::chrono::steady_clock::now();
+    auto totalElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(endTotal - startTotal).count();
+
+    std::cout << "[OPENVINO CACHE-ALIGNED PASS] Total Inference Calls: " << totalInferPassesCount
+              << " | Total Loop Latency: " << totalElapsed << " ms (Cumulative Raw Engine Net: "
+              << cumulativeInferTimeMs << " ms)" << std::endl;
+    printf("Mapped Board:\r\n");
     for(int row = 0; row < NUM_ROW; row++) {
         for(int col = 0; col < NUM_COL; col++) {
             printf("%c ", m_mapClassifiedCell[row][col]);
@@ -2281,6 +2162,8 @@ void ChessImageProcessing::classsifyWholeBoardAtOnce2(const cv::Mat& warpedBoard
     }
 }
 #endif
+
+
 void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) {
     int cellSize = CELL_SIZE;
     printf("classsifyChessBoardImage (BATCH INF MODE: %dx%d, %d Channel(s)):\r\n",
@@ -2352,8 +2235,8 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
         cv::Scalar mean_grayscale(127.5);
         double std_dev_grayscale = 0.5;
 
-        cv::dnn::blobFromImages(
-            batchImages, batchBlob, scale_factor, target_size,
+    cv::dnn::blobFromImages(
+        batchImages, batchBlob, scale_factor, target_size,
             mean_grayscale, swapChannels, false
         );
         cv::divide(batchBlob, std_dev_grayscale, batchBlob);
@@ -2368,7 +2251,7 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
         cv::dnn::blobFromImages(
             batchImages, batchBlob, scale_factor, target_size,
             mean_rgb, swapChannels, false
-        );
+    );
         cv::divide(batchBlob, std_dev_rgb, batchBlob);
     }
 

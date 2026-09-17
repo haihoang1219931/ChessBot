@@ -4,6 +4,7 @@ CONFIG -= app_bundle
 CONFIG -= qt
 
 CONFIG += use_image_processing
+CONFIG += use_openvino
 use_image_processing {
 DEFINES += DEBUG_SHOW_IMAGE
 #DEFINES += DEBUG_SINGLE_IMAGE
@@ -38,7 +39,8 @@ unix:!macx: LIBS += -L/usr/local/runtime/lib/intel64/ \
     -lopenvino_intel_npu_plugin \
     -lopenvino_gguf_frontend \
     -lopenvino_auto_plugin \
-    -lopenvino_auto_batch_plugin
+    -lopenvino_auto_batch_plugin \
+    -lpthread
 }
 unix:!macx: INCLUDEPATH += /usr/local/include/opencv4
 unix:!macx: DEPENDPATH += /usr/local/include/opencv4
