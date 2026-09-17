@@ -244,7 +244,11 @@ private:
     QString m_chessDetectorModel;
     QString m_chessDetectorClassList;
     int m_chessDetectorImageSize;
-    int m_chessDetectorImageChannels = 3;
+    int m_chessDetectorImageChannels;
+    QString m_chessVerifyModel;
+    QString m_chessVerifyClassList;
+    int m_chessVerifyImageSize;
+    int m_chessVerifyImageChannels;
     QString m_voiceModel;
     QString m_speakerModel;
     int m_timeOut;

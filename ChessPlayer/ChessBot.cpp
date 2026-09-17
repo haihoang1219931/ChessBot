@@ -66,28 +66,41 @@ ChessBot::ChessBot(QThread *parent) :
     connect(m_chessController,&ChessController::boardChanged,
             this,&ChessBot::boardChanged);
     if(!m_validCalibFileFound) {
-        m_chessDetectorModel = "chess_piece_resnet18_20260828_100epoch.onnx";
+        m_chessDetectorModel = "mini_resnet_chess_64x64.onnx";
         m_chessDetectorClassList = "b,.,k,n,p,q,r";
-        m_chessDetectorImageSize = 240;
+        m_chessDetectorImageSize = 64;
         m_chessDetectorImageChannels = 3;
+        m_chessVerifyModel = "chess_piece_resnet18_20260828_100epoch.onnx";
+        m_chessVerifyClassList = "b,.,k,n,p,q,r";
+        m_chessVerifyImageSize = 240;
+        m_chessVerifyImageChannels = 3;
         m_voiceModel = "";
         m_speakerModel = "";
         m_chessboardConners.clear();
-        m_chessboardConners.push_back(QPoint(234, 159));
-        m_chessboardConners.push_back(QPoint(1716, 174));
-        m_chessboardConners.push_back(QPoint(1878, 1032));
-        m_chessboardConners.push_back(QPoint(84, 1032));
+        m_chessboardConners.push_back(QPoint(181, 59));
+        m_chessboardConners.push_back(QPoint(1766, 76));
+        m_chessboardConners.push_back(QPoint(1955, 1002));
+        m_chessboardConners.push_back(QPoint(6, 1010));
         m_moveDetector->setCorners(m_chessboardConners[0].x(),m_chessboardConners[0].y(),
                 m_chessboardConners[1].x(),m_chessboardConners[1].y(),
                 m_chessboardConners[2].x(),m_chessboardConners[2].y(),
                 m_chessboardConners[3].x(),m_chessboardConners[3].y());
-        std::vector<char> dnnClassNames;
-        QStringList dnnClassArr = m_chessDetectorClassList.split(",");
-        for(QString className:dnnClassArr) {
-            dnnClassNames.push_back(className.toStdString()[0]);
+        std::vector<char> dnnDetectorClassList;
+        QStringList dnnDetectorClassArr = m_chessDetectorClassList.split(",");
+        for(QString className:dnnDetectorClassArr) {
+            dnnDetectorClassList.push_back(className.toStdString()[0]);
         }
-        m_moveDetector->setDnnNetAllPieces((char*)m_chessDetectorModel.toStdString().c_str(),
-                                           dnnClassNames,
+        m_moveDetector->setDnnDetector((char*)m_chessDetectorModel.toStdString().c_str(),
+                                           dnnDetectorClassList,
+                                           m_chessDetectorImageSize,
+                                           m_chessDetectorImageChannels);
+        std::vector<char> dnnVerifyClassList;
+        QStringList dnnVerifyClassArr = m_chessDetectorClassList.split(",");
+        for(QString className:dnnVerifyClassArr) {
+            dnnVerifyClassList.push_back(className.toStdString()[0]);
+        }
+        m_moveDetector->setDnnVerify((char*)m_chessVerifyModel.toStdString().c_str(),
+                                           dnnVerifyClassList,
                                            m_chessDetectorImageSize,
                                            m_chessDetectorImageChannels);
         saveCalibrationData();
@@ -158,9 +171,6 @@ void ChessBot::updateCorners(QVariantList corners)
     m_chessboardConners.clear();
     for (const QVariant &val : corners) {
         QVariantMap map = val.toMap();
-        int x = map["x"].toInt();
-        int y = map["y"].toInt();
-
         m_chessboardConners.append(QPoint(map["x"].toInt(),map["y"].toInt()));
     }
 
@@ -1497,10 +1507,14 @@ bool ChessBot::saveCalibrationData(QString fileName)
 
     // 1. Store ai models
     QJsonObject childrenObj;
-    childrenObj["chess_detector"] = m_chessDetectorModel;
-    childrenObj["class_list"] = m_chessDetectorClassList;
-    childrenObj["input_size"] = m_chessDetectorImageSize;
-    childrenObj["input_channel"] = m_chessDetectorImageChannels;
+    childrenObj["detector_model"] = m_chessDetectorModel;
+    childrenObj["detector_list"] = m_chessDetectorClassList;
+    childrenObj["detector_size"] = m_chessDetectorImageSize;
+    childrenObj["detector_channel"] = m_chessDetectorImageChannels;
+    childrenObj["verify_model"] = m_chessVerifyModel;
+    childrenObj["verify_list"] = m_chessVerifyClassList;
+    childrenObj["verify_size"] = m_chessVerifyImageSize;
+    childrenObj["verify_channel"] = m_chessVerifyImageChannels;
     childrenObj["voice_detector"] = m_voiceModel;
     childrenObj["speaker"] = m_speakerModel;
 
@@ -1643,17 +1657,26 @@ bool ChessBot::loadCalibrationData(QString fileName)
     }
     if(root.contains("ai_model")) {
         QJsonObject aiModelObj = root["ai_model"].toObject();
-
-        m_chessDetectorModel = aiModelObj["chess_detector"].toString();
-        m_chessDetectorClassList = aiModelObj["class_list"].toString();
-        m_chessDetectorImageSize = aiModelObj["input_size"].toInt();
-        m_chessDetectorImageChannels = aiModelObj["input_channel"].toInt();
+        m_chessDetectorModel = aiModelObj["detector_model"].toString();
+        m_chessDetectorClassList = aiModelObj["detector_list"].toString();
+        m_chessDetectorImageSize = aiModelObj["detector_size"].toInt();
+        m_chessDetectorImageChannels = aiModelObj["detector_channel"].toInt();
+        m_chessVerifyModel = aiModelObj["verify_model"].toString();
+        m_chessVerifyClassList = aiModelObj["verify_list"].toString();
+        m_chessVerifyImageSize = aiModelObj["verify_size"].toInt();
+        m_chessVerifyImageChannels = aiModelObj["verify_channel"].toInt();
         m_voiceModel = aiModelObj["voice_detector"].toString();
         m_speakerModel = aiModelObj["speaker"].toString();
 
         // Print the values to verify
-        qDebug() << "Chess Detector Path:" << m_chessDetectorModel;
-        qDebug() << "Class List:" << m_chessDetectorClassList;
+        qDebug() << "Detector Path:" << m_chessDetectorModel;
+        qDebug() << "Detector List:" << m_chessDetectorClassList;
+        qDebug() << "Detector Size:" << m_chessDetectorImageSize;
+        qDebug() << "Detector Channel:" << m_chessDetectorImageChannels;
+        qDebug() << "Verify Path:" << m_chessVerifyModel;
+        qDebug() << "Verify List:" << m_chessVerifyClassList;
+        qDebug() << "Verify Size:" << m_chessVerifyImageSize;
+        qDebug() << "Verify Channel:" << m_chessVerifyImageChannels;
         qDebug() << "Voice Detector Path:" << m_voiceModel;
         qDebug() << "Speaker Path:" << m_speakerModel;
         std::vector<char> dnnClassNames;

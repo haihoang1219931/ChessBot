@@ -42,34 +42,58 @@ ChessImageProcessing::ChessImageProcessing()
 //    findPossibleMoves2(cv::Mat(),(const char*)testBoardPrev,params);
 }
 
-void ChessImageProcessing::setDnnNetAllPieces(char* source, const std::vector<char>& dnnClassNames,
-                                              int size, int channels)
+void ChessImageProcessing::setDnnDetector(char *source, const std::vector<char> &dnnClassNames, int size, int channels)
 {
-    m_dnnNetAllPieces = cv::dnn::readNetFromONNX(source);
-    m_dnnAllPiecesNames = dnnClassNames;
-    m_dnnNetAllPieces.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
-    m_dnnNetAllPieces.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
-    m_dnnAllPiecesImageSize = size;
-    m_dnnAllPiecesImageChannels = channels;
+    m_dnnDetector = cv::dnn::readNetFromONNX(source);
+    m_dnnDetectorClassList = dnnClassNames;
+    m_dnnDetector.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+    m_dnnDetector.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+    m_dnnDetectorSize = size;
+    m_dnnDetectorChannels = channels;
     // 2. Set parallel processing worker threads to match your CPU capacity
     cv::setNumThreads(cv::getNumberOfCPUs());
     // Add this temporarily inside setDnnNetAllPieces to list all available layers
 #if defined (DEBUG_CNN_LAYER)
-    std::vector<std::string> layer_names = m_dnnNetAllPieces.getLayerNames();
+    std::vector<std::string> layer_names = m_dnnDetector.getLayerNames();
     for (const auto& name : layer_names) {
         std::cout << "Layer available in ONNX graph: " << name << std::endl;
     }
-    printf("setDnnNetAllPieces [%s] ",source);
+    printf("%s [%s] ",__FUNCTION__,source);
     for(char className: dnnClassNames) {
         printf("%c ",className);
     }
     printf("\r\n");
 #endif
 }
+
+void ChessImageProcessing::setDnnVerify(char *source, const std::vector<char> &dnnClassNames, int size, int channels)
+{
+    m_dnnVerify = cv::dnn::readNetFromONNX(source);
+    m_dnnVerifyClassList = dnnClassNames;
+    m_dnnVerify.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+    m_dnnVerify.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+    m_dnnVerifySize = size;
+    m_dnnVerifyChannels = channels;
+    // 2. Set parallel processing worker threads to match your CPU capacity
+    cv::setNumThreads(cv::getNumberOfCPUs());
+    // Add this temporarily inside setDnnNetAllPieces to list all available layers
+#if defined (DEBUG_CNN_LAYER)
+    std::vector<std::string> layer_names = m_dnnDetector.getLayerNames();
+    for (const auto& name : layer_names) {
+        std::cout << "Layer available in ONNX graph: " << name << std::endl;
+    }
+    printf("%s [%s] ",__FUNCTION__,source);
+    for(char className: dnnClassNames) {
+        printf("%c ",className);
+    }
+    printf("\r\n");
+#endif
+}
+
 #if defined (USE_OPENVINO)
 void ChessImageProcessing::setDnnNetAllPieces2(char* source, const std::vector<char>& dnnClassNames)
 {
-    m_dnnAllPiecesNames = dnnClassNames;
+    m_dnnDetectorClassList = dnnClassNames;
 
     std::string sourcePath(source);
     size_t lastDot = sourcePath.find_last_of(".");
@@ -1733,7 +1757,8 @@ bool ChessImageProcessing::isPromoteMove(char* prevBoard, char* currBoard,
     return foundPromoteMove;
 }
 
-ClassificationResult ChessImageProcessing::classifyImage(const cv::Mat& input_mat, int row, int col) {
+ClassificationResult ChessImageProcessing::classifyImage(cv::dnn::Net& dnn, std::vector<char>& classList,
+                                                         const cv::Mat& input_mat, int row, int col) {
     ClassificationResult result;
     result.className = '.';
     result.probability = 0;
@@ -1771,8 +1796,8 @@ ClassificationResult ChessImageProcessing::classifyImage(const cv::Mat& input_ma
     cv::divide(blob, std_dev, blob);
 
     // 4. Run inference pass
-    m_dnnNetAllPieces.setInput(blob);
-    cv::Mat outputs = m_dnnNetAllPieces.forward(); // Output shape: [1, num_classes]
+    dnn.setInput(blob);
+    cv::Mat outputs = dnn.forward(); // Output shape: [1, num_classes]
 
     // 5. Post-processing: Apply manual Softmax to the row vector
     float* data_ptr = outputs.ptr<float>(0);
@@ -1797,7 +1822,7 @@ ClassificationResult ChessImageProcessing::classifyImage(const cv::Mat& input_ma
     for (int i = 0; i < num_classes; ++i) {
         float prob = exp_scores[i] / sum_exp;
 #ifdef DEBUG_SINGLE_IMAGE
-        printf("class[%s] prob[%f]\r\n",m_dnnAllPiecesNames[i].c_str(),prob);
+        printf("class[%s] prob[%f]\r\n",m_dnnDetectorClassList[i].c_str(),prob);
 #endif
         if (prob > max_prob) {
             max2_prob = max_prob;
@@ -1811,12 +1836,12 @@ ClassificationResult ChessImageProcessing::classifyImage(const cv::Mat& input_ma
     }
 #if defined(DEBUG_CLASSIFICATION) && defined (DEBUG_SINGLE_IMAGE)
     // 7. Print Results
-    std::cout << "Prediction Result: " << m_dnnAllPiecesNames[predicted_idx] << "\n";
+    std::cout << "Prediction Result: " << m_dnnDetectorClassList[predicted_idx] << "\n";
     std::cout << "Confidence Level: " << std::fixed << (max_prob * 100.0f) << "%\n";
 #endif
-    result.className = m_dnnAllPiecesNames[predicted_idx];
+    result.className = classList[predicted_idx];
     result.probability = max_prob * 100.0f;
-    result.className2 = m_dnnAllPiecesNames[predicted2_idx];
+    result.className2 = classList[predicted2_idx];
     result.probability2 = max2_prob * 100.0f;
     return result;
 }
@@ -1863,22 +1888,22 @@ void ChessImageProcessing::classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard)
 
     // Phase 1: Handle input color routing configuration dynamically
     cv::Mat preparedBoard;
-    if (m_dnnAllPiecesImageChannels == 1) {
+    if (m_dnnDetectorChannels == 1) {
         cv::cvtColor(warpedBoard, preparedBoard, cv::COLOR_BGR2GRAY);
-    } else if (m_dnnAllPiecesImageChannels == 3) {
+    } else if (m_dnnDetectorChannels == 3) {
         preparedBoard = warpedBoard.clone(); // Preserves raw frame parameters clean
     } else {
-        std::cerr << "Error: Supported channels specification are 1 or 3. Received: " << m_dnnAllPiecesImageChannels << "\n";
+        std::cerr << "Error: Supported channels specification are 1 or 3. Received: " << m_dnnDetectorChannels << "\n";
         return;
     }
 
     // Phase 2: Create a single 4D Tensor Blob capturing the entire chessboard image context at once
-    cv::Size target_size(m_dnnAllPiecesImageSize, m_dnnAllPiecesImageSize);
+    cv::Size target_size(m_dnnDetectorSize, m_dnnDetectorSize);
     double scale_factor = 1.0 / 255.0;
-    bool swapChannels = (m_dnnAllPiecesImageChannels == 3); // Swap R and B lanes if processing your native 3-channel RGB model setup
+    bool swapChannels = (m_dnnDetectorChannels == 3); // Swap R and B lanes if processing your native 3-channel RGB model setup
     cv::Mat wholeBoardBlob;
 
-    if (m_dnnAllPiecesImageChannels == 1) {
+    if (m_dnnDetectorChannels == 1) {
         cv::Scalar mean_grayscale(127.5);
 
         cv::dnn::blobFromImage(
@@ -1905,10 +1930,10 @@ void ChessImageProcessing::classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard)
     }
 
     // Phase 3: Execute ONE single parallel forward pass optimizing CPU cache residency
-    m_dnnNetAllPieces.setInput(wholeBoardBlob, "input"); //
+    m_dnnDetector.setInput(wholeBoardBlob, "input"); //
 
     // Bypasses global pooling logic entirely by extracting the raw output map layer directly from layer4
-    cv::Mat featMap = m_dnnNetAllPieces.forward("onnx_node!/layer4/layer4.1/relu_1/Relu"); //
+    cv::Mat featMap = m_dnnDetector.forward("onnx_node!/layer4/layer4.1/relu_1/Relu"); //
 
     // Extract tensor geometry parameters dynamically from the output matrix
     int featChannels = featMap.size[1]; // 512 feature mappings
@@ -1919,7 +1944,7 @@ void ChessImageProcessing::classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard)
     float stepRow = static_cast<float>(featHeight) / static_cast<float>(NUM_ROW); //
     float stepCol = static_cast<float>(featWidth) / static_cast<float>(NUM_COL); //
 
-    int num_classes = static_cast<int>(m_dnnAllPiecesNames.size()); //
+    int num_classes = static_cast<int>(m_dnnDetectorClassList.size()); //
     int totalCells = NUM_ROW * NUM_COL;
 
     // Phase 4: Packed Feature Extraction Matrix Generation
@@ -2004,9 +2029,9 @@ void ChessImageProcessing::classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard)
         ClassificationResult piece; //
         piece.row = row; //
         piece.col = col; //
-        piece.className = m_dnnAllPiecesNames[predicted_idx]; //
+        piece.className = m_dnnDetectorClassList[predicted_idx]; //
         piece.probability = max_prob * 100.0f; //
-        piece.className2 = m_dnnAllPiecesNames[predicted2_idx]; //
+        piece.className2 = m_dnnDetectorClassList[predicted2_idx]; //
         piece.probability2 = max2_prob * 100.0f; //
 
         // Isolate individual cell boundaries to pass down to legacy color checking routines
@@ -2118,7 +2143,7 @@ void ChessImageProcessing::classsifyWholeBoardAtOnce2(const cv::Mat& warpedBoard
 
     float stepRow = static_cast<float>(featHeight) / static_cast<float>(NUM_ROW);
     float stepCol = static_cast<float>(featWidth) / static_cast<float>(NUM_COL);
-    int num_classes = static_cast<int>(m_dnnAllPiecesNames.size());
+    int num_classes = static_cast<int>(m_dnnDetectorClassList.size());
     int totalCells = NUM_ROW * NUM_COL;
 
     // 4. Packed Feature Extraction Matrix Generation
@@ -2223,7 +2248,7 @@ void ChessImageProcessing::classsifyWholeBoardAtOnce2(const cv::Mat& warpedBoard
             }
         }
 
-        char finalClassName = m_dnnAllPiecesNames[predicted_idx];
+        char finalClassName = m_dnnDetectorClassList[predicted_idx];
         int cropX = col * cellSize;
         int cropY = row * cellSize;
 
@@ -2284,7 +2309,7 @@ void ChessImageProcessing::classsifyWholeBoardAtOnce2(const cv::Mat& warpedBoard
 void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) {
     int cellSize = CELL_SIZE;
     printf("classsifyChessBoardImage (BATCH INF MODE: %dx%d, %d Channel(s)):\r\n",
-           m_dnnAllPiecesImageSize, m_dnnAllPiecesImageSize, m_dnnAllPiecesImageChannels);
+           m_dnnDetectorSize, m_dnnDetectorSize, m_dnnDetectorChannels);
     auto start = std::chrono::steady_clock::now();
 
     // Pre-allocate containers to eliminate memory thrashing inside the core loop
@@ -2317,14 +2342,14 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
             cv::Mat preparedCell;
 
             // Handle channel mapping dynamically based on input parameter
-            if (m_dnnAllPiecesImageChannels == 1) {
+            if (m_dnnDetectorChannels == 1) {
                 // Convert 3-channel BGR to 1-channel Grayscale
                 cv::cvtColor(croppedCellBGR, preparedCell, cv::COLOR_BGR2GRAY);
-            } else if (m_dnnAllPiecesImageChannels == 3) {
+            } else if (m_dnnDetectorChannels == 3) {
                 // Keep original BGR channels (blobFromImages will handle the RGB swap later)
                 preparedCell = croppedCellBGR;
             } else {
-                std::cerr << "Error: Supported channels configuration are 1 or 3. Received: " << m_dnnAllPiecesImageChannels << "\n";
+                std::cerr << "Error: Supported channels configuration are 1 or 3. Received: " << m_dnnDetectorChannels << "\n";
                 return;
             }
 
@@ -2341,13 +2366,13 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
     }
 
     // Phase 2: Create a 4D Tensor Batch Blob using 'blobFromImages'
-    cv::Size target_size(m_dnnAllPiecesImageSize, m_dnnAllPiecesImageSize);
+    cv::Size target_size(m_dnnDetectorSize, m_dnnDetectorSize);
     double scale_factor = 1.0 / 255.0; // Scale pixels to [0.0, 1.0]
 
     cv::Mat batchBlob;
-    bool swapChannels = (m_dnnAllPiecesImageChannels == 3); // Swap R and B channels only if we are feeding a 3-channel model
+    bool swapChannels = (m_dnnDetectorChannels == 3); // Swap R and B channels only if we are feeding a 3-channel model
 
-    if (m_dnnAllPiecesImageChannels == 1) {
+    if (m_dnnDetectorChannels == 1) {
         // Grayscale 1-channel custom weights normalization parity: (pixel - 127.5) * (1/255) / 0.5
         cv::Scalar mean_grayscale(127.5);
         double std_dev_grayscale = 0.5;
@@ -2373,8 +2398,8 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
     }
 
     // Phase 3: Execute full batch processing in a single forward pass
-    m_dnnNetAllPieces.setInput(batchBlob, "input"); // "input" explicitly maps to the layer name set in torch.onnx.export
-    cv::Mat outputs = m_dnnNetAllPieces.forward("output"); // "output" matches your exported ONNX configuration graph node
+    m_dnnDetector.setInput(batchBlob, "input"); // "input" explicitly maps to the layer name set in torch.onnx.export
+    cv::Mat outputs = m_dnnDetector.forward("output"); // "output" matches your exported ONNX configuration graph node
 
     int num_classes = outputs.cols;
 
@@ -2425,9 +2450,9 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
         ClassificationResult piece;
         piece.row = row;
         piece.col = col;
-        piece.className = m_dnnAllPiecesNames[predicted_idx];
+        piece.className = m_dnnDetectorClassList[predicted_idx];
         piece.probability = max_prob * 100.0f;
-        piece.className2 = m_dnnAllPiecesNames[predicted2_idx];
+        piece.className2 = m_dnnDetectorClassList[predicted2_idx];
         piece.probability2 = max2_prob * 100.0f;
 
         // Execute background color checks locally (Uses original color matrix mapping rules)

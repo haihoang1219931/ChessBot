@@ -76,7 +76,9 @@ class ChessImageProcessing
 {
 public:
     ChessImageProcessing();
-    void setDnnNetAllPieces(char* source, const std::vector<char>& dnnClassNames,
+    void setDnnDetector(char* source, const std::vector<char>& dnnClassNames,
+                            int size, int channels);
+    void setDnnVerify(char* source, const std::vector<char>& dnnClassNames,
                             int size, int channels);
 #if defined (USE_OPENVINO)
     void setDnnNetAllPieces2(char* source, const std::vector<char>& dnnClassNames,
@@ -124,7 +126,8 @@ public:
     int countMatchPixelColor(const cv::Mat& imageHSV, const std::vector<TargetColor>& targetColors, int maxH, int maxSV, std::string showName);
     void checkPieceColor(const cv::Mat& imageRGB, ClassificationResult& pieceClass, int row, int col);
     bool detectMovePhase3Classification();
-    ClassificationResult classifyImage(const cv::Mat& input_mat, int row, int col);
+    ClassificationResult classifyImage(cv::dnn::Net& dnn, std::vector<char>& classList,
+                                       const cv::Mat& input_mat, int row, int col);
     void classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard);
 #if defined (USE_OPENVINO)
     void classsifyWholeBoardAtOnce2(const cv::Mat& warpedBoard);
@@ -191,10 +194,14 @@ private:
     cv::Mat m_transformMatrix;
     bool m_transformMaxtrixValid;
     int m_detectState;
-    cv::dnn::Net m_dnnNetAllPieces;
-    std::vector<char> m_dnnAllPiecesNames;
-    int m_dnnAllPiecesImageSize;
-    int m_dnnAllPiecesImageChannels;
+    cv::dnn::Net m_dnnDetector;
+    std::vector<char> m_dnnDetectorClassList;
+    int m_dnnDetectorSize;
+    int m_dnnDetectorChannels;
+    cv::dnn::Net m_dnnVerify;
+    std::vector<char> m_dnnVerifyClassList;
+    int m_dnnVerifySize;
+    int m_dnnVerifyChannels;
     uint8_t m_mapExcludedCell[NUM_ROW][NUM_COL];
     char m_mapClassifiedCell[NUM_ROW][NUM_COL];
     // Internal layer parameters mapped from training weights file
