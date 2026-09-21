@@ -246,19 +246,15 @@ void ChessImageProcessing::setCorners(float topLeftX, float topLeftY,
     }
     m_transformHeadPiecesWholeBoard = cv::getPerspectiveTransform(srcCorners, dstCorners);
 
-    // 9. Generate warp matrix for only 8x8 chess board
-    // Top-Left: 3, Top-Right: 11, Bottom-Right: (9*15)-4 = 131, Bottom-Left: 9*15 - 15 + 3 = 123
-    int groundCorner_indices[] = {3, total_columns - 4,
-                                  (total_rows * total_columns) - 4, (total_rows * total_columns) - total_columns + 3};
-    for(int idx : groundCorner_indices) {
+    for(int idx : corner_indices) {
         srcGroundCorners.push_back(cv::Point2f(projected_ground_points[idx].x,
                                          projected_ground_points[idx].y));
     }
 
     dstGroundCorners = {
         cv::Point2f(0, 0),
-        cv::Point2f(WARP_SMALL_HEIGHT - 1, 0),
-        cv::Point2f(WARP_SMALL_HEIGHT - 1, WARP_SMALL_HEIGHT - 1),
+        cv::Point2f(WARP_SMALL_WIDTH - 1, 0),
+        cv::Point2f(WARP_SMALL_WIDTH - 1, WARP_SMALL_HEIGHT - 1),
         cv::Point2f(0, WARP_SMALL_HEIGHT - 1)
     };
 
@@ -1919,7 +1915,8 @@ void ChessImageProcessing::classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard)
         int row = spatialMap[i].first;
         int col = spatialMap[i].second;
 
-        if(m_mapExcludedCell[row][col] == 0) { //
+        if(m_mapExcludedCell[row][col] == 0 ||
+                m_mapFilteredCell[row][col] == 0) { //
             m_mapClassifiedCell[row][col] = '.'; //
             continue;
         }
@@ -2069,7 +2066,8 @@ void ChessImageProcessing::classifyWholeBoardNativeOpenVINO(const cv::Mat& warpe
     // Phase 1: Allocation-Free Iteration
     for(int row = 0; row < NUM_ROW; row++) {
         for(int col = 0; col < NUM_COL; col++) {
-            if(m_mapExcludedCell[row][col] == 0) {
+            if(m_mapExcludedCell[row][col] == 0 ||
+                    m_mapFilteredCell[row][col] == 0) {
                 m_mapClassifiedCell[row][col] = '.';
                 continue;
             }
@@ -2179,7 +2177,8 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
     // Phase 1: Rapidly parse coordinates and preprocess structural cells
     for(int row = 0; row < NUM_ROW; row++) {
         for(int col = 0; col < NUM_COL; col++) {
-            if(m_mapExcludedCell[row][col] == 0) {
+            if(m_mapExcludedCell[row][col] == 0 ||
+                    m_mapFilteredCell[row][col] == 0) {
                 m_mapClassifiedCell[row][col] = '.';
                 continue;
             }
@@ -2519,13 +2518,29 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
     std::vector<std::string> listMoves;
     std::vector<cv::Point> listStartCell;
     std::vector<cv::Point> listChangedCell;
+    cv::Mat homographyMatrixFilter = getSubTranformMatrix();
+    cv::Mat warpedBoardFilter;
+    // 0. Preprocessing, filter cells with possible pieces
+    cv::warpPerspective(imgCurrent, warpedBoardFilter, homographyMatrixFilter,
+                        cv::Size(WARP_SMALL_WIDTH, WARP_SMALL_HEIGHT));
+    std::vector<cv::Point> listCellHasPiece =
+            findCellsExceedingThreshold(warpedBoardFilter,CELL_SMALL_SIZE*CELL_SMALL_SIZE/20);
+    memset(m_mapFilteredCell,0,NUM_ROW*NUM_COL);
+    for(cv::Point cell: listCellHasPiece) {
+        m_mapFilteredCell[cell.y][cell.x] = 1;
+    }
     // 1. Check board status
     cv::Mat warpImage;
     cv::Mat homographyMatrix = getFullTranformMatrix();
     cv::Mat warpedBoard;
-    cv::warpPerspective(imgCurrent, warpedBoard, homographyMatrix, cv::Size(WARP_WIDTH, WARP_HEIGHT));
+    cv::warpPerspective(imgCurrent, warpedBoard, homographyMatrix,
+                        cv::Size(WARP_WIDTH, WARP_HEIGHT));
     printf("warpedBoard[%dx%d]\r\n",warpedBoard.cols,warpedBoard.rows);
+#if defined (USE_OPENVINO)
+    classifyWholeBoardNativeOpenVINO(warpedBoard);
+#else
     classsifyChessBoardImage(warpedBoard);
+#endif
     char currentBoard[NUM_ROW][NUM_ROW];
     char convertedPrevBoard[NUM_ROW][NUM_ROW];
     for(int row = 0; row < NUM_ROW; row++) {
@@ -2622,3 +2637,111 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
 //    }
     return listMoves;
 }
+
+void ChessImageProcessing::traditionalThinning(const cv::Mat& src, cv::Mat& dst) {
+    // If input is already color or has channel variance, convert safely to single channel
+    cv::Mat gray;
+    if (src.channels() == 3) {
+        cv::cvtColor(src, gray, cv::COLOR_BGR2GRAY);
+    } else {
+        src.copyTo(gray);
+    }
+
+    // Smooth out high-frequency sensor noise before computing local blocks
+    cv::Mat blurred;
+    cv::GaussianBlur(gray, blurred, cv::Size(5, 5), 0);
+
+    // Apply Adaptive Thresholding natively inside the function
+    cv::Mat img;
+    int blockSize = 11; // Must be odd
+    double C = 2.0;
+    cv::adaptiveThreshold(
+        blurred,
+        img,
+        255,
+        cv::ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv::THRESH_BINARY_INV, // Keeps edges white (255) on black background (0)
+        blockSize,
+        C
+    );
+
+    // Run structural cleanup to minimize pixel fragmentation
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+    cv::morphologyEx(img, img, cv::MORPH_CLOSE, kernel);
+
+    // Morphological skeletonization loop
+    dst = cv::Mat::zeros(img.size(), CV_8UC1);
+    cv::Mat skel(img.size(), CV_8UC1, cv::Scalar(0));
+    cv::Mat temp;
+    cv::Mat eroded;
+    cv::Mat element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
+
+    bool done;
+    do {
+        cv::erode(img, eroded, element);
+        cv::dilate(eroded, temp, element);
+        cv::subtract(img, temp, temp);
+        cv::bitwise_or(skel, temp, skel);
+        eroded.copyTo(img);
+
+        done = (cv::countNonZero(img) == 0);
+    } while (!done);
+
+    skel.copyTo(dst);
+}
+
+// Function to find cells that exceed the white pixel count threshold
+std::vector<cv::Point> ChessImageProcessing::findCellsExceedingThreshold(const cv::Mat& warpedColor, int pixelThreshold) {
+    std::vector<cv::Point> activeCells;
+    cv::Mat perfectEdges;
+    traditionalThinning(warpedColor, perfectEdges);
+    cv::Mat outputDisplay = warpedColor.clone();
+    int cellWidth = CELL_SMALL_SIZE;
+    int cellHeight = CELL_SMALL_SIZE;
+    int radius = CELL_SMALL_SIZE/2;
+
+    for (int r = 0; r < NUM_ROW; ++r) {
+        for (int c = 0; c < NUM_COL; ++c) {
+            int centerX = (c * cellWidth) + (cellWidth / 2);
+            int centerY = (r * cellHeight) + (cellHeight / 2);
+            int whitePixelCount = 0;
+
+            for (int y = r * cellHeight; y < (r + 1) * cellHeight; ++y) {
+                for (int x = c * cellWidth; x < (c + 1) * cellWidth; ++x) {
+                    if (perfectEdges.at<uchar>(y, x) == 255) {
+                        double dx = x - centerX;
+                        double dy = y - centerY;
+                        double distance = std::sqrt(dx * dx + dy * dy);
+
+                        if (distance <= radius) {
+                            whitePixelCount++;
+                        }
+                    }
+                }
+            }
+
+            if (whitePixelCount > pixelThreshold) {
+                activeCells.push_back(cv::Point(c, r)); // Store as (column, row)
+            }
+#ifdef DEBUG_ROI
+            cv::putText(outputDisplay, std::to_string(whitePixelCount),
+                                    cv::Point(centerX - 10, centerY - 10), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 2);
+#endif
+        }
+    }
+#ifdef DEBUG_ROI
+    for (const auto& cell : activeCells) {
+        int col = cell.x;
+        int row = cell.y;
+
+        int cx = (col * cellWidth) + (cellWidth / 2);
+        int cy = (row * cellHeight) + (cellHeight / 2);
+
+        cv::circle(outputDisplay, cv::Point(cx, cy), radius, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
+    }
+    cv::imshow("perfectEdges",perfectEdges);
+    cv::imshow("Filtered",outputDisplay);
+#endif
+    return activeCells;
+}
+

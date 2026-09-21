@@ -177,6 +177,8 @@ public:
     bool findPromotePiece(cv::Point& promoteCell, char piece);
     void warpChessBoardImage(const cv::Mat& imgCurrent, cv::Mat& imgWarped);
     void getAnalyzeResult(std::vector<std::string>& analyzeResult);
+    void traditionalThinning(const cv::Mat& src, cv::Mat& dst);
+    std::vector<cv::Point> findCellsExceedingThreshold(const cv::Mat& warpedColor, int pixelThreshold);
 
 private:
     bool m_sourceConnected;
@@ -196,6 +198,7 @@ private:
     int m_dnnAllPiecesImageSize;
     int m_dnnAllPiecesImageChannels;
     uint8_t m_mapExcludedCell[NUM_ROW][NUM_COL];
+    uint8_t m_mapFilteredCell[NUM_ROW][NUM_COL];
     char m_mapClassifiedCell[NUM_ROW][NUM_COL];
     // Internal layer parameters mapped from training weights file
     cv::Mat m_fcWeightsMat; // Size: [7 x 512]

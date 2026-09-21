@@ -226,15 +226,27 @@ void classification() {
             scaleFactor*clicked_points[1].x,scaleFactor*clicked_points[1].y,
             scaleFactor*clicked_points[2].x,scaleFactor*clicked_points[2].y,
             scaleFactor*clicked_points[3].x,scaleFactor*clicked_points[3].y);
-    cv::Mat homographyMatrix = chessDetector.getFullTranformMatrix();
-    cv::Mat warpedBoard;
-    cv::warpPerspective(img_input, warpedBoard, homographyMatrix, cv::Size(WARP_WIDTH, WARP_HEIGHT));
+//    cv::Mat homographyMatrix = chessDetector.getFullTranformMatrix();
+//    cv::Mat warpedBoard;
+//    cv::warpPerspective(img_input, warpedBoard, homographyMatrix, cv::Size(WARP_WIDTH, WARP_HEIGHT));
 //    cv::Mat blurred;
 //    cv::GaussianBlur(warpedBoard, blurred, cv::Size(0, 0), 3.0);
 //    cv::addWeighted(warpedBoard, 1.5, blurred, -0.5, 0, warpedBoard);
 //    chessDetector.classsifyWholeBoardAtOnce((const cv::Mat&)warpedBoard,3360, 1920, 3);
-    chessDetector.classifyWholeBoardNativeOpenVINO((const cv::Mat&)warpedBoard);
+//    chessDetector.classifyWholeBoardNativeOpenVINO((const cv::Mat&)warpedBoard);
 //    chessDetector.classsifyChessBoardImage((const cv::Mat&)warpedBoard);
+    unsigned char testBoardPrev[64] = {
+        '.','.','.','.','.','.','.','.',
+        '.','.','.','.','.','.','.','.',
+        '.','.','.','.','.','.','.','.',
+        '.','.','.','.','.','.','.','.',
+        '.','.','.','.','.','.','.','.',
+        '.','.','.','.','.','.','.','.',
+        '.','.','.','.','.','.','.','.',
+        '.','.','.','.','.','.','.','.'};
+    MoveDetectParams params;
+    params.playerSide = "black";
+    chessDetector.findPossibleMoves2(img_input,(const char*)testBoardPrev,params);
 }
 void onTrackbar(int, void*) {
     updateProjection();
@@ -258,8 +270,7 @@ int main(int argc, char** argv) {
         g_dnnInputSize = atoi(argv[3]);
         g_dnnChannel = atoi(argv[4]);
     }
-    setenv("OPENCV_DNN_CACHE_DIR", "./dnn_cache", 1);
-    chessDetector.setDnnNetAllPieces2(argv[1],print_names,g_dnnInputSize,g_dnnChannel);
+    chessDetector.setDnnNetAllPieces(argv[1],print_names,g_dnnInputSize,g_dnnChannel);
     std::vector<cv::Point> listCell {
         cv::Point(0,0),cv::Point(1,0),cv::Point(2,0),cv::Point(11,0),
         cv::Point(0,1),cv::Point(1,1),cv::Point(2,1),cv::Point(11,1),
