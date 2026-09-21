@@ -2510,17 +2510,9 @@ void ChessImageProcessing::getAnalyzeResult(std::vector<std::string>& analyzeRes
         }
     }
 }
-
-std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
-        const cv::Mat& imgCurrent,
-        const char* prevBoard,
-        const MoveDetectParams& params) {
-    std::vector<std::string> listMoves;
-    std::vector<cv::Point> listStartCell;
-    std::vector<cv::Point> listChangedCell;
+void ChessImageProcessing::filterPossibleValidCell(const cv::Mat& imgCurrent){
     cv::Mat homographyMatrixFilter = getSubTranformMatrix();
     cv::Mat warpedBoardFilter;
-    // 0. Preprocessing, filter cells with possible pieces
     cv::warpPerspective(imgCurrent, warpedBoardFilter, homographyMatrixFilter,
                         cv::Size(WARP_SMALL_WIDTH, WARP_SMALL_HEIGHT));
     std::vector<cv::Point> listCellHasPiece =
@@ -2529,6 +2521,16 @@ std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
     for(cv::Point cell: listCellHasPiece) {
         m_mapFilteredCell[cell.y][cell.x] = 1;
     }
+}
+std::vector<std::string> ChessImageProcessing::findPossibleMoves2(
+        const cv::Mat& imgCurrent,
+        const char* prevBoard,
+        const MoveDetectParams& params) {
+    std::vector<std::string> listMoves;
+    std::vector<cv::Point> listStartCell;
+    std::vector<cv::Point> listChangedCell;
+    // 0. Preprocessing, filter cells with possible pieces
+    filterPossibleValidCell(imgCurrent);
     // 1. Check board status
     cv::Mat warpImage;
     cv::Mat homographyMatrix = getFullTranformMatrix();

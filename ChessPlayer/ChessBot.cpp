@@ -995,7 +995,6 @@ uint8_t ChessBot::analyzeChessBoard()
     // Get current system time
     auto now = std::chrono::system_clock::now();
     std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-
     // Format time as a string
     std::stringstream ss;
     ss << std::put_time(std::localtime(&now_c), "%Y-%m-%d %H:%M:%S");
@@ -1014,6 +1013,7 @@ uint8_t ChessBot::analyzeChessBoard()
 
     cv::imwrite(warpedImagePath.toStdString(),warpedImage);
     Q_EMIT preprocessDone(warpedImagePath);
+    m_moveDetector->filterPossibleValidCell(currentImage);
     m_moveDetector->classifyWholeBoardNativeOpenVINO(warpedImage);
     m_moveDetector->getAnalyzeResult(analyzeResult);
     m_analyzeChessBoardResult.clear();

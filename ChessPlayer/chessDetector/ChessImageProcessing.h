@@ -122,6 +122,7 @@ public:
                                                   int roiPercent, int minWhitePercent, int maxBlackPercent,
                                                   std::string name);
     int countMatchPixelColor(const cv::Mat& imageHSV, const std::vector<TargetColor>& targetColors, int maxH, int maxSV, std::string showName);
+    void filterPossibleValidCell(const cv::Mat& imgCurrent);
     void checkPieceColor(const cv::Mat& imageRGB, ClassificationResult& pieceClass, int row, int col);
     bool detectMovePhase3Classification();
     ClassificationResult classifyImage(const cv::Mat& input_mat, int row, int col);
