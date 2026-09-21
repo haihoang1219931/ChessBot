@@ -86,7 +86,7 @@ ChessBot::ChessBot(QThread *parent) :
         for(QString className:dnnClassArr) {
             dnnClassNames.push_back(className.toStdString()[0]);
         }
-        m_moveDetector->setDnnNetAllPieces2((char*)m_chessDetectorModel.toStdString().c_str(),
+        m_moveDetector->setDnnNetAllPiecesOpenVINO((char*)m_chessDetectorModel.toStdString().c_str(),
                                            dnnClassNames,
                                            m_chessDetectorImageSize,
                                            m_chessDetectorImageChannels);
@@ -1661,7 +1661,7 @@ bool ChessBot::loadCalibrationData(QString fileName)
         for(QString className:dnnClassArr) {
             dnnClassNames.push_back(className.toStdString()[0]);
         }
-        m_moveDetector->setDnnNetAllPieces2((char*)m_chessDetectorModel.toStdString().c_str(),
+        m_moveDetector->setDnnNetAllPiecesOpenVINO((char*)m_chessDetectorModel.toStdString().c_str(),
                                            dnnClassNames,
                                            m_chessDetectorImageSize,
                                            m_chessDetectorImageChannels);

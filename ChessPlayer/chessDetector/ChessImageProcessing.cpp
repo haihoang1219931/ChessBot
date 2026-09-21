@@ -2010,7 +2010,7 @@ void ChessImageProcessing::classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard)
     }
 }
 #if defined (USE_OPENVINO)
-void ChessImageProcessing::setDnnNetAllPieces2(char* source, const std::vector<char>& dnnClassNames, int size, int channels)
+void ChessImageProcessing::setDnnNetAllPiecesOpenVINO(char* source, const std::vector<char>& dnnClassNames, int size, int channels)
 {
     m_dnnAllPiecesNames = dnnClassNames;
     m_dnnAllPiecesImageSize = size;

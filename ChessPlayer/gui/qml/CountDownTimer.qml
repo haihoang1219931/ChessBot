@@ -132,7 +132,7 @@ Rectangle {
         // --- SHAPE LAYER SECTION (Main Timer Area) ---
         Item {
             width: parent.width
-            height: parent.height - topBar.height // Take up remaining space
+            height: parent.height // Take up remaining space
 
             // Blue Background (Right)
             Rectangle {

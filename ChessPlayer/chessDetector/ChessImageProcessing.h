@@ -79,7 +79,7 @@ public:
     void setDnnNetAllPieces(char* source, const std::vector<char>& dnnClassNames,
                             int size, int channels);
 #if defined (USE_OPENVINO)
-    void setDnnNetAllPieces2(char* source, const std::vector<char>& dnnClassNames,
+    void setDnnNetAllPiecesOpenVINO(char* source, const std::vector<char>& dnnClassNames,
                             int size, int channels);
 #endif
     void connectSource(char* source);
