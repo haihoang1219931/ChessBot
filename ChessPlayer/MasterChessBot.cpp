@@ -6,6 +6,12 @@ MasterChessBot::MasterChessBot(QObject *parent) : QObject(parent)
     m_workerChessbot = new ChessBot();
 #if defined(USE_AI_ASSISTANT)
     m_workerAssistant = new AssistantController();
+    m_workerAssistant->setAIModel(m_workerChessbot->botName(),
+                             m_workerChessbot->playerName(),
+                             m_workerChessbot->whisperModelPath(),
+                             m_workerChessbot->llmModelPath(),
+                             m_workerChessbot->piperExePath(),
+                             m_workerChessbot->piperModelPath());
     connect(m_workerChessbot, &ChessBot::newCommentAdded,
             m_workerAssistant, &AssistantController::singleVoice);
     connect(m_workerChessbot, &ChessBot::newMoveAdded,
@@ -177,4 +183,14 @@ int MasterChessBot::timerLimit() const
 void MasterChessBot::setTimeLimit(int timeout) const
 {
     m_workerChessbot->setTimeLimit(timeout);
+}
+
+Q_INVOKABLE QString MasterChessBot::botName() const
+{
+    return m_workerChessbot->botName();
+}
+
+Q_INVOKABLE QString MasterChessBot::playerName() const
+{
+    return m_workerAssistant->playerName();
 }

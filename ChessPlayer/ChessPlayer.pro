@@ -4,7 +4,7 @@ CONFIG += c++17 console
 QT += core gui qml quick serialport multimedia
 
 CONFIG += use_chess_algo
-#CONFIG += use_ai_assistant
+CONFIG += use_ai_assistant
 CONFIG += use_image_processing
 CONFIG += use_system_voice
 CONFIG += use_openmp

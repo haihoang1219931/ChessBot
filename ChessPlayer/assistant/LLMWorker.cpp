@@ -6,9 +6,6 @@ LLMWorker::LLMWorker(QObject *parent)
 {
     m_mutex = new QMutex;
     m_pauseCond = new QWaitCondition;
-
-    initializeLlama();
-    initializeWhisper();
 }
 
 LLMWorker::~LLMWorker() {
@@ -31,8 +28,13 @@ void dummy_whisper_log_callback(ggml_log_level level, const char * text, void * 
 void LLMWorker::initializeLlama() {
     llama_log_set(dummy_llama_log_callback, nullptr);
     llama_backend_init();
-    m_model = llama_load_model_from_file(".\\chessgpt-base-v1-q4_k_m.gguf", llama_model_default_params());
-    if (!m_model) { qWarning() << "Failed to find Llama GGUF model path."; return; }
+    m_model = llama_load_model_from_file(m_llmModelPath.toStdString().c_str(),
+                                         llama_model_default_params());
+    if (!m_model) {
+        qDebug("Failed to find Llama GGUF model path[%s]",
+               m_llmModelPath.toStdString().c_str());
+        return;
+    }
 
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = 2048;
@@ -42,8 +44,12 @@ void LLMWorker::initializeLlama() {
 
 void LLMWorker::initializeWhisper() {
     whisper_log_set(dummy_whisper_log_callback, nullptr);
-    m_whisperCtx = whisper_init_from_file("ggml-base.en.bin");
-    if (!m_whisperCtx) { qWarning() << "Failed to find Whisper BIN model path."; return; }
+    m_whisperCtx = whisper_init_from_file(m_whisperModelPath.toStdString().c_str());
+    if (!m_whisperCtx) {
+        qDebug("Failed to find Whisper BIN model path[%s]",
+               m_whisperModelPath.toStdString().c_str());
+        return;
+    }
     m_whisperParams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
     m_whisperParams.language = "en";
 }
@@ -149,9 +155,9 @@ QString LLMWorker::generatePromptChat(const QString& userPrompt) {
     }
     // 2. FULL GENERAL-PURPOSE PROMPT CONSTRUCTION
     QString systemContent =
-        "You are Pikachu, a futuristic AI assistant, created by Mr Hai."
+        "You are "+m_name+"."
         "Adhere strictly to these rules:\n"
-        "- If you do not know the answer to a question, say 'I don't know' instead of making up facts.\n"
+        "- If you do not know the answer to a question, say 'Sorry. I don't know' instead of making up facts.\n"
         "- Keep your responses brief, concise, and focused on the core answer.\n"
         "- Do not repeat yourself or loop the same sentence structural phrases."
             ;
@@ -215,6 +221,14 @@ void LLMWorker::requestInterruption() {
     m_interrupted.storeRelease(1);
 }
 
+void LLMWorker::setModel(const QString& name,
+                         const QString& whisperModelPath,
+                         const QString& llmModelPath) {
+    m_name = name;
+    m_whisperModelPath = whisperModelPath;
+    m_llmModelPath = llmModelPath;
+}
+
 int LLMWorker::transcribeAudio() {
     int nextState = LLM_PENDING;
     qDebug() << "transcribeAudio "<<m_pcmData.size() << "bytes";
@@ -241,6 +255,8 @@ int LLMWorker::transcribeAudio() {
         if (!parsedPrompt.isEmpty() && parsedPrompt.length() >=1 &&
                 !parsedPrompt.contains("[") &&
                 !parsedPrompt.contains("]") &&
+                !parsedPrompt.contains("(") &&
+                !parsedPrompt.contains(")") &&
                 !parsedPrompt.contains("*")) {
             m_userPrompt = parsedPrompt;
             nextState = LLM_DONE_SUCCESS;
@@ -323,12 +339,11 @@ int LLMWorker::runLlamaInference() {
     llama_sampler_chain_add(smpl, llama_sampler_init_dist(1234));
 
     QString final_output = "";
-    int max_new_tokens = 30;
+    int max_new_tokens = 300;
     nextState = LLM_DONE_SUCCESS;
     // 7. Generation Loop (Token by Token generation)
     for (int i = 0; i < max_new_tokens; i++) {
         if (m_interrupted.loadAcquire() == 1) {
-            final_output += "... [Interrupted by User]";
             Q_EMIT tokenGenerated("... [Interrupted]");
             nextState = LLM_DONE_INTERRUPT;
             m_interrupted.storeRelease(0);

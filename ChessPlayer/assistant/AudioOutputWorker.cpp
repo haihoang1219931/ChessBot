@@ -2,7 +2,7 @@
 #include <QDebug>
 #include <QThread>
 #define DEBUG_AUDIO_OUTPUT
-// Sure! Pokémon are characters from the world of video games and anime. They're a type of fictional creatures with different abilities, powers or types that can be traded between players in various online adventures known as POKeMON games and the anime. They are designed to appeal both children and adults, focusing on fun gameplay mechanics while also incorporating elements of art design that have become iconic over time. I hope this helps! Let me know if you need more information.
+// Voice model: https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_US
 AudioOutputWorker::AudioOutputWorker(QObject *parent)
     : QObject(parent), m_stopped(false), m_audioOutput(nullptr), m_audioDevice(nullptr)
 {
@@ -14,7 +14,7 @@ AudioOutputWorker::AudioOutputWorker(QObject *parent)
 
     // Standard low-latency PCM configuration format
     QAudioFormat format;
-    format.setSampleRate(24000);
+    format.setSampleRate(22050);
     format.setChannelCount(1);
     format.setSampleSize(16);
     format.setSampleType(QAudioFormat::SignedInt);
@@ -23,7 +23,7 @@ AudioOutputWorker::AudioOutputWorker(QObject *parent)
 
     QAudioDeviceInfo info = QAudioDeviceInfo::defaultOutputDevice();
     if (!info.isFormatSupported(format)) {
-        qWarning() << "⚠️ 24000Hz raw PCM not supported natively. Attempting nearest matching fallback format...";
+        qWarning() << "⚠️ 22050Hz raw PCM not supported natively. Attempting nearest matching fallback format...";
         format = info.nearestFormat(format);
     }
 
@@ -65,6 +65,15 @@ void AudioOutputWorker::togglePause(bool paused)
 
 void AudioOutputWorker::requestInterruption() {
     m_interrupted.storeRelease(1);
+}
+
+void AudioOutputWorker::setVoiceModel(const QString& botName,
+                    const QString& piperExePath,
+                   const QString& modelPath)
+{
+    m_botName = botName;
+    m_piperExePath = piperExePath;
+    m_modelPath = modelPath;
 }
 
 void AudioOutputWorker::startWorker()
@@ -124,12 +133,11 @@ void AudioOutputWorker::handleToken(const QString &token)
 void AudioOutputWorker::doWork() {
     qDebug("AudioOutputWorker Dowork");
     m_stopped = false; // Reset flags
-    m_sentenceBuffer = "Greetings, my friend. Let us play a match.";
+    m_sentenceBuffer = "I'm "+m_botName+". Let us play a match.";
     m_textQueue.enqueue(m_sentenceBuffer);
     m_sentenceBuffer = "";
     m_nextState = AUDIOOUTPUT_PROCESSING;
     m_state = m_nextState;
-    QThread::sleep(5);
     while(!m_stopped){
         // Check for Stop
         m_mutex->lock();
@@ -181,6 +189,9 @@ int AudioOutputWorker::processAudioLoop()
     m_emitVoiceStop = false;
     Q_EMIT voiceStarted();
     textToSpeak = m_textQueue.dequeue();
+    m_textQueue.clear();
+    qDebug("AudioOutputWorker::processAudioLoop m_textQueue size[%d]",
+           m_textQueue.size());
 #ifdef DEBUG_AUDIO_OUTPUT
     qDebug("AudioOutputWorker::processAudioLoop [%s]",
            textToSpeak.toStdString().c_str());
@@ -191,10 +202,10 @@ int AudioOutputWorker::processAudioLoop()
         m_currentEngine->speakDirect(textToSpeak);
     } else {
         // Path B: Piper Local Synthesis (Returns chunks into your legacy QAudioOutput line)
-        QList<QByteArray> audioChunks = m_currentEngine->generatePCM(textToSpeak);
-        for(QByteArray pcmChunk: audioChunks) {
-            appendAndPlayPCM(pcmChunk);
-        }
+        QByteArray audioChunks = m_currentEngine->generatePCM(textToSpeak,
+                                                              m_piperExePath,
+                                                              m_modelPath);
+        appendAndPlayPCM(audioChunks);
     }
 #ifdef DEBUG_AUDIO_OUTPUT
     qDebug("AudioOutputWorker::processAudioLoop [%s] done",
@@ -206,26 +217,34 @@ int AudioOutputWorker::processAudioLoop()
 void AudioOutputWorker::appendAndPlayPCM(const QByteArray &newPcmData) {
     if (newPcmData.isEmpty()) return;
 #ifdef DEBUG_AUDIO_OUTPUT
-    qDebug("appendAndPlayPCM %d bytes",newPcmData.size());
+    qDebug("appendAndPlayPCM %d bytes", newPcmData.size());
 #endif
-    // 2. Track where the speaker was previously reading
-    if (m_audioOutput->state() == QAudio::ActiveState) {
-        m_readPosition = m_buffer.pos();
-    }
 
-    // 3. Move cursor to the absolute end to append the fresh data frame payload
-    m_buffer.seek(m_audioData.size());
-    m_buffer.write(newPcmData);
-
-    // 4. Force the Qt 5 Audio State Machine reset sequence
+    // 1. Stop any currently active hardware playback safely
     m_audioOutput->stop();
-    m_buffer.seek(m_readPosition);
+    m_buffer.close();
+
+    // 2. Clear old data completely so we NEVER repeat past phrases
+    m_audioData = newPcmData;
+
+    // 3. Reinitialize the buffer with the fresh payload
+    m_buffer.setBuffer(&m_audioData);
+    if (!m_buffer.open(QIODevice::ReadOnly)) { // ReadOnly is safer for playback lines
+        qWarning() << "Failed to open QBuffer in ReadOnly mode.";
+        return;
+    }
+    m_buffer.seek(0);
+
+    // 4. Fire up the audio hardware device pointing to the brand new data
     m_audioOutput->start(&m_buffer);
-    while (m_audioOutput->state() == QAudio::ActiveState && !m_stopped) {
-        if (m_audioOutput->bytesFree() < 2048) {
-            QThread::msleep(10); // Throttle loop processing dynamically
-        } else {
-            break; // Break throttling loop if the sound hardware requires more data chunks
+
+    // 5. Corrected Throttling: Block the worker thread until this discrete chunk finishes playing
+    while (m_audioOutput->state() != QAudio::StoppedState && !m_stopped) {
+        if (m_audioOutput->state() == QAudio::IdleState) {
+            // IdleState in QAudioOutput means the entire buffer has been consumed
+            break;
         }
+        QThread::msleep(10);
     }
 }
+

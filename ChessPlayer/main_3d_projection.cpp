@@ -16,7 +16,7 @@ std::vector<cv::Point2f> srcCorners;
 cv::Mat base_rvec, base_tvec;
 double base_tilt_deg = 0.0;
 bool is_pnp_initialized = false;
-int g_dnnInputSize =  240;
+int g_dnnInputSize =  128;
 int g_dnnChannel = 3;
 
 // Trackbar variables (scaled to integers for OpenCV)

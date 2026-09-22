@@ -123,6 +123,12 @@ public:
     void updateCorners(QVariantList corners);
     void updateCalibrationData(int type, int row, int col, int x, int y);
     void acceptPlayFENFromHistory(bool accept);
+    QString botName();
+    QString playerName();
+    QString whisperModelPath();
+    QString llmModelPath();
+    QString piperExePath();
+    QString piperModelPath();
 
     void run() override;
     void startService();
@@ -245,8 +251,12 @@ private:
     QString m_chessDetectorClassList;
     int m_chessDetectorImageSize;
     int m_chessDetectorImageChannels = 3;
-    QString m_voiceModel;
-    QString m_speakerModel;
+    QString m_botName;
+    QString m_playerName;
+    QString m_whisperModelPath;
+    QString m_llmModelPath;
+    QString m_piperExePath;
+    QString m_piperModelPath;
     int m_timeOut;
 };
 

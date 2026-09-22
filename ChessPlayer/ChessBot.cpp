@@ -62,16 +62,20 @@ ChessBot::ChessBot(QThread *parent) :
 #endif
 #ifdef IMAGE_PROCESS_MOVE
 #endif
-    m_validCalibFileFound = loadCalibrationData();
     connect(m_chessController,&ChessController::boardChanged,
             this,&ChessBot::boardChanged);
+    m_validCalibFileFound = loadCalibrationData();
     if(!m_validCalibFileFound) {
         m_chessDetectorModel = "chess_piece_resnet18_20260828_100epoch.onnx";
         m_chessDetectorClassList = "b,.,k,n,p,q,r";
         m_chessDetectorImageSize = 240;
         m_chessDetectorImageChannels = 3;
-        m_voiceModel = "";
-        m_speakerModel = "";
+        m_botName = "Tobot";
+        m_playerName = "Bean";
+        m_whisperModelPath = "ggml-base.en.bin";
+        m_llmModelPath = "qwen2.5-1.5b-instruct-q4_k_m.gguf";
+        m_piperExePath = "piper";
+        m_piperModelPath = "en_US-sam-medium.onnx";
         m_chessboardConners.clear();
         m_chessboardConners.push_back(QPoint(234, 159));
         m_chessboardConners.push_back(QPoint(1716, 174));
@@ -86,10 +90,17 @@ ChessBot::ChessBot(QThread *parent) :
         for(QString className:dnnClassArr) {
             dnnClassNames.push_back(className.toStdString()[0]);
         }
+#if defined (USE_OPENVINO)
         m_moveDetector->setDnnNetAllPiecesOpenVINO((char*)m_chessDetectorModel.toStdString().c_str(),
                                            dnnClassNames,
                                            m_chessDetectorImageSize,
                                            m_chessDetectorImageChannels);
+#else
+        m_moveDetector->setDnnNetAllPieces((char*)m_chessDetectorModel.toStdString().c_str(),
+                                           dnnClassNames,
+                                           m_chessDetectorImageSize,
+                                           m_chessDetectorImageChannels);
+#endif
         saveCalibrationData();
     }
 }
@@ -411,13 +422,13 @@ void ChessBot::playLoop()
         break;
     case PLAY_INFORM_ERROR_CALCULATE_NEXT_MOVE: {
         qDebug("Can not calculate best move");
-        Q_EMIT newCommentAdded("Can not calculate best move");
+//        Q_EMIT newCommentAdded("Can not calculate best move");
         m_statePlay = PLAY_PROCESS_DONE;
     }
         break;
     case PLAY_INFORM_ERROR_EXECUTE_NEXT_MOVE: {
         qDebug("Execute move error");
-        Q_EMIT newCommentAdded("Execute move error");
+//        Q_EMIT newCommentAdded("Execute move error");
         m_statePlay = PLAY_PROCESS_DONE;
     }
         break;
@@ -629,6 +640,7 @@ uint8_t ChessBot::playDetectMove()
             }
         }
         if(numPossibleMove == 1) {
+            QString fenBeforeMove = m_chessController->extractFEN();
             qDebug("Found Move %s",possibleMove.c_str());
             QString from = QString::fromStdString(possibleMove.substr(0,2));  // Result: "e2"
             QString to = QString::fromStdString(possibleMove.substr(2,2));   // Result: "e4"
@@ -636,8 +648,17 @@ uint8_t ChessBot::playDetectMove()
             if(possibleMove.length()==5) promotePiece = QChar(possibleMove[4]);
             choosenPiece = m_chessController->pieceType(from);
             choosenPieceMoveNotation = to;
+
             if(m_chessController->moveByCoordinates(from,to,choosenMove,
                                                     promotePiece.toLower())) {
+
+                if(possibleMove.length()==4) {
+                    QString formattedMove = choosenPiece + " "+
+                        from + " to "+ to;
+                    Q_EMIT newMoveAdded(fenBeforeMove,
+                                       m_chessController->playerColor() == Color::WHITE?"White":"Black",
+                                       formattedMove);
+                }
                 detectState = STATE_DONE_SUCCESS;
             } else {
                 if(m_chessController->status() == "CHOOSE_PROMOTION_PIECE") {
@@ -662,7 +683,7 @@ uint8_t ChessBot::playRandomMove()
         m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1],choosenMove);
         return STATE_DONE_SUCCESS;
     } else {
-        Q_EMIT newCommentAdded("No invalid move found\r\n");
+        qDebug("No invalid move found\r\n");
         return STATE_DONE_FAIL;
     }
 }
@@ -1014,7 +1035,11 @@ uint8_t ChessBot::analyzeChessBoard()
     cv::imwrite(warpedImagePath.toStdString(),warpedImage);
     Q_EMIT preprocessDone(warpedImagePath);
     m_moveDetector->filterPossibleValidCell(currentImage);
+#if defined (USE_OPENVINO)
     m_moveDetector->classifyWholeBoardNativeOpenVINO(warpedImage);
+#else
+    m_moveDetector->classsifyChessBoardImage(warpedImage);
+#endif
     m_moveDetector->getAnalyzeResult(analyzeResult);
     m_analyzeChessBoardResult.clear();
     m_analyzeChessBoardRevertedResult.clear();
@@ -1501,8 +1526,12 @@ bool ChessBot::saveCalibrationData(QString fileName)
     childrenObj["class_list"] = m_chessDetectorClassList;
     childrenObj["input_size"] = m_chessDetectorImageSize;
     childrenObj["input_channel"] = m_chessDetectorImageChannels;
-    childrenObj["voice_detector"] = m_voiceModel;
-    childrenObj["speaker"] = m_speakerModel;
+    childrenObj["bot_name"] = m_botName;
+    childrenObj["player_name"] = m_playerName;
+    childrenObj["whisper_model"] = m_whisperModelPath;
+    childrenObj["llm_model"] = m_llmModelPath;
+    childrenObj["piper_model"] = m_piperModelPath;
+    childrenObj["piper_exe_path"] = m_piperExePath;
 
     root["ai_model"] = childrenObj;
 
@@ -1648,23 +1677,37 @@ bool ChessBot::loadCalibrationData(QString fileName)
         m_chessDetectorClassList = aiModelObj["class_list"].toString();
         m_chessDetectorImageSize = aiModelObj["input_size"].toInt();
         m_chessDetectorImageChannels = aiModelObj["input_channel"].toInt();
-        m_voiceModel = aiModelObj["voice_detector"].toString();
-        m_speakerModel = aiModelObj["speaker"].toString();
-
+        m_botName = aiModelObj["bot_name"].toString();
+        m_playerName = aiModelObj["player_name"].toString();
+        m_whisperModelPath = aiModelObj["whisper_model"].toString();
+        m_llmModelPath = aiModelObj["llm_model"].toString();
+        m_piperModelPath = aiModelObj["piper_model"].toString();
+        m_piperExePath = aiModelObj["piper_exe_path"].toString();
         // Print the values to verify
         qDebug() << "Chess Detector Path:" << m_chessDetectorModel;
         qDebug() << "Class List:" << m_chessDetectorClassList;
-        qDebug() << "Voice Detector Path:" << m_voiceModel;
-        qDebug() << "Speaker Path:" << m_speakerModel;
+        qDebug() << "Bot Name:" << m_botName;
+        qDebug() << "Player Name:" << m_playerName;
+        qDebug() << "Whisper Model:" << m_whisperModelPath;
+        qDebug() << "Llm Model:" << m_llmModelPath;
+        qDebug() << "Piper Model:" << m_piperModelPath;
+        qDebug() << "Piper Exe:" << m_piperExePath;
         std::vector<char> dnnClassNames;
         QStringList dnnClassArr = m_chessDetectorClassList.split(",");
         for(QString className:dnnClassArr) {
             dnnClassNames.push_back(className.toStdString()[0]);
         }
+#if defined (USE_OPENVINO)
         m_moveDetector->setDnnNetAllPiecesOpenVINO((char*)m_chessDetectorModel.toStdString().c_str(),
                                            dnnClassNames,
                                            m_chessDetectorImageSize,
                                            m_chessDetectorImageChannels);
+#else
+        m_moveDetector->setDnnNetAllPieces((char*)m_chessDetectorModel.toStdString().c_str(),
+                                           dnnClassNames,
+                                           m_chessDetectorImageSize,
+                                           m_chessDetectorImageChannels);
+#endif
         std::vector<cv::Point> listCell {
             cv::Point(0,0),cv::Point(1,0),cv::Point(2,0),cv::Point(11,0),
             cv::Point(0,1),cv::Point(1,1),cv::Point(2,1),cv::Point(11,1),
@@ -2259,4 +2302,34 @@ char ChessBot::pieceName(int piece, int color)
             break;
     }
     return pieceChar;
+}
+
+QString ChessBot::botName()
+{
+    return m_botName;
+}
+
+QString ChessBot::playerName()
+{
+    return m_playerName;
+}
+
+QString ChessBot::whisperModelPath()
+{
+    return m_whisperModelPath;
+}
+
+QString ChessBot::llmModelPath()
+{
+    return m_llmModelPath;
+}
+
+QString ChessBot::piperExePath()
+{
+    return m_piperExePath;
+}
+
+QString ChessBot::piperModelPath()
+{
+    return m_piperModelPath;
 }

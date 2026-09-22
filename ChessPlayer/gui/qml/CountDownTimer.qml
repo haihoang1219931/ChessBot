@@ -315,6 +315,8 @@ Rectangle {
         root.levelType = chessController.engineLevel
         root.levelScore = chessController.engineElo
         root.side =  chessController.playerColor
+        root.player1Name = masterBot.botName();
+        root.player2Name = masterBot.playerName();
         console.log("timeout: "+root.playTime)
         if(root.playTime != 0) {
             root.player1Time = root.playTime;

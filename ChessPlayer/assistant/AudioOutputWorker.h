@@ -39,7 +39,9 @@ public:
     void stop();
     void togglePause(bool paused);
     void requestInterruption();
-
+    void setVoiceModel(const QString& botName,
+                       const QString& piperExePath,
+                       const QString& modelPath);
 public Q_SLOTS:
     void handleToken(const QString &token);
     void startWorker();
@@ -77,6 +79,9 @@ private:
     int m_state;
     int m_nextState;
     bool m_emitVoiceStop;
+    QString m_botName;
+    QString m_piperExePath;
+    QString m_modelPath;
 };
 
 #endif // AUDIOOUTPUTWORKER_H

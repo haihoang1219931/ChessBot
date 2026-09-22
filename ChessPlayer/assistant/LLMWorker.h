@@ -41,7 +41,12 @@ public:
     void togglePause(bool paused);
     int handlePrompt(const QString& prompt);
     int analyzeChessMove(QString fen, QString playColor, QString move);
-    void requestInterruption() ;
+    void requestInterruption();
+    void setModel(const QString& name,
+                  const QString& whisperModelPath,
+                  const QString& llmModelPath);
+    void initializeLlama();
+    void initializeWhisper();
 public Q_SLOTS:
     void doWork();
     void handleSpeech(const QByteArray& pcmData);
@@ -55,8 +60,6 @@ private:
     bool m_pause = false;
     QMutex *m_mutex;
     QWaitCondition* m_pauseCond;
-    void initializeLlama();
-    void initializeWhisper();
     int runLlamaInference();
     int transcribeAudio();
     QString generatePromptChat(const QString& userPrompt);
@@ -73,6 +76,9 @@ private:
     QAtomicInt m_interrupted; // Thread-safe atomic flag
     int m_state;
     int m_nextState;
+    QString m_llmModelPath;
+    QString m_whisperModelPath;
+    QString m_name;
 };
 
 #endif // LLMWORKER_H
