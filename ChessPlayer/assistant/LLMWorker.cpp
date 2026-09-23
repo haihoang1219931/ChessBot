@@ -127,7 +127,7 @@ void LLMWorker::doWork() {
 }
 
 void LLMWorker::handleSpeech(const QByteArray& pcmData) {
-    qDebug("LLMWorker handleSpeech [%d] bytes",pcmData.size());
+    qDebug("LLMWorker handleSpeech [%d] bytes m_state[%d]",pcmData.size(),m_state);
     if(m_state != LLM_TRANSCRIBE) {
         if(m_state == LLM_PROCESSING)
             requestInterruption();

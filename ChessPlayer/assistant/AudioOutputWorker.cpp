@@ -202,10 +202,11 @@ int AudioOutputWorker::processAudioLoop()
         m_currentEngine->speakDirect(textToSpeak);
     } else {
         // Path B: Piper Local Synthesis (Returns chunks into your legacy QAudioOutput line)
-        QByteArray audioChunks = m_currentEngine->generatePCM(textToSpeak,
-                                                              m_piperExePath,
-                                                              m_modelPath);
-        appendAndPlayPCM(audioChunks);
+//        QByteArray audioChunks = m_currentEngine->generatePCM(textToSpeak,
+//                                                              m_piperExePath,
+//                                                              m_modelPath);
+//        appendAndPlayPCM(audioChunks);
+        m_currentEngine->outSpeakerSystem(textToSpeak, m_piperExePath, m_modelPath);
     }
 #ifdef DEBUG_AUDIO_OUTPUT
     qDebug("AudioOutputWorker::processAudioLoop [%s] done",

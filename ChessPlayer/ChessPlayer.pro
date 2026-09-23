@@ -4,7 +4,7 @@ CONFIG += c++17 console
 QT += core gui qml quick serialport multimedia
 
 CONFIG += use_chess_algo
-CONFIG += use_ai_assistant
+#CONFIG += use_ai_assistant
 CONFIG += use_image_processing
 CONFIG += use_system_voice
 CONFIG += use_openmp
@@ -163,10 +163,6 @@ DEFINES += USE_AI_ASSISTANT
         gcc {
             QMAKE_CXXFLAGS += -fexceptions
         }
-        # Add WHISPER_VERSION to your existing DEFINES block
-        DEFINES += NOMINMAX \
-                   _CRT_SECURE_NO_WARNINGS \
-                   WHISPER_VERSION=\\\"1.6.0\\\"  # <--- ADD THIS LINE TO FIX THE COMPILER SCOPE ERROR!
 
         msvc {
             QMAKE_CXXFLAGS += /EHsc
@@ -174,6 +170,26 @@ DEFINES += USE_AI_ASSISTANT
             QMAKE_CXXFLAGS += /arch:AVX2
         }
     }
+    unix:!macx {
+        # 1. Update these paths to match where your repositories live on your disk
+        LLAMA_SOURCE_DIR = "$$PWD/../../ai/llama.cpp"
+
+        # Update this directory address to match your folder structure
+        WHISPER_DIR = "$$PWD/../../ai/whisper.cpp"
+        # 3. Link Compiled Libraries (Windows MSVC syntax)
+        LIBS += -L/usr/local/lib/ \
+            -lllama \
+            -lllama-common \
+            -lggml \
+            -lggml-cpu \
+            -lggml-base \
+            -lwhisper \
+            -lparakeet
+    }
+# Add WHISPER_VERSION to your existing DEFINES block
+DEFINES += NOMINMAX \
+           _CRT_SECURE_NO_WARNINGS \
+           WHISPER_VERSION=\\\"1.6.0\\\"  # <--- ADD THIS LINE TO FIX THE COMPILER SCOPE ERROR!
 # 2. Include Headers
 # Add the missing ggml folder paths here
 INCLUDEPATH += $$LLAMA_SOURCE_DIR/include \

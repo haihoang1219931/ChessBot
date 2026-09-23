@@ -192,5 +192,9 @@ Q_INVOKABLE QString MasterChessBot::botName() const
 
 Q_INVOKABLE QString MasterChessBot::playerName() const
 {
+#if defined(USE_AI_ASSISTANT)
     return m_workerAssistant->playerName();
+#else
+    return m_workerChessbot->playerName();
+#endif
 }
