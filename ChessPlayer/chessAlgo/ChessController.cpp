@@ -142,6 +142,7 @@ const std::string whitePawnPromotion = "8/2P1k3/8/3K4/8/8/8/8 w - - 0 1";
 const std::string whitePawnPromotion2 = "1q6/2P1k3/8/3K4/8/8/8/8 w - - 0 1";
 const std::string blackPawnPromotion = "7K/8/8/8/8/3k4/p7/8 w - - 0 1";
 const std::string blackPawnPromotion2 = "1k5K/8/8/8/8/8/Np6/RN6 w - - 0 1";
+const std::string blackPawnPromotion3 = "rnbqkbnr/ppp1pppp/8/8/4P3/5Q2/PPPp1PPP/1RB1KBNR w kq - 9 5";
 const std::string whiteMateFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
 const std::string blackMateFen = "7K/6q1/6k1/8/8/8/8/8 w - - 0 1";
 const std::string staleMateFen = "7k/5Q2/7K/8/8/8/8/8 b - - 0 1";
@@ -594,9 +595,11 @@ void ChessController::playEngineMove()
     Search search(m_board);
     search.negaMaxRoot(m_engineElo/500);
     Move bestMove = search.myBestMove;
+    std::string bestMoveStr = bestMove.toShortString();
     qDebug("ChessController::playEngineMove bestmove %s",
-           bestMove.toShortString().c_str());
-    if (tryFindLegalMove(bestMove.getOrigin(), bestMove.getDestination(), chosenMove)) {
+           bestMoveStr.c_str());
+    if (tryFindLegalMove(bestMove.getOrigin(), bestMove.getDestination(), chosenMove,
+                         bestMoveStr.length()==5?QChar(bestMoveStr[4]):QChar())) {
         foundBestMove = true;
     } else if(m_promotionPending) {
         chosenMove = bestMove;
@@ -608,15 +611,18 @@ void ChessController::playEngineMove()
         if(moveList.size() > 0) {
             int randomMove = rand()%moveList.size();
             if(randomMove < 0) randomMove = 0;
+            std::string randomMoveStr = moveList[randomMove].toShortString();
             qDebug("ChessController::playEngineMove random move %s",
-                   moveList[randomMove].toShortString().c_str());
-            if (tryFindLegalMove(moveList[randomMove].getOrigin(), moveList[randomMove].getDestination(), chosenMove)) {
+                   randomMoveStr.c_str());
+            if (tryFindLegalMove(moveList[randomMove].getOrigin(), moveList[randomMove].getDestination(), chosenMove,
+                                 randomMoveStr.length()==5?QChar(randomMoveStr[4]):QChar())) {
                 foundBestMove = true;
             }
         }
     }
     if(foundBestMove) {
         m_botMove = chosenMove;
+        qDebug("ChessController::playEngineMove execute bot move");
         m_board->executeMove(chosenMove);
         qDebug("ChessController::playEngineMove execute bot move done");
         updateBoard();
@@ -682,7 +688,6 @@ bool ChessController::tryFindLegalMove(int originSquare, int destinationSquare, 
 {
     MoveGen moveGen(m_board);
     const auto legalMoves = moveGen.generateMoves();
-
     m_pendingPromotionMoves.clear();
     bool hasMatchingPromotion = false;
 

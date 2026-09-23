@@ -169,7 +169,7 @@ private:
     void playLoop();
     void configureLoop();
     void testLoop();
-    bool playCheckEndGame();
+    bool playCheckEndGame(bool talkCheckmate);
     bool playCheckDoubleMove();
     bool canMoveStraight(int startRow, int startCol, int stopRow, int stopCol, PIECE_MOVE_TYPE moveType = PIECE_MOVE_NORMAL);
     uint8_t playDetectMove();
@@ -222,6 +222,7 @@ private:
     QString m_commandTest;
     bool m_pause = false;
     int m_state;
+    bool m_handleNewCommand;
     int m_statePlay;
     int m_stateConfigure;
     int m_stateTest;

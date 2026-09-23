@@ -336,11 +336,13 @@ void ChessBot::playLoop()
         logWithTimestampQt(m_chessController->extractFEN());
         qDebug("Init FEN done");
         m_statePlay = PLAY_PROCESS_DONE;
+        m_handleNewCommand = false;
     }
         break;
     case PLAY_INIT: {
         qDebug("PLAY_INIT");
-        if(playCheckEndGame() == true)
+        Q_EMIT playTurnChanged(m_chessController->playerColor() == Color::WHITE ? 1-m_chessController->playerColor() : m_chessController->playerColor());
+        if(playCheckEndGame(false) == true)
             m_statePlay = PLAY_CHECK_CURRENT_MOVE;
         else
             m_statePlay = PLAY_PROCESS_DONE;
@@ -435,9 +437,14 @@ void ChessBot::playLoop()
     case PLAY_PROCESS_DONE: {
         qDebug("PLAY_PROCESS_DONE");
         Q_EMIT playTurnChanged(m_chessController->playerColor() == Color::WHITE ? m_chessController->playerColor():1-m_chessController->playerColor());
-        playCheckEndGame();
-        m_state = STATE_EXIT;
-        togglePause(true);
+        playCheckEndGame(true);
+        if(m_handleNewCommand) {
+            m_statePlay = PLAY_INIT;
+            m_handleNewCommand = false;
+        } else {
+            m_state = STATE_EXIT;
+            togglePause(true);
+        }
     }
         break;
     }
@@ -547,7 +554,7 @@ bool ChessBot::canMoveStraight(int startRow, int startCol, int stopRow, int stop
     return !foundBlockingPiece;
 }
 
-bool ChessBot::playCheckEndGame()
+bool ChessBot::playCheckEndGame(bool talkCheckmate)
 {
     QString gameState = m_chessController->buildResultText();
     qDebug("gameState[%s]",gameState.toStdString().c_str());
@@ -558,20 +565,24 @@ bool ChessBot::playCheckEndGame()
             Q_EMIT gameEnded(0);
             return false;
         } else if(gameState == "WHITE_WIN") {
-            Q_EMIT newCommentAdded(m_chessController->playerColor() == 0?"Check mate. You win":
+            if(talkCheckmate)
+                Q_EMIT newCommentAdded(m_chessController->playerColor() == 0?"Check mate. You win":
                                   "Check mate. You lost");
             Q_EMIT gameEnded(m_chessController->playerColor() == 0?1:2);
             return false;
         } else if(gameState == "BLACK_WIN") {
-            Q_EMIT newCommentAdded(m_chessController->playerColor() == 1?"Check mate. You win":
+            if(talkCheckmate)
+                Q_EMIT newCommentAdded(m_chessController->playerColor() == 1?"Check mate. You win":
                                   "Check mate. You lost");
             Q_EMIT gameEnded(m_chessController->playerColor() == 1?1:2);
             return false;
         } else if(gameState == "BLACK_CHECK") {
-            Q_EMIT newCommentAdded(m_chessController->playerColor() == 0?"Check mate":"Good checkmate");
+            if(talkCheckmate)
+                Q_EMIT newCommentAdded(m_chessController->playerColor() == 0?"Check mate":"Good checkmate");
             return true;
         } else if(gameState == "WHITE_CHECK") {
-            Q_EMIT newCommentAdded(m_chessController->playerColor() == 1?"Check mate":"Good checkmate");
+            if(talkCheckmate)
+                Q_EMIT newCommentAdded(m_chessController->playerColor() == 1?"Check mate":"Good checkmate");
             return true;
         }
     } else {
@@ -897,7 +908,9 @@ uint8_t ChessBot::playCalculateNextMove()
 
 bool ChessBot::sendRobotCommand(const char* cmd, int waitTime)
 {
+#if defined(DEBUG_COMMAND)
     qDebug("sendRobotCommand %d [%s]",strlen(cmd),cmd);
+#endif
     if (!robotController->isOpen()) {
         qDebug("Serial port is not open to write");
         return false;
@@ -920,7 +933,9 @@ QString ChessBot::readRobotResponse(int waitTime)
             chunk += robotController->readAll();
         }
     }
+#if defined(DEBUG_COMMAND)
     qDebug("Robot rep [%d]:%s",chunk.size(),chunk.data());
+#endif
     return QString::fromUtf8(chunk);
 }
 uint8_t ChessBot::playExecuteNextMove()
@@ -1901,16 +1916,17 @@ void ChessBot::initRobotCommunication() {
 }
 void ChessBot::processNextMove()
 {
-    if(m_state != STATE_EXIT) {
-        qDebug("Previous move is not finished %d",m_state);
-        return;
+    if(m_state == STATE_PLAY) {
+        qDebug("Queue command to play next time m_statePlay[%d]",m_statePlay);
+        if(m_statePlay != PLAY_PROCESS_DONE) {
+            m_handleNewCommand = true;
+            return;
+        }
     }
     m_mutex->lock();
     m_state = STATE_PLAY;
     m_statePlay = PLAY_INIT;
     m_mutex->unlock();
-//    m_statePlay = PLAY_INFORM_ERROR;
-    Q_EMIT playTurnChanged(m_chessController->playerColor() == Color::WHITE ? 1-m_chessController->playerColor() : m_chessController->playerColor());
     togglePause(false);
     startService();
 }
