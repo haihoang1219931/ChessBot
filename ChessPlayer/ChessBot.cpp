@@ -578,11 +578,11 @@ bool ChessBot::playCheckEndGame(bool talkCheckmate)
             return false;
         } else if(gameState == "BLACK_CHECK") {
             if(talkCheckmate)
-                Q_EMIT newCommentAdded(m_chessController->playerColor() == 0?"Check mate":"Good checkmate");
+                Q_EMIT newCommentAdded(m_chessController->playerColor() == 0?"Check":"Good check");
             return true;
         } else if(gameState == "WHITE_CHECK") {
             if(talkCheckmate)
-                Q_EMIT newCommentAdded(m_chessController->playerColor() == 1?"Check mate":"Good checkmate");
+                Q_EMIT newCommentAdded(m_chessController->playerColor() == 1?"Check":"Good check");
             return true;
         }
     } else {

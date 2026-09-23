@@ -36,9 +36,9 @@ const QStringList GOOD_PHRASES = {
     "That is a very solid move.",
     "You are controlling the board.",
     "It is a nice strategic development.",
-    "Hmm, that's okay, but watch your defenses.",
-    "An interesting choice, but you missed a safer square.",
-    "Be cautious! The engine sees an opening there."
+    "Watch your defenses.",
+    "An interesting choice.",
+    "Be cautious! I'm calculating."
 };
 
 ChessController::ChessController(QObject* parent)
