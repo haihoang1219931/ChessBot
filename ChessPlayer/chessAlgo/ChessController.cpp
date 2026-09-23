@@ -33,9 +33,12 @@ const QStringList BRILLIANT_PHRASES = {
 };
 
 const QStringList GOOD_PHRASES = {
-    " is a very solid move.",
-    " helps you control the board.",
-    " is a nice strategic development."
+    "That is a very solid move.",
+    "You are controlling the board.",
+    "It is a nice strategic development.",
+    "Hmm, that's okay, but watch your defenses.",
+    "An interesting choice, but you missed a safer square.",
+    "Be cautious! The engine sees an opening there."
 };
 
 ChessController::ChessController(QObject* parent)
@@ -855,24 +858,24 @@ bool ChessController::tryParseCoordinate(const QString& coordinate, int& uiIndex
 QString ChessController::processRobotCommentary(const QString fen, const int color,
                                                 const QString pieceType, const QString pieceNotation,
                                                 Move playerMove) {
-    std::shared_ptr<Board> cloneBoard = std::make_shared<Board>(fen.toStdString());
-    Eval eval(cloneBoard);
-    // 1. Get score before execution
-    int scoreBefore = eval.evaluate();
-
-    // 2. Play the move using Deepov's internal transition function
-    cloneBoard->executeMove(playerMove);
-    int scoreAfter = eval.evaluate();
-
-    // 4. Score drop calculation (Delta)
-    // Note: Since turn flipped, adjust delta relative to who just moved
-    std::cout << "scoreBefore: " << scoreBefore << " scoreAfter:" << scoreAfter << std::endl;
     QString speechText = "";
     QString moveNotation = pieceType+" to "+pieceNotation + " ";
-    // Seed random selection
-    std::srand(static_cast<unsigned int>(std::time(nullptr)));
+//    std::shared_ptr<Board> cloneBoard = std::make_shared<Board>(fen.toStdString());
+//    Eval eval(cloneBoard);
+//    // 1. Get score before execution
+//    int scoreBefore = eval.evaluate();
 
-    // 5. Categorize score change
+//    // 2. Play the move using Deepov's internal transition function
+//    cloneBoard->executeMove(playerMove);
+//    int scoreAfter = eval.evaluate();
+
+//    // 4. Score drop calculation (Delta)
+//    // Note: Since turn flipped, adjust delta relative to who just moved
+//    std::cout << "scoreBefore: " << scoreBefore << " scoreAfter:" << scoreAfter << std::endl;
+//    // Seed random selection
+//    std::srand(static_cast<unsigned int>(std::time(nullptr)));
+
+//    // 5. Categorize score change
 //    int delta = scoreAfter - scoreBefore;
 //    if (delta >= 15) { // Loss of 1 whole pawn or more
 //        speechText = BLUNDER_PHRASES[std::rand() % BLUNDER_PHRASES.size()];
@@ -885,7 +888,7 @@ QString ChessController::processRobotCommentary(const QString fen, const int col
 //    }
 //    else
     { // Safe, standard development choice
-        speechText = moveNotation + GOOD_PHRASES[std::rand() % GOOD_PHRASES.size()];
+        speechText = GOOD_PHRASES[std::rand() % GOOD_PHRASES.size()];
     }
 
     // 6. Direct command execution to offline Text-to-Speech Engine

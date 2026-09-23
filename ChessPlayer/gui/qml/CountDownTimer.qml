@@ -71,6 +71,7 @@ Rectangle {
         loaderDialogEndgame.item.gameResult = result
         gameEnded = true;
         masterBot.stopGame(result === 2 ?"Player lost":"Player win");
+        timer.stop();
     }
 
     function enablePromotionSelection(enable) {

@@ -49,10 +49,9 @@ AssistantController::AssistantController(QObject *parent) : QObject(parent) {
         m_audioWorker->togglePause(false);
     });
 
-    connect(m_llmThread, &QThread::started, m_llmWorker, &LLMWorker::doWork);
+//    connect(m_audioThread, &QThread::finished, m_audioWorker, &QObject::deleteLater);
+//    connect(m_llmThread, &QThread::started, m_llmWorker, &LLMWorker::doWork);
     connect(m_voiceThread, &QThread::started, m_voiceWorker, &AudioOutputWorker::doWork);
-
-    connect(m_audioThread, &QThread::finished, m_audioWorker, &QObject::deleteLater);
     m_playerName = "Player";
 }
 
@@ -61,14 +60,14 @@ AssistantController::~AssistantController() {
 }
 
 void AssistantController::startService() {
+//    if (!m_audioThread->isRunning()) {
+//        m_audioThread->start();
+//    }
+//    if (!m_llmThread->isRunning()) {
+//        m_llmThread->start();
+//    }
     if (!m_voiceThread->isRunning()) {
         m_voiceThread->start();
-    }
-    if (!m_llmThread->isRunning()) {
-        m_llmThread->start();
-    }
-    if (!m_audioThread->isRunning()) {
-        m_audioThread->start();
     }
 }
 

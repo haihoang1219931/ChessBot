@@ -655,9 +655,14 @@ uint8_t ChessBot::playDetectMove()
                 if(possibleMove.length()==4) {
                     QString formattedMove = choosenPiece + " "+
                         from + " to "+ to;
-                    Q_EMIT newMoveAdded(fenBeforeMove,
-                                       m_chessController->playerColor() == Color::WHITE?"White":"Black",
-                                       formattedMove);
+//                    Q_EMIT newMoveAdded(fenBeforeMove,
+//                                       m_chessController->playerColor() == Color::WHITE?"White":"Black",
+//                                       formattedMove);
+                    QString comment = m_chessController->processRobotCommentary(fenBeforeMove,
+                                                                                m_chessController->playerColor(),
+                                                                                choosenPiece,to,choosenMove);
+                    Q_EMIT newCommentAdded(comment);
+
                 }
                 detectState = STATE_DONE_SUCCESS;
             } else {
