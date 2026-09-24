@@ -312,7 +312,7 @@ int Search::negaMaxRoot(const int depth)
 
 	MoveGen moveGen(myBoard);
 	std::vector<Move> moveList = moveGen.generateMoves();
-
+    printf("Search %d moveList\r\n",moveList.size());
 	myMoveOrder.rateMoves(moveList, myBoard, myPly, true);
 	myMoveOrder.sortMoves(moveList);
 

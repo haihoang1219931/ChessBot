@@ -36,9 +36,16 @@ public:
     Q_INVOKABLE void stopService();
     Q_INVOKABLE void sendTestCommand(QString command);
     Q_INVOKABLE int playerColor();
+    Q_INVOKABLE void classifyImage();
+    Q_INVOKABLE bool isClassificationDone();
     Q_INVOKABLE QString getCalibrationJson() const;
+    Q_INVOKABLE QSize getImageSize() const;
     Q_INVOKABLE QVariantList chessboardCorners() const;
     Q_INVOKABLE void stopGame(QString comment);
+    Q_INVOKABLE int timerLimit() const;
+    Q_INVOKABLE void setTimeLimit(int timeout) const;
+    Q_INVOKABLE QString botName() const;
+    Q_INVOKABLE QString playerName() const;
 
 Q_SIGNALS:
     void boardChanged(QStringList boardModel);
@@ -49,6 +56,11 @@ Q_SIGNALS:
     void calibrationUploadComplete(int direction, bool success);
     void showPromotionPieces();
     void foundLastFEN();
+    void preprocessDone(QString imagePath);
+    void classificationDone(QStringList boardModel,
+                            QStringList boardModelReverted);
+
+
 private:
     ChessBot* m_workerChessbot;
 #if defined(USE_AI_ASSISTANT)

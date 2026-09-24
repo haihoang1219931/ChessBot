@@ -21,5 +21,7 @@
         <file>qml/HomeOption.qml</file>
         <file>qml/ConfirmPlay.qml</file>
         <file>qml/SettingTestCommand.qml</file>
+        <file>qml/BotVision.qml</file>
+        <file>qml/GameTypeSelection.qml</file>
     </qresource>
 </RCC>

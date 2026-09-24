@@ -27,6 +27,13 @@ public:
     Q_INVOKABLE void startService();
     Q_INVOKABLE void stopService();
     Q_INVOKABLE void generateResponse(const QString &prompt);
+    Q_INVOKABLE void setAIModel(const QString& botName,
+                    const QString& playerName,
+                    const QString& whisperModelPath,
+                    const QString& llmModelPath,
+                    const QString& piperExePath,
+                    const QString& piperModelPath);
+    QString playerName();
 
 public Q_SLOTS:
     Q_INVOKABLE void singleVoice(QString text);
@@ -53,4 +60,5 @@ private:
     bool m_isListening = false;
     bool m_isThinking = false;
     QString m_responseText;
+    QString m_playerName;
 };

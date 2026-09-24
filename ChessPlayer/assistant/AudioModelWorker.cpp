@@ -23,35 +23,31 @@ void AudioModelWorker::handleManualPrompt(const QString &prompt) {
 }
 
 void AudioModelWorker::togglePause(bool pause) {
-//    if(pause) {
-//        if(m_audioIOStream != nullptr)
-//            m_audioInput->suspend();
-//    } else {
-//        if(m_audioIOStream == nullptr) {
-//            m_audioIOStream = m_audioInput->start();
-//            if (m_audioIOStream) {
-//                connect(m_audioIOStream, &QIODevice::readyRead, this, &AudioModelWorker::processIncomingAudio);
-//                Q_EMIT isListeningChanged(true);
-//                qDebug() << "Microphone auto-monitoring is active.";
-//            } else {
-//                qWarning() << "Audio hardware input stream failed to open.";
-//            }
-//        } else {
-//            m_audioInput->resume();
-//        }
-//    }
+    m_paused = pause;
+    Q_EMIT isListeningChanged(!pause);
 }
 
 void AudioModelWorker::initializeAudio() {
     QAudioFormat format;
-    format.setSampleRate(16000); format.setChannelCount(1); format.setSampleSize(16);
+    format.setSampleRate(22050); format.setChannelCount(1); format.setSampleSize(16);
     format.setCodec("audio/pcm"); format.setByteOrder(QAudioFormat::LittleEndian);
     format.setSampleType(QAudioFormat::SignedInt);
     m_audioInput = new QAudioInput(QAudioDeviceInfo::defaultInputDevice(), format, this);
+    m_audioIOStream = m_audioInput->start();
+    if (m_audioIOStream) {
+        connect(m_audioIOStream, &QIODevice::readyRead, this, &AudioModelWorker::processIncomingAudio);
+        Q_EMIT isListeningChanged(true);
+        qDebug() << "Microphone auto-monitoring is active.";
+    } else {
+        qWarning() << "Audio hardware input stream failed to open.";
+    }
 }
 
 void AudioModelWorker::processIncomingAudio() {
-    if(m_audioIOStream==nullptr) return;
+    if(m_audioIOStream==nullptr) {
+        qDebug() << "Microphone processIncomingAudio return m_audioIOStream==nullptr";
+        return;
+    }
     QByteArray freshBytes = m_audioIOStream->readAll();
     if (freshBytes.isEmpty()) return;
 
@@ -83,7 +79,7 @@ void AudioModelWorker::processIncomingAudio() {
                 qDebug() << "Speech finished. Starting processing pipeline.";
                 m_isSpeaking = false;
                 m_consecutiveSilenceSamples = 0;
-                Q_EMIT speechFinished(m_accumulatedPcmData);
+                if(!m_paused) Q_EMIT speechFinished(m_accumulatedPcmData);
             }
         }
     }

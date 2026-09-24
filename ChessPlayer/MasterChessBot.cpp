@@ -6,6 +6,12 @@ MasterChessBot::MasterChessBot(QObject *parent) : QObject(parent)
     m_workerChessbot = new ChessBot();
 #if defined(USE_AI_ASSISTANT)
     m_workerAssistant = new AssistantController();
+    m_workerAssistant->setAIModel(m_workerChessbot->botName(),
+                             m_workerChessbot->playerName(),
+                             m_workerChessbot->whisperModelPath(),
+                             m_workerChessbot->llmModelPath(),
+                             m_workerChessbot->piperExePath(),
+                             m_workerChessbot->piperModelPath());
     connect(m_workerChessbot, &ChessBot::newCommentAdded,
             m_workerAssistant, &AssistantController::singleVoice);
     connect(m_workerChessbot, &ChessBot::newMoveAdded,
@@ -27,6 +33,10 @@ MasterChessBot::MasterChessBot(QObject *parent) : QObject(parent)
             this, &MasterChessBot::showPromotionPieces);
     connect(m_workerChessbot, &ChessBot::foundLastFEN,
             this, &MasterChessBot::foundLastFEN);
+    connect(m_workerChessbot, &ChessBot::classificationDone,
+            this, &MasterChessBot::classificationDone);
+    connect(m_workerChessbot, &ChessBot::preprocessDone,
+            this, &MasterChessBot::preprocessDone);
 }
 
 ChessBot* MasterChessBot::chessbot()
@@ -135,6 +145,21 @@ int MasterChessBot::playerColor()
     return m_workerChessbot->chessController()->playerColor();
 }
 
+void MasterChessBot::classifyImage()
+{
+    m_workerChessbot->classifyImage();
+}
+
+bool MasterChessBot::isClassificationDone()
+{
+    return m_workerChessbot->isClassificationDone();
+}
+
+QSize MasterChessBot::getImageSize() const
+{
+    return m_workerChessbot->getImageSize();
+}
+
 QString MasterChessBot::getCalibrationJson() const
 {
     return m_workerChessbot->getCalibrationJson();
@@ -148,4 +173,28 @@ QVariantList MasterChessBot::chessboardCorners() const
 void MasterChessBot::stopGame(QString comment)
 {
     m_workerChessbot->stopGame(comment);
+}
+
+int MasterChessBot::timerLimit() const
+{
+    return m_workerChessbot->timerLimit();
+}
+
+void MasterChessBot::setTimeLimit(int timeout) const
+{
+    m_workerChessbot->setTimeLimit(timeout);
+}
+
+Q_INVOKABLE QString MasterChessBot::botName() const
+{
+    return m_workerChessbot->botName();
+}
+
+Q_INVOKABLE QString MasterChessBot::playerName() const
+{
+#if defined(USE_AI_ASSISTANT)
+    return m_workerAssistant->playerName();
+#else
+    return m_workerChessbot->playerName();
+#endif
 }

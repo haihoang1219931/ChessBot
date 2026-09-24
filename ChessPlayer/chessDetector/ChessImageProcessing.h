@@ -17,6 +17,9 @@
 #include <math.h>
 #include <sys/time.h> // for clock_gettime()
 #include <unistd.h> // for usleep()
+#if defined (USE_OPENVINO)
+#include <openvino/openvino.hpp>
+#endif
 
 const int NUM_COL = 14;
 const int NUM_ROW = 8;
@@ -73,8 +76,12 @@ class ChessImageProcessing
 {
 public:
     ChessImageProcessing();
-    void setDnnNetAllPieces(char* source, const std::vector<char>& dnnClassNames);
-    void setDnnNetSpecial(char* source, const std::vector<char>& dnnClassNames);
+    void setDnnNetAllPieces(char* source, const std::vector<char>& dnnClassNames,
+                            int size, int channels);
+#if defined (USE_OPENVINO)
+    void setDnnNetAllPiecesOpenVINO(char* source, const std::vector<char>& dnnClassNames,
+                            int size, int channels);
+#endif
     void connectSource(char* source);
     cv::Mat getNewImageSide();
     bool detectSide(cv::Mat image);
@@ -115,9 +122,14 @@ public:
                                                   int roiPercent, int minWhitePercent, int maxBlackPercent,
                                                   std::string name);
     int countMatchPixelColor(const cv::Mat& imageHSV, const std::vector<TargetColor>& targetColors, int maxH, int maxSV, std::string showName);
+    void filterPossibleValidCell(const cv::Mat& imgCurrent);
     void checkPieceColor(const cv::Mat& imageRGB, ClassificationResult& pieceClass, int row, int col);
     bool detectMovePhase3Classification();
     ClassificationResult classifyImage(const cv::Mat& input_mat, int row, int col);
+    void classsifyWholeBoardAtOnce(const cv::Mat& warpedBoard);
+#if defined (USE_OPENVINO)
+    void classifyWholeBoardNativeOpenVINO(const cv::Mat& warpedBoard);
+#endif
     void classsifyChessBoardImage(const cv::Mat& warpedBoard);
     void classsifyChessBoardImage2(const cv::Mat& warpedBoard);
     void excludeCellList(std::vector<cv::Point> listCell);
@@ -164,6 +176,11 @@ public:
                        bool whiteMove);
     bool findDropCells(std::vector<cv::Point>& dropCells);
     bool findPromotePiece(cv::Point& promoteCell, char piece);
+    void warpChessBoardImage(const cv::Mat& imgCurrent, cv::Mat& imgWarped);
+    void getAnalyzeResult(std::vector<std::string>& analyzeResult);
+    void traditionalThinning(const cv::Mat& src, cv::Mat& dst);
+    std::vector<cv::Point> findCellsExceedingThreshold(const cv::Mat& warpedColor, int pixelThreshold);
+
 private:
     bool m_sourceConnected;
     bool m_isBlackSide;
@@ -179,10 +196,23 @@ private:
     int m_detectState;
     cv::dnn::Net m_dnnNetAllPieces;
     std::vector<char> m_dnnAllPiecesNames;
-    cv::dnn::Net m_dnnNetBishopPawn;
-    std::vector<char> m_dnnBishopPawnNames;
+    int m_dnnAllPiecesImageSize;
+    int m_dnnAllPiecesImageChannels;
     uint8_t m_mapExcludedCell[NUM_ROW][NUM_COL];
+    uint8_t m_mapFilteredCell[NUM_ROW][NUM_COL];
     char m_mapClassifiedCell[NUM_ROW][NUM_COL];
+    // Internal layer parameters mapped from training weights file
+    cv::Mat m_fcWeightsMat; // Size: [7 x 512]
+    cv::Mat m_fcBiasMat;    // Size: [7 x 1]
+    bool m_isFcLayersInitialized = false;
+    // Internal helper initialization method
+    void initializeManualClassificationHead();
+#if defined (USE_OPENVINO)
+    ov::Core m_ovCore;
+    ov::CompiledModel m_ovCompiledModel;
+    ov::InferRequest m_ovInferRequest;
+    std::vector<ov::InferRequest> m_ovInferRequestPool;
+#endif
 };
 
 #endif // CHESSIMAGEPROCESSING_H

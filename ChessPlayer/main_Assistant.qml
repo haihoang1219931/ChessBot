@@ -1,7 +1,6 @@
-import QtQuick 2.12
+ import QtQuick 2.12
 import QtQuick.Controls 2.12
 import QtQuick.Layouts 1.12
-import ChessAssistant 1.0
 
 ApplicationWindow {
     visible: true
@@ -15,9 +14,8 @@ ApplicationWindow {
     }
 
     // Instantiate your C++ Assistant Controller
-    AssistantController {
-        id: assistant
-
+    Connections {
+        target: assistant
         onGenerationFinished: function(finalText) {
             console.log("Generation completed successfully!")
             // You can trigger your Text-to-Speech logic here later

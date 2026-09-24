@@ -33,9 +33,12 @@ const QStringList BRILLIANT_PHRASES = {
 };
 
 const QStringList GOOD_PHRASES = {
-    " is a very solid move.",
-    " helps you control the board.",
-    " is a nice strategic development."
+    "That is a very solid move.",
+    "You are controlling the board.",
+    "It is a nice strategic development.",
+    "Watch your defenses.",
+    "An interesting choice.",
+    "Be cautious! I'm calculating."
 };
 
 ChessController::ChessController(QObject* parent)
@@ -139,6 +142,7 @@ const std::string whitePawnPromotion = "8/2P1k3/8/3K4/8/8/8/8 w - - 0 1";
 const std::string whitePawnPromotion2 = "1q6/2P1k3/8/3K4/8/8/8/8 w - - 0 1";
 const std::string blackPawnPromotion = "7K/8/8/8/8/3k4/p7/8 w - - 0 1";
 const std::string blackPawnPromotion2 = "1k5K/8/8/8/8/8/Np6/RN6 w - - 0 1";
+const std::string blackPawnPromotion3 = "rnbqkbnr/ppp1pppp/8/8/4P3/5Q2/PPPp1PPP/1RB1KBNR w kq - 9 5";
 const std::string whiteMateFen = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
 const std::string blackMateFen = "7K/6q1/6k1/8/8/8/8/8 w - - 0 1";
 const std::string staleMateFen = "7k/5Q2/7K/8/8/8/8/8 b - - 0 1";
@@ -591,9 +595,11 @@ void ChessController::playEngineMove()
     Search search(m_board);
     search.negaMaxRoot(m_engineElo/500);
     Move bestMove = search.myBestMove;
+    std::string bestMoveStr = bestMove.toShortString();
     qDebug("ChessController::playEngineMove bestmove %s",
-           bestMove.toShortString().c_str());
-    if (tryFindLegalMove(bestMove.getOrigin(), bestMove.getDestination(), chosenMove)) {
+           bestMoveStr.c_str());
+    if (tryFindLegalMove(bestMove.getOrigin(), bestMove.getDestination(), chosenMove,
+                         bestMoveStr.length()==5?QChar(bestMoveStr[4]):QChar())) {
         foundBestMove = true;
     } else if(m_promotionPending) {
         chosenMove = bestMove;
@@ -605,15 +611,18 @@ void ChessController::playEngineMove()
         if(moveList.size() > 0) {
             int randomMove = rand()%moveList.size();
             if(randomMove < 0) randomMove = 0;
+            std::string randomMoveStr = moveList[randomMove].toShortString();
             qDebug("ChessController::playEngineMove random move %s",
-                   moveList[randomMove].toShortString().c_str());
-            if (tryFindLegalMove(moveList[randomMove].getOrigin(), moveList[randomMove].getDestination(), chosenMove)) {
+                   randomMoveStr.c_str());
+            if (tryFindLegalMove(moveList[randomMove].getOrigin(), moveList[randomMove].getDestination(), chosenMove,
+                                 randomMoveStr.length()==5?QChar(randomMoveStr[4]):QChar())) {
                 foundBestMove = true;
             }
         }
     }
     if(foundBestMove) {
         m_botMove = chosenMove;
+        qDebug("ChessController::playEngineMove execute bot move");
         m_board->executeMove(chosenMove);
         qDebug("ChessController::playEngineMove execute bot move done");
         updateBoard();
@@ -679,7 +688,6 @@ bool ChessController::tryFindLegalMove(int originSquare, int destinationSquare, 
 {
     MoveGen moveGen(m_board);
     const auto legalMoves = moveGen.generateMoves();
-
     m_pendingPromotionMoves.clear();
     bool hasMatchingPromotion = false;
 
@@ -855,24 +863,24 @@ bool ChessController::tryParseCoordinate(const QString& coordinate, int& uiIndex
 QString ChessController::processRobotCommentary(const QString fen, const int color,
                                                 const QString pieceType, const QString pieceNotation,
                                                 Move playerMove) {
-    std::shared_ptr<Board> cloneBoard = std::make_shared<Board>(fen.toStdString());
-    Eval eval(cloneBoard);
-    // 1. Get score before execution
-    int scoreBefore = eval.evaluate();
-
-    // 2. Play the move using Deepov's internal transition function
-    cloneBoard->executeMove(playerMove);
-    int scoreAfter = eval.evaluate();
-
-    // 4. Score drop calculation (Delta)
-    // Note: Since turn flipped, adjust delta relative to who just moved
-    std::cout << "scoreBefore: " << scoreBefore << " scoreAfter:" << scoreAfter << std::endl;
     QString speechText = "";
     QString moveNotation = pieceType+" to "+pieceNotation + " ";
-    // Seed random selection
-    std::srand(static_cast<unsigned int>(std::time(nullptr)));
+//    std::shared_ptr<Board> cloneBoard = std::make_shared<Board>(fen.toStdString());
+//    Eval eval(cloneBoard);
+//    // 1. Get score before execution
+//    int scoreBefore = eval.evaluate();
 
-    // 5. Categorize score change
+//    // 2. Play the move using Deepov's internal transition function
+//    cloneBoard->executeMove(playerMove);
+//    int scoreAfter = eval.evaluate();
+
+//    // 4. Score drop calculation (Delta)
+//    // Note: Since turn flipped, adjust delta relative to who just moved
+//    std::cout << "scoreBefore: " << scoreBefore << " scoreAfter:" << scoreAfter << std::endl;
+//    // Seed random selection
+//    std::srand(static_cast<unsigned int>(std::time(nullptr)));
+
+//    // 5. Categorize score change
 //    int delta = scoreAfter - scoreBefore;
 //    if (delta >= 15) { // Loss of 1 whole pawn or more
 //        speechText = BLUNDER_PHRASES[std::rand() % BLUNDER_PHRASES.size()];
@@ -885,7 +893,7 @@ QString ChessController::processRobotCommentary(const QString fen, const int col
 //    }
 //    else
     { // Safe, standard development choice
-        speechText = moveNotation + GOOD_PHRASES[std::rand() % GOOD_PHRASES.size()];
+        speechText = GOOD_PHRASES[std::rand() % GOOD_PHRASES.size()];
     }
 
     // 6. Direct command execution to offline Text-to-Speech Engine

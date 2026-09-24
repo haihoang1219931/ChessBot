@@ -10,6 +10,7 @@
 #include <QVariant>
 #include <QVariantList>
 #include <QPoint>
+#include <QSize>
 #include <QVector>
 
 #define CONFIGURE_CHESSBOARD_CALIB_FILE "calib_data.json"
@@ -45,6 +46,7 @@ typedef enum {
     STATE_PLAY,
     STATE_CONFIGURE,
     STATE_TEST,
+    STATE_CLASSIFICATION,
     STATE_EXIT,
 } STATE_CHESBOT;
 
@@ -86,6 +88,7 @@ typedef enum{
 } STATE_INIT_PHASE;
 
 typedef enum{
+    TEST_CLASSIFICATION,
     TEST_ROBOT,
     TEST_CHECK_RESULT,
     TEST_DONE
@@ -114,11 +117,18 @@ public:
     ChessController* chessController();
     QVariantList chessboardCorners() const;
     QString getCalibrationJson() const;
+    QSize getImageSize() const;
     bool saveCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
     bool loadCalibrationData(QString fileName = CONFIGURE_CHESSBOARD_CALIB_FILE);
     void updateCorners(QVariantList corners);
     void updateCalibrationData(int type, int row, int col, int x, int y);
     void acceptPlayFENFromHistory(bool accept);
+    QString botName();
+    QString playerName();
+    QString whisperModelPath();
+    QString llmModelPath();
+    QString piperExePath();
+    QString piperModelPath();
 
     void run() override;
     void startService();
@@ -136,6 +146,10 @@ public:
     void playInputMove(int startIndex, int stopIndex, int promotePiece = -1);
     void playInputCancelPromotion();
     void stopGame(QString comment);
+    void classifyImage();
+    bool isClassificationDone();
+    int timerLimit();
+    void setTimeLimit(int timeOut);
 
 Q_SIGNALS:
     void boardChanged(QStringList boardModel);
@@ -148,12 +162,14 @@ Q_SIGNALS:
     void foundLastFEN();
     void newCommentAdded(QString text);
     void newMoveAdded(QString fen, QString playColor, QString move);
+    void preprocessDone(QString imagePath);
+    void classificationDone(QStringList boardModel,QStringList boardModelReverted);
 
 private:
     void playLoop();
     void configureLoop();
     void testLoop();
-    bool playCheckEndGame();
+    bool playCheckEndGame(bool talkCheckmate);
     bool playCheckDoubleMove();
     bool canMoveStraight(int startRow, int startCol, int stopRow, int stopCol, PIECE_MOVE_TYPE moveType = PIECE_MOVE_NORMAL);
     uint8_t playDetectMove();
@@ -166,6 +182,7 @@ private:
     uint8_t configureLevel();
     uint8_t testRobot();
     uint8_t testCheckResult();
+    uint8_t analyzeChessBoard();
     void initRobot();
     bool detectArduinoPort(int baudRate = 38400);
     bool readCalibrationPoint(const QString &command, QPoint& point);
@@ -205,10 +222,12 @@ private:
     QString m_commandTest;
     bool m_pause = false;
     int m_state;
+    bool m_handleNewCommand;
     int m_statePlay;
     int m_stateConfigure;
     int m_stateTest;
     int m_stateInit;
+    int m_stateClassification;
     int m_width;
     int m_height;
 #ifdef IMAGE_PROCESS_MOVE
@@ -227,6 +246,19 @@ private:
     char m_robotCommand[32];
     GameInfo m_lastGame;
     QString m_timeoutComment;
+    QStringList m_analyzeChessBoardResult;
+    QStringList m_analyzeChessBoardRevertedResult;
+    QString m_chessDetectorModel;
+    QString m_chessDetectorClassList;
+    int m_chessDetectorImageSize;
+    int m_chessDetectorImageChannels = 3;
+    QString m_botName;
+    QString m_playerName;
+    QString m_whisperModelPath;
+    QString m_llmModelPath;
+    QString m_piperExePath;
+    QString m_piperModelPath;
+    int m_timeOut;
 };
 
 #endif // CHESSBOT_H

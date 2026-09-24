@@ -1,12 +1,14 @@
 TEMPLATE = app
-CONFIG += c++11 console
+CONFIG += c++17 console
 
 QT += core gui qml quick serialport multimedia
 
 CONFIG += use_chess_algo
-#CONFIG += use_ai_assistant
+CONFIG += use_ai_assistant
 CONFIG += use_image_processing
 CONFIG += use_system_voice
+CONFIG += use_openmp
+CONFIG += use_openvino
 #CONFIG += use_sanitize
 use_system_voice {
     QT += texttospeech
@@ -15,7 +17,37 @@ use_sanitize {
 QMAKE_CXXFLAGS += -fsanitize=address -fno-omit-frame-pointer
 QMAKE_LFLAGS += -fsanitize=address
 }
+use_openmp {
+DEFINES += USE_OPENMP
+# Enable the OpenMP multi-threading compiler flags
+QMAKE_CXXFLAGS += -fopenmp
+QMAKE_LFLAGS   += -fopenmp
+
+# Link the OpenMP runtime system library
+LIBS += -lgomp
+}
 #DEFINES += TEST_RANDOM_MOVE
+use_openvino {
+DEFINES += USE_OPENVINO
+unix:!macx: INCLUDEPATH += /usr/local/runtime/include
+unix:!macx: DEPENDPATH += /usr/local/runtime/include
+unix:!macx: LIBS += -L/usr/local/runtime/3rdparty/tbb/lib/ -ltbb
+unix:!macx: LIBS += -L/usr/local/runtime/lib/intel64/ \
+    -lopenvino \
+    -lopenvino_tensorflow_lite_frontend \
+    -lopenvino_tensorflow_frontend \
+    -lopenvino_pytorch_frontend \
+    -lopenvino_paddle_frontend \
+    -lopenvino_onnx_frontend \
+    -lopenvino_hetero_plugin \
+    -lopenvino_intel_cpu_plugin \
+    -lopenvino_intel_gpu_plugin \
+    -lopenvino_intel_npu_plugin \
+    -lopenvino_gguf_frontend \
+    -lopenvino_auto_plugin \
+    -lopenvino_auto_batch_plugin \
+    -lpthread
+}
 use_image_processing {
 #DEFINES += DEBUG_ROI
 #DEFINES += DEBUG_SHOW_IMAGE
@@ -131,10 +163,6 @@ DEFINES += USE_AI_ASSISTANT
         gcc {
             QMAKE_CXXFLAGS += -fexceptions
         }
-        # Add WHISPER_VERSION to your existing DEFINES block
-        DEFINES += NOMINMAX \
-                   _CRT_SECURE_NO_WARNINGS \
-                   WHISPER_VERSION=\\\"1.6.0\\\"  # <--- ADD THIS LINE TO FIX THE COMPILER SCOPE ERROR!
 
         msvc {
             QMAKE_CXXFLAGS += /EHsc
@@ -142,6 +170,26 @@ DEFINES += USE_AI_ASSISTANT
             QMAKE_CXXFLAGS += /arch:AVX2
         }
     }
+    unix:!macx {
+        # 1. Update these paths to match where your repositories live on your disk
+        LLAMA_SOURCE_DIR = "$$PWD/../../ai/llama.cpp"
+
+        # Update this directory address to match your folder structure
+        WHISPER_DIR = "$$PWD/../../ai/whisper.cpp"
+        # 3. Link Compiled Libraries (Windows MSVC syntax)
+        LIBS += -L/usr/local/lib/ \
+            -lllama \
+            -lllama-common \
+            -lggml \
+            -lggml-cpu \
+            -lggml-base \
+            -lwhisper \
+            -lparakeet
+    }
+# Add WHISPER_VERSION to your existing DEFINES block
+DEFINES += NOMINMAX \
+           _CRT_SECURE_NO_WARNINGS \
+           WHISPER_VERSION=\\\"1.6.0\\\"  # <--- ADD THIS LINE TO FIX THE COMPILER SCOPE ERROR!
 # 2. Include Headers
 # Add the missing ggml folder paths here
 INCLUDEPATH += $$LLAMA_SOURCE_DIR/include \

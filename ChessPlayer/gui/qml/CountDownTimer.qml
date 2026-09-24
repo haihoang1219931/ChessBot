@@ -41,9 +41,10 @@ Rectangle {
     property int gameTurn: 0
     property string player1Name: "Bot"
     property string player2Name: "Player"
-    property int playTime: 600
-    property int player1Time: 600
-    property int player2Time: 600
+    property int playTime: 0
+    property int player1Time: 0
+    property int player2Time: 0
+    property int dirTime: 0
     property bool gameEnded: false;
     function resetGame(){
         player1Time = playTime;
@@ -70,6 +71,7 @@ Rectangle {
         loaderDialogEndgame.item.gameResult = result
         gameEnded = true;
         masterBot.stopGame(result === 2 ?"Player lost":"Player win");
+        timer.stop();
     }
 
     function enablePromotionSelection(enable) {
@@ -131,7 +133,7 @@ Rectangle {
         // --- SHAPE LAYER SECTION (Main Timer Area) ---
         Item {
             width: parent.width
-            height: parent.height - topBar.height // Take up remaining space
+            height: parent.height-topBar.height // Take up remaining space
 
             // Blue Background (Right)
             Rectangle {
@@ -223,18 +225,18 @@ Rectangle {
     Timer {
         id: timer
         interval: 1000
-        running: true
+        running: false
         repeat: true
 
         onTriggered: {
             if(gameTurn == side) {
-                player2Time --
+                player2Time += dirTime
                 if(player2Time == 0) {
                     openGameResult(2)
                     timer.stop();
                 }
             } else {
-                player1Time --
+                player1Time += dirTime
                 if(player1Time == 0) {
                     openGameResult(1)
                     timer.stop();
@@ -314,6 +316,17 @@ Rectangle {
         root.levelType = chessController.engineLevel
         root.levelScore = chessController.engineElo
         root.side =  chessController.playerColor
+        root.player1Name = masterBot.botName();
+        root.player2Name = masterBot.playerName();
+        console.log("timeout: "+root.playTime)
+        if(root.playTime != 0) {
+            root.player1Time = root.playTime;
+            root.player2Time = root.playTime;
+            root.dirTime = -1;
+        } else {
+            root.dirTime = 1;
+        }
+        timer.start();
     }
     Connections {
         target: masterBot

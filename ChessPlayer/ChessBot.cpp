@@ -62,9 +62,47 @@ ChessBot::ChessBot(QThread *parent) :
 #endif
 #ifdef IMAGE_PROCESS_MOVE
 #endif
-    m_validCalibFileFound = loadCalibrationData();
     connect(m_chessController,&ChessController::boardChanged,
             this,&ChessBot::boardChanged);
+    m_validCalibFileFound = loadCalibrationData();
+    if(!m_validCalibFileFound) {
+        m_chessDetectorModel = "chess_piece_resnet18_20260828_100epoch.onnx";
+        m_chessDetectorClassList = "b,.,k,n,p,q,r";
+        m_chessDetectorImageSize = 240;
+        m_chessDetectorImageChannels = 3;
+        m_botName = "Tobot";
+        m_playerName = "Bean";
+        m_whisperModelPath = "ggml-base.en.bin";
+        m_llmModelPath = "qwen2.5-1.5b-instruct-q4_k_m.gguf";
+        m_piperExePath = "piper";
+        m_piperModelPath = "en_US-sam-medium.onnx";
+        m_chessboardConners.clear();
+        m_chessboardConners.push_back(QPoint(234, 159));
+        m_chessboardConners.push_back(QPoint(1716, 174));
+        m_chessboardConners.push_back(QPoint(1878, 1032));
+        m_chessboardConners.push_back(QPoint(84, 1032));
+        m_moveDetector->setCorners(m_chessboardConners[0].x(),m_chessboardConners[0].y(),
+                m_chessboardConners[1].x(),m_chessboardConners[1].y(),
+                m_chessboardConners[2].x(),m_chessboardConners[2].y(),
+                m_chessboardConners[3].x(),m_chessboardConners[3].y());
+        std::vector<char> dnnClassNames;
+        QStringList dnnClassArr = m_chessDetectorClassList.split(",");
+        for(QString className:dnnClassArr) {
+            dnnClassNames.push_back(className.toStdString()[0]);
+        }
+#if defined (USE_OPENVINO)
+        m_moveDetector->setDnnNetAllPiecesOpenVINO((char*)m_chessDetectorModel.toStdString().c_str(),
+                                           dnnClassNames,
+                                           m_chessDetectorImageSize,
+                                           m_chessDetectorImageChannels);
+#else
+        m_moveDetector->setDnnNetAllPieces((char*)m_chessDetectorModel.toStdString().c_str(),
+                                           dnnClassNames,
+                                           m_chessDetectorImageSize,
+                                           m_chessDetectorImageChannels);
+#endif
+        saveCalibrationData();
+    }
 }
 
 ChessBot::~ChessBot()
@@ -72,7 +110,6 @@ ChessBot::~ChessBot()
     stopService();
 }
 #ifdef IMAGE_PROCESS_MOVE
-bool openFirstTime = false;
 bool ChessBot::readFrame(cv::Mat& outImg)
 {
     QElapsedTimer timer;
@@ -81,46 +118,30 @@ bool ChessBot::readFrame(cv::Mat& outImg)
     if (!cap.isOpened()) {
         QElapsedTimer timer;
         timer.start();
-        cap.open(0);
+        cap.open(0, cv::CAP_V4L);
         qint64 milliSeconds = timer.elapsed();
 
         qDebug() << "Open took" << milliSeconds << "milliseconds.";
-//        if(!openFirstTime)
-        {
-            QElapsedTimer timer;
-            timer.start();
-            cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
+        QElapsedTimer timerSetProp;
+        timerSetProp.start();
+        cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
 
-            // Set your target resolution
-            cap.set(cv::CAP_PROP_FRAME_WIDTH, m_width);
-            cap.set(cv::CAP_PROP_FRAME_HEIGHT, m_height);
+        // Set your target resolution
+        cap.set(cv::CAP_PROP_FRAME_WIDTH, m_width);
+        cap.set(cv::CAP_PROP_FRAME_HEIGHT, m_height);
 
-            // Set your target frame rate
-            cap.set(cv::CAP_PROP_FPS, 30);
+        // Set your target frame rate
+        cap.set(cv::CAP_PROP_FPS, 30);
 
-            // Verify what the hardware actually set (some cameras fallback if unsupported)
-            double actual_width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
-            double actual_height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
-            double actual_fps = cap.get(cv::CAP_PROP_FPS);
+        // Verify what the hardware actually set (some cameras fallback if unsupported)
+        double actual_width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
+        double actual_height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
+        double actual_fps = cap.get(cv::CAP_PROP_FPS);
 
-            std::cout << "Capture initialized: " << actual_width << "x" << actual_height
-                      << " @ " << actual_fps << " FPS" << std::endl;
+        std::cout << "Capture initialized: " << actual_width << "x" << actual_height
+                  << " @ " << actual_fps << " FPS" << std::endl;
 
-            qint64 milliSeconds = timer.elapsed();
-
-            qDebug() << "Set property took" << milliSeconds << "milliseconds.";
-            openFirstTime = true;
-            timer.start();
-            for(int i=0; i< 0;i++) {
-//                cap.read(outImg);
-                cap.grab();
-//                QThread::msleep(30);
-                printf(".");
-            }
-            milliSeconds = timer.elapsed();
-
-            qDebug() << "grap 2 images took" << milliSeconds << "milliseconds.";
-        }
+        qDebug() << "Set property took" << timerSetProp.elapsed() << "milliseconds.";
     }
     if (cap.isOpened()) {
         QElapsedTimer timer;
@@ -134,8 +155,11 @@ bool ChessBot::readFrame(cv::Mat& outImg)
     }
     // 3. Get the elapsed time
     qint64 milliSeconds = timer.elapsed();
-
-    qDebug() << "The read frame took" << milliSeconds << "milliseconds.";
+    if(readResult) {
+        qDebug() << "Read frame success " << milliSeconds << "milliseconds. ["<<outImg.cols << "," << outImg.rows << "]";
+    } else {
+        qDebug() << "Read frame failed " << milliSeconds << "milliseconds.";
+    }
     return readResult;
 }
 #endif
@@ -145,8 +169,8 @@ void ChessBot::updateCorners(QVariantList corners)
     m_chessboardConners.clear();
     for (const QVariant &val : corners) {
         QVariantMap map = val.toMap();
-        int x = map["x"].toInt()*m_width/640;
-        int y = map["y"].toInt()*m_height/360;
+        int x = map["x"].toInt();
+        int y = map["y"].toInt();
 
         m_chessboardConners.append(QPoint(map["x"].toInt(),map["y"].toInt()));
     }
@@ -312,11 +336,13 @@ void ChessBot::playLoop()
         logWithTimestampQt(m_chessController->extractFEN());
         qDebug("Init FEN done");
         m_statePlay = PLAY_PROCESS_DONE;
+        m_handleNewCommand = false;
     }
         break;
     case PLAY_INIT: {
         qDebug("PLAY_INIT");
-        if(playCheckEndGame() == true)
+        Q_EMIT playTurnChanged(m_chessController->playerColor() == Color::WHITE ? 1-m_chessController->playerColor() : m_chessController->playerColor());
+        if(playCheckEndGame(false) == true)
             m_statePlay = PLAY_CHECK_CURRENT_MOVE;
         else
             m_statePlay = PLAY_PROCESS_DONE;
@@ -398,22 +424,27 @@ void ChessBot::playLoop()
         break;
     case PLAY_INFORM_ERROR_CALCULATE_NEXT_MOVE: {
         qDebug("Can not calculate best move");
-        Q_EMIT newCommentAdded("Can not calculate best move");
+//        Q_EMIT newCommentAdded("Can not calculate best move");
         m_statePlay = PLAY_PROCESS_DONE;
     }
         break;
     case PLAY_INFORM_ERROR_EXECUTE_NEXT_MOVE: {
         qDebug("Execute move error");
-        Q_EMIT newCommentAdded("Execute move error");
+//        Q_EMIT newCommentAdded("Execute move error");
         m_statePlay = PLAY_PROCESS_DONE;
     }
         break;
     case PLAY_PROCESS_DONE: {
         qDebug("PLAY_PROCESS_DONE");
         Q_EMIT playTurnChanged(m_chessController->playerColor() == Color::WHITE ? m_chessController->playerColor():1-m_chessController->playerColor());
-        playCheckEndGame();
-        m_state = STATE_EXIT;
-        togglePause(true);
+        playCheckEndGame(true);
+        if(m_handleNewCommand) {
+            m_statePlay = PLAY_INIT;
+            m_handleNewCommand = false;
+        } else {
+            m_state = STATE_EXIT;
+            togglePause(true);
+        }
     }
         break;
     }
@@ -451,10 +482,17 @@ void ChessBot::configureLoop()
 void ChessBot::testLoop()
 {
     switch (m_stateTest) {
+    case TEST_CLASSIFICATION: {
+        if(analyzeChessBoard()!=STATE_PENDING){
+            m_stateTest = TEST_DONE;
+        }
+        break;
+    }
     case TEST_ROBOT: {
         if(testRobot() == STATE_DONE_SUCCESS){
             m_stateTest = TEST_CHECK_RESULT;
         }
+        break;
     }
     case TEST_CHECK_RESULT: {
         if(testCheckResult() != STATE_PENDING){
@@ -516,7 +554,7 @@ bool ChessBot::canMoveStraight(int startRow, int startCol, int stopRow, int stop
     return !foundBlockingPiece;
 }
 
-bool ChessBot::playCheckEndGame()
+bool ChessBot::playCheckEndGame(bool talkCheckmate)
 {
     QString gameState = m_chessController->buildResultText();
     qDebug("gameState[%s]",gameState.toStdString().c_str());
@@ -527,20 +565,24 @@ bool ChessBot::playCheckEndGame()
             Q_EMIT gameEnded(0);
             return false;
         } else if(gameState == "WHITE_WIN") {
-            Q_EMIT newCommentAdded(m_chessController->playerColor() == 0?"Check mate. You win":
+            if(talkCheckmate)
+                Q_EMIT newCommentAdded(m_chessController->playerColor() == 0?"Check mate. You win":
                                   "Check mate. You lost");
             Q_EMIT gameEnded(m_chessController->playerColor() == 0?1:2);
             return false;
         } else if(gameState == "BLACK_WIN") {
-            Q_EMIT newCommentAdded(m_chessController->playerColor() == 1?"Check mate. You win":
+            if(talkCheckmate)
+                Q_EMIT newCommentAdded(m_chessController->playerColor() == 1?"Check mate. You win":
                                   "Check mate. You lost");
             Q_EMIT gameEnded(m_chessController->playerColor() == 1?1:2);
             return false;
         } else if(gameState == "BLACK_CHECK") {
-            Q_EMIT newCommentAdded(m_chessController->playerColor() == 0?"Check mate":"Good checkmate");
+            if(talkCheckmate)
+                Q_EMIT newCommentAdded(m_chessController->playerColor() == 0?"Check":"Good check");
             return true;
         } else if(gameState == "WHITE_CHECK") {
-            Q_EMIT newCommentAdded(m_chessController->playerColor() == 1?"Check mate":"Good checkmate");
+            if(talkCheckmate)
+                Q_EMIT newCommentAdded(m_chessController->playerColor() == 1?"Check":"Good check");
             return true;
         }
     } else {
@@ -609,6 +651,7 @@ uint8_t ChessBot::playDetectMove()
             }
         }
         if(numPossibleMove == 1) {
+            QString fenBeforeMove = m_chessController->extractFEN();
             qDebug("Found Move %s",possibleMove.c_str());
             QString from = QString::fromStdString(possibleMove.substr(0,2));  // Result: "e2"
             QString to = QString::fromStdString(possibleMove.substr(2,2));   // Result: "e4"
@@ -616,8 +659,22 @@ uint8_t ChessBot::playDetectMove()
             if(possibleMove.length()==5) promotePiece = QChar(possibleMove[4]);
             choosenPiece = m_chessController->pieceType(from);
             choosenPieceMoveNotation = to;
+
             if(m_chessController->moveByCoordinates(from,to,choosenMove,
                                                     promotePiece.toLower())) {
+
+                if(possibleMove.length()==4) {
+                    QString formattedMove = choosenPiece + " "+
+                        from + " to "+ to;
+//                    Q_EMIT newMoveAdded(fenBeforeMove,
+//                                       m_chessController->playerColor() == Color::WHITE?"White":"Black",
+//                                       formattedMove);
+                    QString comment = m_chessController->processRobotCommentary(fenBeforeMove,
+                                                                                m_chessController->playerColor(),
+                                                                                choosenPiece,to,choosenMove);
+                    Q_EMIT newCommentAdded(comment);
+
+                }
                 detectState = STATE_DONE_SUCCESS;
             } else {
                 if(m_chessController->status() == "CHOOSE_PROMOTION_PIECE") {
@@ -642,7 +699,7 @@ uint8_t ChessBot::playRandomMove()
         m_chessController->moveByCoordinates(randomMoves[0],randomMoves[1],choosenMove);
         return STATE_DONE_SUCCESS;
     } else {
-        Q_EMIT newCommentAdded("No invalid move found\r\n");
+        qDebug("No invalid move found\r\n");
         return STATE_DONE_FAIL;
     }
 }
@@ -700,6 +757,7 @@ uint8_t ChessBot::playCalculateNextMove()
                                                 m_chessController->playerColor() != 0?"white":"black");
     toCoord = notationToCoord(to.toStdString(),
                                                 m_chessController->playerColor() != 0?"white":"black");
+#if defined (IMAGE_PROCESS_MOVE)
     qDebug("Bot move %s->%s",
            from.toStdString().c_str(),
            to.toStdString().c_str());
@@ -844,12 +902,15 @@ uint8_t ChessBot::playCalculateNextMove()
     qDebug("playCalculateNextMove %s to cmd[%s]\r\n",
            lastMoveStr.toStdString().c_str(),
            m_robotCommand);
+#endif
     return STATE_DONE_SUCCESS;
 }
 
 bool ChessBot::sendRobotCommand(const char* cmd, int waitTime)
 {
+#if defined(DEBUG_COMMAND)
     qDebug("sendRobotCommand %d [%s]",strlen(cmd),cmd);
+#endif
     if (!robotController->isOpen()) {
         qDebug("Serial port is not open to write");
         return false;
@@ -872,13 +933,19 @@ QString ChessBot::readRobotResponse(int waitTime)
             chunk += robotController->readAll();
         }
     }
+#if defined(DEBUG_COMMAND)
     qDebug("Robot rep [%d]:%s",chunk.size(),chunk.data());
+#endif
     return QString::fromUtf8(chunk);
 }
 uint8_t ChessBot::playExecuteNextMove()
 {
+#if defined (IMAGE_PROCESS_MOVE)
     // TODO: Send command to robot and wait until execution is done
     return executeCommand(m_robotCommand);
+#else
+    return STATE_DONE_SUCCESS;
+#endif
 }
 
 uint8_t ChessBot::playInformResult()
@@ -954,6 +1021,79 @@ uint8_t ChessBot::testCheckResult()
         } while(retry < 25);
     }
     return cmdResult;
+}
+
+uint8_t ChessBot::analyzeChessBoard()
+{
+#if defined(IMAGE_PROCESS_MOVE)
+    cv::Mat currentImage, warpedImage;
+    QString warpedImagePath = "warpedImage.jpg";
+    std::vector<std::string> analyzeResult;
+    if(!readFrame(currentImage)) {
+        return STATE_DONE_FAIL;
+    }
+    m_moveDetector->warpChessBoardImage(currentImage, warpedImage);
+    // Get current system time
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    // Format time as a string
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&now_c), "%Y-%m-%d %H:%M:%S");
+    std::string timestamp = ss.str();
+
+    // Define text properties
+    cv::Point org(30, 50); // Bottom-left corner of the text string in the image
+    int fontFace = cv::FONT_HERSHEY_SIMPLEX;
+    double fontScale = 1.0;
+    cv::Scalar color(0, 255, 0); // Green color in BGR
+    int thickness = 2;
+    int lineType = cv::LINE_AA;
+
+    // Put timestamp on the image
+    cv::putText(warpedImage, timestamp, org, fontFace, fontScale, color, thickness, lineType);
+
+    cv::imwrite(warpedImagePath.toStdString(),warpedImage);
+    Q_EMIT preprocessDone(warpedImagePath);
+    m_moveDetector->filterPossibleValidCell(currentImage);
+#if defined (USE_OPENVINO)
+    m_moveDetector->classifyWholeBoardNativeOpenVINO(warpedImage);
+#else
+    m_moveDetector->classsifyChessBoardImage(warpedImage);
+#endif
+    m_moveDetector->getAnalyzeResult(analyzeResult);
+    m_analyzeChessBoardResult.clear();
+    m_analyzeChessBoardRevertedResult.clear();
+    for(std::string piece: analyzeResult) {
+        m_analyzeChessBoardResult.push_back(QString::fromStdString(std::string(1,piece[0])));
+    }
+    if(m_analyzeChessBoardResult.size() != NUM_COL * NUM_ROW) {
+        qDebug("m_analyzeChessBoardResult.size()[%d] != (NUM_COL * NUM_ROW)%d",
+               m_analyzeChessBoardResult.size(),NUM_COL * NUM_ROW);
+        return STATE_DONE_FAIL;
+    }
+    std::reverse_copy(m_analyzeChessBoardResult.begin(),
+                      m_analyzeChessBoardResult.end(),
+                      std::back_inserter(m_analyzeChessBoardRevertedResult));
+    qDebug("classificationDone");
+    Q_EMIT classificationDone(m_analyzeChessBoardResult,
+                              m_analyzeChessBoardRevertedResult);
+#endif
+    return STATE_DONE_SUCCESS;
+}
+
+bool ChessBot::isClassificationDone()
+{
+    return m_stateClassification != STATE_PENDING;
+}
+
+int ChessBot::timerLimit()
+{
+    return m_timeOut;
+}
+
+void ChessBot::setTimeLimit(int timeOut)
+{
+    m_timeOut = timeOut;
 }
 
 bool ChessBot::readCalibrationPoint(const QString &command,QPoint& point)
@@ -1402,10 +1542,16 @@ bool ChessBot::saveCalibrationData(QString fileName)
 
     // 1. Store ai models
     QJsonObject childrenObj;
-    childrenObj["chess_detector"] = "chess_piece_resnet18_20260828_100epoch.onnx";
-    childrenObj["class_list"] = "b,.,k,n,p,q,r";
-    childrenObj["voice_detector"] = "";
-    childrenObj["speaker"] = "";
+    childrenObj["chess_detector"] = m_chessDetectorModel;
+    childrenObj["class_list"] = m_chessDetectorClassList;
+    childrenObj["input_size"] = m_chessDetectorImageSize;
+    childrenObj["input_channel"] = m_chessDetectorImageChannels;
+    childrenObj["bot_name"] = m_botName;
+    childrenObj["player_name"] = m_playerName;
+    childrenObj["whisper_model"] = m_whisperModelPath;
+    childrenObj["llm_model"] = m_llmModelPath;
+    childrenObj["piper_model"] = m_piperModelPath;
+    childrenObj["piper_exe_path"] = m_piperExePath;
 
     root["ai_model"] = childrenObj;
 
@@ -1522,8 +1668,8 @@ bool ChessBot::loadCalibrationData(QString fileName)
     QJsonArray calibArr = root.value("camera_calibration").toArray();
     for (const QJsonValue &val : calibArr) {
         QJsonObject obj = val.toObject();
-        m_chessboardConners.append(QPoint(obj.value("x").toInt()*m_width/640,
-                                          obj.value("y").toInt()*m_height/360));
+        m_chessboardConners.append(QPoint(obj.value("x").toInt(),
+                                          obj.value("y").toInt()));
     }
     qDebug("m_chessboardConners.size() %d",m_chessboardConners.size());
 #if defined(IMAGE_PROCESS_MOVE)
@@ -1547,22 +1693,41 @@ bool ChessBot::loadCalibrationData(QString fileName)
     if(root.contains("ai_model")) {
         QJsonObject aiModelObj = root["ai_model"].toObject();
 
-        QString chessPath = aiModelObj["chess_detector"].toString();
-        QString classList = aiModelObj["class_list"].toString();
-        QString voicePath = aiModelObj["voice_detector"].toString();
-        QString speakerPath = aiModelObj["speaker"].toString();
-
+        m_chessDetectorModel = aiModelObj["chess_detector"].toString();
+        m_chessDetectorClassList = aiModelObj["class_list"].toString();
+        m_chessDetectorImageSize = aiModelObj["input_size"].toInt();
+        m_chessDetectorImageChannels = aiModelObj["input_channel"].toInt();
+        m_botName = aiModelObj["bot_name"].toString();
+        m_playerName = aiModelObj["player_name"].toString();
+        m_whisperModelPath = aiModelObj["whisper_model"].toString();
+        m_llmModelPath = aiModelObj["llm_model"].toString();
+        m_piperModelPath = aiModelObj["piper_model"].toString();
+        m_piperExePath = aiModelObj["piper_exe_path"].toString();
         // Print the values to verify
-        qDebug() << "Chess Detector Path:" << chessPath;
-        qDebug() << "Class List:" << classList;
-        qDebug() << "Voice Detector Path:" << voicePath;
-        qDebug() << "Speaker Path:" << speakerPath;
+        qDebug() << "Chess Detector Path:" << m_chessDetectorModel;
+        qDebug() << "Class List:" << m_chessDetectorClassList;
+        qDebug() << "Bot Name:" << m_botName;
+        qDebug() << "Player Name:" << m_playerName;
+        qDebug() << "Whisper Model:" << m_whisperModelPath;
+        qDebug() << "Llm Model:" << m_llmModelPath;
+        qDebug() << "Piper Model:" << m_piperModelPath;
+        qDebug() << "Piper Exe:" << m_piperExePath;
         std::vector<char> dnnClassNames;
-        QStringList dnnClassArr = classList.split(",");
+        QStringList dnnClassArr = m_chessDetectorClassList.split(",");
         for(QString className:dnnClassArr) {
             dnnClassNames.push_back(className.toStdString()[0]);
         }
-        m_moveDetector->setDnnNetAllPieces((char*)chessPath.toStdString().c_str(),dnnClassNames);
+#if defined (USE_OPENVINO)
+        m_moveDetector->setDnnNetAllPiecesOpenVINO((char*)m_chessDetectorModel.toStdString().c_str(),
+                                           dnnClassNames,
+                                           m_chessDetectorImageSize,
+                                           m_chessDetectorImageChannels);
+#else
+        m_moveDetector->setDnnNetAllPieces((char*)m_chessDetectorModel.toStdString().c_str(),
+                                           dnnClassNames,
+                                           m_chessDetectorImageSize,
+                                           m_chessDetectorImageChannels);
+#endif
         std::vector<cv::Point> listCell {
             cv::Point(0,0),cv::Point(1,0),cv::Point(2,0),cv::Point(11,0),
             cv::Point(0,1),cv::Point(1,1),cv::Point(2,1),cv::Point(11,1),
@@ -1579,6 +1744,11 @@ bool ChessBot::loadCalibrationData(QString fileName)
 #endif
 
     return true;
+}
+
+QSize ChessBot::getImageSize() const
+{
+    return QSize(m_width,m_height);
 }
 
 QString ChessBot::getCalibrationJson() const
@@ -1701,6 +1871,16 @@ void ChessBot::sendTestCommand(QString command)
     m_commandTest = command;
     togglePause(false);
 }
+void ChessBot::classifyImage()
+{
+    if(m_state != STATE_EXIT) {
+        qDebug("Previous move is not finished");
+        return;
+    }
+    m_state = STATE_TEST;
+    m_stateTest = TEST_CLASSIFICATION;
+    togglePause(false);
+}
 
 int ChessBot::executeCommand(QString command)
 {
@@ -1736,16 +1916,17 @@ void ChessBot::initRobotCommunication() {
 }
 void ChessBot::processNextMove()
 {
-    if(m_state != STATE_EXIT) {
-        qDebug("Previous move is not finished %d",m_state);
-        return;
+    if(m_state == STATE_PLAY) {
+        qDebug("Queue command to play next time m_statePlay[%d]",m_statePlay);
+        if(m_statePlay != PLAY_PROCESS_DONE) {
+            m_handleNewCommand = true;
+            return;
+        }
     }
     m_mutex->lock();
     m_state = STATE_PLAY;
     m_statePlay = PLAY_INIT;
     m_mutex->unlock();
-//    m_statePlay = PLAY_INFORM_ERROR;
-    Q_EMIT playTurnChanged(m_chessController->playerColor() == Color::WHITE ? 1-m_chessController->playerColor() : m_chessController->playerColor());
     togglePause(false);
     startService();
 }
@@ -1760,9 +1941,10 @@ QVariantList ChessBot::chessboardCorners() const {
     qDebug("Number of m_chessboardConners %d",m_chessboardConners.size());
     for (const QPoint &corner : m_chessboardConners) {
         QVariantMap pointMap;
-        pointMap["x"] = corner.x()*640/m_width;
-        pointMap["y"] = corner.y()*360/m_height;
+        pointMap["x"] = corner.x();
+        pointMap["y"] = corner.y();
         rootList.append(pointMap);
+        qDebug("Corner x,y=(%d,%d)",pointMap["x"].toInt(),pointMap["y"].toInt());
     }
     return rootList;
 }
@@ -2141,4 +2323,34 @@ char ChessBot::pieceName(int piece, int color)
             break;
     }
     return pieceChar;
+}
+
+QString ChessBot::botName()
+{
+    return m_botName;
+}
+
+QString ChessBot::playerName()
+{
+    return m_playerName;
+}
+
+QString ChessBot::whisperModelPath()
+{
+    return m_whisperModelPath;
+}
+
+QString ChessBot::llmModelPath()
+{
+    return m_llmModelPath;
+}
+
+QString ChessBot::piperExePath()
+{
+    return m_piperExePath;
+}
+
+QString ChessBot::piperModelPath()
+{
+    return m_piperModelPath;
 }

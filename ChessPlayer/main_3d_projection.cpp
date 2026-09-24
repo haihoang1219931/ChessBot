@@ -16,6 +16,8 @@ std::vector<cv::Point2f> srcCorners;
 cv::Mat base_rvec, base_tvec;
 double base_tilt_deg = 0.0;
 bool is_pnp_initialized = false;
+int g_dnnInputSize =  128;
+int g_dnnChannel = 3;
 
 // Trackbar variables (scaled to integers for OpenCV)
 // These now serve purely as structural adjustments (+/- offsets) relative to the PnP base values
@@ -224,10 +226,27 @@ void classification() {
             scaleFactor*clicked_points[1].x,scaleFactor*clicked_points[1].y,
             scaleFactor*clicked_points[2].x,scaleFactor*clicked_points[2].y,
             scaleFactor*clicked_points[3].x,scaleFactor*clicked_points[3].y);
-    cv::Mat homographyMatrix = chessDetector.getFullTranformMatrix();
-    cv::Mat warpedBoard;
-    cv::warpPerspective(img_input, warpedBoard, homographyMatrix, cv::Size(WARP_WIDTH, WARP_HEIGHT));
-    chessDetector.classsifyChessBoardImage((const cv::Mat&)warpedBoard);
+//    cv::Mat homographyMatrix = chessDetector.getFullTranformMatrix();
+//    cv::Mat warpedBoard;
+//    cv::warpPerspective(img_input, warpedBoard, homographyMatrix, cv::Size(WARP_WIDTH, WARP_HEIGHT));
+//    cv::Mat blurred;
+//    cv::GaussianBlur(warpedBoard, blurred, cv::Size(0, 0), 3.0);
+//    cv::addWeighted(warpedBoard, 1.5, blurred, -0.5, 0, warpedBoard);
+//    chessDetector.classsifyWholeBoardAtOnce((const cv::Mat&)warpedBoard,3360, 1920, 3);
+//    chessDetector.classifyWholeBoardNativeOpenVINO((const cv::Mat&)warpedBoard);
+//    chessDetector.classsifyChessBoardImage((const cv::Mat&)warpedBoard);
+    unsigned char testBoardPrev[64] = {
+        '.','.','.','.','.','.','.','.',
+        '.','.','.','.','.','.','.','.',
+        '.','.','.','.','.','.','.','.',
+        '.','.','.','.','.','.','.','.',
+        '.','.','.','.','.','.','.','.',
+        '.','.','.','.','.','.','.','.',
+        '.','.','.','.','.','.','.','.',
+        '.','.','.','.','.','.','.','.'};
+    MoveDetectParams params;
+    params.playerSide = "black";
+    chessDetector.findPossibleMoves2(img_input,(const char*)testBoardPrev,params);
 }
 void onTrackbar(int, void*) {
     updateProjection();
@@ -247,8 +266,11 @@ int main(int argc, char** argv) {
     std::vector<char> print_names = {
         'b', '.', 'k', 'n', 'p', 'q', 'r'
     };
-
-    chessDetector.setDnnNetAllPieces(argv[1],print_names);
+    if(argc >=5) {
+        g_dnnInputSize = atoi(argv[3]);
+        g_dnnChannel = atoi(argv[4]);
+    }
+    chessDetector.setDnnNetAllPieces(argv[1],print_names,g_dnnInputSize,g_dnnChannel);
     std::vector<cv::Point> listCell {
         cv::Point(0,0),cv::Point(1,0),cv::Point(2,0),cv::Point(11,0),
         cv::Point(0,1),cv::Point(1,1),cv::Point(2,1),cv::Point(11,1),

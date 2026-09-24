@@ -33,6 +33,7 @@ private:
     QAudioInput* m_audioInput = nullptr;
     QIODevice* m_audioIOStream = nullptr;
     QByteArray m_accumulatedPcmData;
+    bool m_paused = false;
     bool m_isSpeaking = false;
     int m_consecutiveSilenceSamples = 0;
 };

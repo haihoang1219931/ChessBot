@@ -26,7 +26,7 @@ AssistantController::AssistantController(QObject *parent) : QObject(parent) {
 
     connect(m_llmWorker, &LLMWorker::tokenGenerated, this, [this](QString text) {
         m_responseText += text;
-        m_voiceWorker->handleToken(text);
+//        m_voiceWorker->handleToken(text);
         Q_EMIT responseTextChanged(m_responseText);
     });
     connect(m_llmWorker, &LLMWorker::generationFinished, this, [this](QString text) {
@@ -34,6 +34,7 @@ AssistantController::AssistantController(QObject *parent) : QObject(parent) {
         m_responseText = text;
         m_isThinking = false;
         Q_EMIT isThinkingChanged();
+        m_voiceWorker->handleToken(m_responseText);
         Q_EMIT responseTextChanged(m_responseText);
         m_responseText = "";
     });
@@ -48,10 +49,10 @@ AssistantController::AssistantController(QObject *parent) : QObject(parent) {
         m_audioWorker->togglePause(false);
     });
 
-    connect(m_llmThread, &QThread::started, m_llmWorker, &LLMWorker::doWork);
+//    connect(m_audioThread, &QThread::finished, m_audioWorker, &QObject::deleteLater);
+//    connect(m_llmThread, &QThread::started, m_llmWorker, &LLMWorker::doWork);
     connect(m_voiceThread, &QThread::started, m_voiceWorker, &AudioOutputWorker::doWork);
-
-    connect(m_audioThread, &QThread::finished, m_audioWorker, &QObject::deleteLater);
+    m_playerName = "Player";
 }
 
 AssistantController::~AssistantController() {
@@ -59,14 +60,14 @@ AssistantController::~AssistantController() {
 }
 
 void AssistantController::startService() {
+//    if (!m_audioThread->isRunning()) {
+//        m_audioThread->start();
+//    }
+//    if (!m_llmThread->isRunning()) {
+//        m_llmThread->start();
+//    }
     if (!m_voiceThread->isRunning()) {
         m_voiceThread->start();
-    }
-    if (!m_llmThread->isRunning()) {
-        m_llmThread->start();
-    }
-    if (!m_audioThread->isRunning()) {
-        m_audioThread->start();
     }
 }
 
@@ -89,12 +90,13 @@ void AssistantController::stopService() {
 
 void AssistantController::singleVoice(QString text) {
     qDebug("AssistantController singleVoice [%s]",text.toStdString().c_str());
-    m_audioWorker->togglePause(true);
-    m_voiceWorker->clearQueue();
-    QStringList tokens = text.split(" ");
-    for(QString tmpToken: tokens)
-        m_voiceWorker->handleToken(tmpToken+" ");
-    m_voiceWorker->handleToken(".");
+//    m_audioWorker->togglePause(true);
+//    m_voiceWorker->clearQueue();
+//    QStringList tokens = text.split(" ");
+//    for(QString tmpToken: tokens)
+//        m_voiceWorker->handleToken(tmpToken+" ");
+//    m_voiceWorker->handleToken(".");
+    m_voiceWorker->handleToken(text+".");
 }
 
 void AssistantController::analyzeChessMove(QString fen, QString playColor, QString move) {
@@ -112,3 +114,20 @@ void AssistantController::generateResponse(const QString &prompt) {
     m_llmWorker->handlePrompt(prompt);
 }
 
+void AssistantController::setAIModel(const QString& botName,
+                    const QString& playerName,
+                    const QString& whisperModelPath,
+                    const QString& llmModelPath,
+                    const QString& piperExePath,
+                    const QString& piperModelPath) {
+    m_llmWorker->setModel(botName,whisperModelPath, llmModelPath);
+    m_llmWorker->initializeLlama();
+    m_llmWorker->initializeWhisper();
+    m_voiceWorker->setVoiceModel(botName,piperExePath,piperModelPath);
+    m_playerName = playerName;
+}
+
+QString AssistantController::playerName()
+{
+    return m_playerName;
+}
