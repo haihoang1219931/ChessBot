@@ -185,12 +185,22 @@ void MasterChessBot::setTimeLimit(int timeout) const
     m_workerChessbot->setTimeLimit(timeout);
 }
 
-Q_INVOKABLE QString MasterChessBot::botName() const
+void MasterChessBot::setGameTypeCustom() const
+{
+    m_workerChessbot->setGameTypeCustom();
+}
+
+bool MasterChessBot::gameTypeCustom() const
+{
+    return m_workerChessbot->gameTypeCustom();
+}
+
+QString MasterChessBot::botName() const
 {
     return m_workerChessbot->botName();
 }
 
-Q_INVOKABLE QString MasterChessBot::playerName() const
+QString MasterChessBot::playerName() const
 {
 #if defined(USE_AI_ASSISTANT)
     return m_workerAssistant->playerName();

@@ -51,6 +51,7 @@ typedef enum {
 } STATE_CHESBOT;
 
 typedef enum{
+    PLAY_DETECT_BOARD,
     PLAY_CHECK_LOG,
     PLAY_CALCULATE_NEXT_MOVE_RESET,
     PLAY_SETUP,
@@ -150,6 +151,8 @@ public:
     bool isClassificationDone();
     int timerLimit();
     void setTimeLimit(int timeOut);
+    void setGameTypeCustom();
+    bool gameTypeCustom();
 
 Q_SIGNALS:
     void boardChanged(QStringList boardModel);
@@ -259,6 +262,7 @@ private:
     QString m_piperExePath;
     QString m_piperModelPath;
     int m_timeOut;
+    bool m_gameTypeCustom;
 };
 
 #endif // CHESSBOT_H

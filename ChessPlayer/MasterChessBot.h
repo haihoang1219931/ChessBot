@@ -44,6 +44,8 @@ public:
     Q_INVOKABLE void stopGame(QString comment);
     Q_INVOKABLE int timerLimit() const;
     Q_INVOKABLE void setTimeLimit(int timeout) const;
+    Q_INVOKABLE void setGameTypeCustom() const;
+    Q_INVOKABLE bool gameTypeCustom() const;
     Q_INVOKABLE QString botName() const;
     Q_INVOKABLE QString playerName() const;
 

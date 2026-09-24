@@ -315,6 +315,13 @@ void ChessBot::stopGame(QString comment)
 void ChessBot::playLoop()
 {
     switch (m_statePlay) {
+    case PLAY_DETECT_BOARD: {
+        qDebug("PLAY_DETECT_BOARD");
+        if(analyzeChessBoard()!=STATE_PENDING){
+            m_statePlay = PLAY_PROCESS_DONE;
+        }
+    }
+        break;
     case PLAY_CHECK_LOG: {
         qDebug("PLAY_CHECK_LOG");
         if(findLastFENInLog()) {
@@ -1094,6 +1101,17 @@ int ChessBot::timerLimit()
 void ChessBot::setTimeLimit(int timeOut)
 {
     m_timeOut = timeOut;
+    m_gameTypeCustom = false;
+}
+
+void ChessBot::setGameTypeCustom()
+{
+    m_gameTypeCustom = true;
+}
+
+bool ChessBot::gameTypeCustom()
+{
+    return m_gameTypeCustom;
 }
 
 bool ChessBot::readCalibrationPoint(const QString &command,QPoint& point)
@@ -1960,13 +1978,22 @@ QObject* ChessBot::chessControllerObject() const
 
 void ChessBot::resetGame(){
     qDebug("Reset game side[%d] m_state[%d]",m_chessController->playerColor(),m_state);
-    m_chessController->newGame();
-    m_mutex->lock();
-    m_state = STATE_PLAY;
-    m_statePlay = PLAY_CHECK_LOG;
-    m_mutex->unlock();
-    togglePause(false);
-    startService();
+    if(m_gameTypeCustom) {
+        m_mutex->lock();
+        m_state = STATE_PLAY;
+        m_statePlay = PLAY_DETECT_BOARD;
+        m_mutex->unlock();
+        togglePause(false);
+        startService();
+    } else {
+        m_chessController->newGame();
+        m_mutex->lock();
+        m_state = STATE_PLAY;
+        m_statePlay = PLAY_CHECK_LOG;
+        m_mutex->unlock();
+        togglePause(false);
+        startService();
+    }
 }
 
 void ChessBot::setEngineElo(QString level, int score)

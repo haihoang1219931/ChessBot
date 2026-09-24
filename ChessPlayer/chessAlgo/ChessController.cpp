@@ -114,6 +114,8 @@ int ChessController::playerColor() const
 
 void ChessController::setEngineElo(QString level, int elo)
 {
+    qDebug("setEngineElo level[%s] score[%d]",
+           level.toStdString().c_str(),elo);
     if(m_engineElo != elo || m_engineLevel != level) {
         m_engineElo = elo;
         m_engineLevel = level;

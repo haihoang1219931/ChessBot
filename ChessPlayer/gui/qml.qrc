@@ -23,5 +23,6 @@
         <file>qml/SettingTestCommand.qml</file>
         <file>qml/BotVision.qml</file>
         <file>qml/GameTypeSelection.qml</file>
+        <file>qml/CustomGame.qml</file>
     </qresource>
 </RCC>
