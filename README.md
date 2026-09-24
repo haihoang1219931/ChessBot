@@ -3,7 +3,7 @@
 ## Overview
 
 ChessBot is DIY project for playing chess using clone robot arm from Sense chess robot.
-This project includes 2 sub projects:
+This project includes 3 sub projects:
 
 ### 1. ChessPlayer
 - QML based GUI for ChessBot
