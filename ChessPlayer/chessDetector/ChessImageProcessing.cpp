@@ -2142,6 +2142,7 @@ void ChessImageProcessing::classifyWholeBoardNativeOpenVINO(const cv::Mat& warpe
             checkPieceColor(croppedCellBGR, piece, row, col);
 
             m_mapClassifiedCell[row][col] = piece.className;
+            m_mapClassifiedCellPro[row][col] = maxScore;
         }
     }
 

@@ -1132,19 +1132,12 @@ uint8_t ChessBot::setupAnalizedChessBoard()
 
     printf("3. Castling Availability\r\n");
     // 3. Castling Availability
-    std::string castling = "";
-    castling += "K";
-    castling += "Q";
-    castling += "k";
-    castling += "q";
-    fen << " " << (castling.empty() ? "-" : castling);
 
     printf("4. En Passant Target Square\r\n");
     // 4. En Passant Target Square
-    fen << " - 0 0";
+    fen << " - - 0 0";
     printf("Generate fen done [%s]\r\n",fen.str().c_str());
     m_chessController->newGame(QString::fromStdString(fen.str()));
-//    m_chessController->newGame("3b1rk1/p4p1p/1p1p2bQ/8/4p3/2N3P1/P1n2P2/5K1R b - - 0 0");
     return STATE_DONE_SUCCESS;
 }
 

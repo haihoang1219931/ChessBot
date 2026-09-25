@@ -627,6 +627,8 @@ void ChessController::playEngineMove()
         qDebug("ChessController::playEngineMove execute bot move");
         m_board->executeMove(chosenMove);
         qDebug("ChessController::playEngineMove execute bot move done");
+        std::string fen = m_board->extractFen();
+        qDebug("ChessController::playEngineMove %s",fen.c_str());
         updateBoard();
         qDebug("ChessController::playEngineMove playEngineMove done");
     } else {

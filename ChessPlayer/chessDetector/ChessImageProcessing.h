@@ -201,6 +201,7 @@ private:
     uint8_t m_mapExcludedCell[NUM_ROW][NUM_COL];
     uint8_t m_mapFilteredCell[NUM_ROW][NUM_COL];
     char m_mapClassifiedCell[NUM_ROW][NUM_COL];
+    float m_mapClassifiedCellPro[NUM_ROW][NUM_COL];
     // Internal layer parameters mapped from training weights file
     cv::Mat m_fcWeightsMat; // Size: [7 x 512]
     cv::Mat m_fcBiasMat;    // Size: [7 x 1]
