@@ -8,7 +8,6 @@ Rectangle {
     height: 480
     color: "black"
     signal goback()
-    signal startGame()
     signal gobackLevelSelection()
     Keys.onPressed: {
         if (event.key === Qt.Key_Home) {
@@ -27,7 +26,6 @@ Rectangle {
         }
     }
     Keys.onReturnPressed: {
-        root.startGame()
         if(!gameEnded) chessboard.updateUserSelection();
     }
     Keys.onSpacePressed: masterBot.processNextMove()
@@ -45,7 +43,7 @@ Rectangle {
     property int player1Time: 0
     property int player2Time: 0
     property int dirTime: 0
-    property bool gameEnded: false;
+    property bool gameEnded: false
     function resetGame(){
         player1Time = playTime;
         player2Time = playTime;

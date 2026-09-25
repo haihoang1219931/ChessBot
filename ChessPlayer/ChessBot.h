@@ -51,7 +51,8 @@ typedef enum {
 } STATE_CHESBOT;
 
 typedef enum{
-    PLAY_DETECT_BOARD,
+    PLAY_DETECT_CUSTOM_BOARD,
+    PLAY_SETUP_CUSTOM_BOARD,
     PLAY_CHECK_LOG,
     PLAY_CALCULATE_NEXT_MOVE_RESET,
     PLAY_SETUP,
@@ -186,6 +187,7 @@ private:
     uint8_t testRobot();
     uint8_t testCheckResult();
     uint8_t analyzeChessBoard();
+    uint8_t setupAnalizedChessBoard();
     void initRobot();
     bool detectArduinoPort(int baudRate = 38400);
     bool readCalibrationPoint(const QString &command, QPoint& point);

@@ -315,11 +315,18 @@ void ChessBot::stopGame(QString comment)
 void ChessBot::playLoop()
 {
     switch (m_statePlay) {
-    case PLAY_DETECT_BOARD: {
-        qDebug("PLAY_DETECT_BOARD");
+    case PLAY_DETECT_CUSTOM_BOARD: {
+        qDebug("PLAY_DETECT_CUSTOM_BOARD");
         if(analyzeChessBoard()!=STATE_PENDING){
-            m_statePlay = PLAY_PROCESS_DONE;
+            m_statePlay = PLAY_SETUP_CUSTOM_BOARD;
         }
+    }
+        break;
+    case PLAY_SETUP_CUSTOM_BOARD: {
+        qDebug("PLAY_SETUP_CUSTOM_BOARD");
+        setupAnalizedChessBoard();
+        m_statePlay = PLAY_PROCESS_DONE;
+        m_handleNewCommand = false;
     }
         break;
     case PLAY_CHECK_LOG: {
@@ -1085,6 +1092,59 @@ uint8_t ChessBot::analyzeChessBoard()
     Q_EMIT classificationDone(m_analyzeChessBoardResult,
                               m_analyzeChessBoardRevertedResult);
 #endif
+    return STATE_DONE_SUCCESS;
+}
+
+uint8_t ChessBot::setupAnalizedChessBoard()
+{
+    std::stringstream fen;
+    printf("1. Piece Placement\r\n");
+    // 1. Piece Placement (Ranks 8 down to 1)
+        for (int rank = 7; rank >= 0; --rank) {
+            int empty_squares = 0;
+            for (int file = 0; file < 8; ++file) {
+                char piece_char = m_chessController->playerColor() == Color::WHITE?
+                            m_analyzeChessBoardResult[rank*14+10-file].at(0).toLatin1():
+                            m_analyzeChessBoardRevertedResult[rank*14+10-file].at(0).toLatin1();
+
+                // Added check for '*' since Deepov flags empty spaces with asterisks
+                if (piece_char == '*' || piece_char == ' ' || piece_char == '.' || piece_char == '\0') {
+                    empty_squares++;
+                } else {
+                    if (empty_squares > 0) {
+                        fen << empty_squares;
+                        empty_squares = 0;
+                    }
+                    fen << piece_char;
+                }
+            }
+            if (empty_squares > 0) {
+                fen << empty_squares;
+            }
+            if (rank > 0) {
+                fen << "/";
+            }
+        }
+
+    printf("2. Active Color\r\n");
+    // 2. Active Color
+    fen << " " << (m_chessController->playerColor() == Color::WHITE ? "w" : "b");
+
+    printf("3. Castling Availability\r\n");
+    // 3. Castling Availability
+    std::string castling = "";
+    castling += "K";
+    castling += "Q";
+    castling += "k";
+    castling += "q";
+    fen << " " << (castling.empty() ? "-" : castling);
+
+    printf("4. En Passant Target Square\r\n");
+    // 4. En Passant Target Square
+    fen << " - 0 0";
+    printf("Generate fen done [%s]\r\n",fen.str().c_str());
+    m_chessController->newGame(QString::fromStdString(fen.str()));
+//    m_chessController->newGame("3b1rk1/p4p1p/1p1p2bQ/8/4p3/2N3P1/P1n2P2/5K1R b - - 0 0");
     return STATE_DONE_SUCCESS;
 }
 
@@ -1981,7 +2041,7 @@ void ChessBot::resetGame(){
     if(m_gameTypeCustom) {
         m_mutex->lock();
         m_state = STATE_PLAY;
-        m_statePlay = PLAY_DETECT_BOARD;
+        m_statePlay = PLAY_DETECT_CUSTOM_BOARD;
         m_mutex->unlock();
         togglePause(false);
         startService();

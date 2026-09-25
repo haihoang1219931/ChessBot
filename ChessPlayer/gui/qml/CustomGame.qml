@@ -12,12 +12,63 @@ Rectangle {
     property int levelScore: 700
     property int side: 0
     property int gameTurn: 0
+    property bool gameEnded: false
     signal gobackLevelSelection()
     Keys.onPressed: {
         if (event.key === Qt.Key_Home) {
             console.log("Home key was pressed!");
             root.gobackLevelSelection();
         }
+    }
+    Keys.onEscapePressed: {
+        if(chessboard.activeUserInput) {
+            console.log("chessboard.cancelUserSelection()");
+            chessboard.cancelUserSelection();
+        }
+        else {
+            console.log("masterBot.undoMove()");
+            masterBot.undoMove();
+        }
+    }
+    Keys.onReturnPressed: {
+        if(!gameEnded) chessboard.updateUserSelection();
+    }
+    Keys.onSpacePressed: masterBot.processNextMove()
+    Keys.onLeftPressed: chessboard.updateUserInput(-1)
+    Keys.onRightPressed: chessboard.updateUserInput(1)
+    Keys.onUpPressed: chessboard.updateUserInput(-8)
+    Keys.onDownPressed: chessboard.updateUserInput(8)
+    function openGameResult(result) {
+        // 1. Set the source to your QML file
+        if(loaderDialogEndgame.item === null)
+        loaderDialogEndgame.setSource("GameResult.qml");
+        loaderDialogEndgame.item.gameResult = result
+        gameEnded = true;
+        masterBot.stopGame(result === 2 ?"Player lost":"Player win");
+    }
+
+    function enablePromotionSelection(enable) {
+        if(enable){
+            // 1. Set the source to your QML file
+            if(loaderDialogPromotion.item === null)
+            loaderDialogPromotion.setSource("PromotionPieces.qml");
+            loaderDialogPromotion.item.side = masterBot.playerColor() === 0 ?"white":"black";
+        } else {
+            loaderDialogPromotion.source = ""; // Close it
+            root.forceActiveFocus();
+        }
+    }
+
+    function openHomeOption() {
+        // 1. Set the source to your QML file
+        if(loaderDialogEndgame.item === null)
+        loaderDialogEndgame.setSource("HomeOption.qml");
+    }
+
+    function openConfirmPlayOption() {
+        // 1. Set the source to your QML file
+        if(loaderDialogEndgame.item === null)
+        loaderDialogEndgame.setSource("ConfirmPlay.qml");
     }
     ColumnLayout {
         spacing: 0
@@ -70,9 +121,50 @@ Rectangle {
             }
         }
     }
-//    Component.onCompleted: {
-//        root.levelType = chessController.engineLevel
-//        root.levelScore = chessController.engineElo
-//        root.side =  chessController.playerColor
-//    }
+    Loader {
+        id: loaderDialogEndgame
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        focus: true // Necessary for children to receive focus
+
+        onLoaded: {
+            // 2. Force focus to the loaded item immediately after it's ready
+            item.forceActiveFocus();
+        }
+    }
+
+    Loader {
+        id: loaderDialogPromotion
+        anchors.centerIn: parent
+        focus: true // Necessary for children to receive focus
+
+        onLoaded: {
+            // 2. Force focus to the loaded item immediately after it's ready
+            item.forceActiveFocus();
+        }
+    }
+    Connections {
+        target: masterBot
+        onGameEnded: {
+            console.log("Game end: "+endState);
+            openGameResult(endState);
+        }
+        onDetectFailed: {
+            chessboard.enableUserInput(true);
+        }
+        onShowPromotionPieces: {
+            enablePromotionSelection(true);
+        }
+        onBoardChanged: {
+            chessboard.board = boardModel;
+            chessboard.playerColor = chessController.playerColor
+            chessboard.selectedSquare = chessController.selectedSquare
+            chessboard.checkedKingSquare = chessController.checkedKingSquare
+        }
+    }
+    Component.onCompleted: {
+        root.levelType = chessController.engineLevel
+        root.levelScore = chessController.engineElo
+        root.side =  chessController.playerColor
+    }
 }
