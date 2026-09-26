@@ -24,5 +24,6 @@
         <file>qml/BotVision.qml</file>
         <file>qml/GameTypeSelection.qml</file>
         <file>qml/CustomGame.qml</file>
+        <file>qml/HomeOptionWithDetect.qml</file>
     </qresource>
 </RCC>

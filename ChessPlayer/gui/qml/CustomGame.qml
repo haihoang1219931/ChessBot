@@ -17,7 +17,7 @@ Rectangle {
     Keys.onPressed: {
         if (event.key === Qt.Key_Home) {
             console.log("Home key was pressed!");
-            root.gobackLevelSelection();
+            openHomeOption();
         }
     }
     Keys.onEscapePressed: {
@@ -61,14 +61,18 @@ Rectangle {
 
     function openHomeOption() {
         // 1. Set the source to your QML file
-        if(loaderDialogEndgame.item === null)
-        loaderDialogEndgame.setSource("HomeOption.qml");
+        if(loaderDialogEndgame.item === null) {
+            root.focus = false;
+            loaderDialogEndgame.setSource("HomeOptionWithDetect.qml");
+        }
     }
 
     function openConfirmPlayOption() {
         // 1. Set the source to your QML file
-        if(loaderDialogEndgame.item === null)
-        loaderDialogEndgame.setSource("ConfirmPlay.qml");
+        if(loaderDialogEndgame.item === null) {
+            root.focus = false;
+            loaderDialogEndgame.setSource("ConfirmPlay.qml");
+        }
     }
     ColumnLayout {
         spacing: 0
@@ -141,6 +145,47 @@ Rectangle {
         onLoaded: {
             // 2. Force focus to the loaded item immediately after it's ready
             item.forceActiveFocus();
+        }
+    }
+
+    Connections {
+        target: loaderDialogEndgame.item // Connects to the loaded object
+        ignoreUnknownSignals: true // Prevents errors before source is loaded
+
+        onGameNextStep: {
+            loaderDialogEndgame.source = ""; // Close it
+            if(nextStep === 1) {
+                console.log("gobackLevelSelection");
+                gobackLevelSelection();
+                masterBot.stopGame("Exit");
+                gameEnded = true;
+            } else {
+                console.log("resetGame");
+                masterBot.resetGame();
+                root.forceActiveFocus();
+                gameEnded = true;
+            }
+        }
+        onHomeNextStep: {
+            loaderDialogEndgame.source = ""; // Close it
+            if(nextStep === 2) {
+                console.log("level selection");
+                gobackLevelSelection();
+                masterBot.stopGame("Exit");
+                gameEnded = true;
+            } else if(nextStep === 1){
+                console.log("homing robot");
+                masterBot.homingRobot();
+                root.forceActiveFocus();
+            } else if(nextStep === 0){
+                console.log("Reset game");
+                masterBot.resetGame();
+            }
+        }
+
+        onGoback: {
+            loaderDialogEndgame.source = ""; // Close it
+            root.forceActiveFocus();
         }
     }
     Connections {
