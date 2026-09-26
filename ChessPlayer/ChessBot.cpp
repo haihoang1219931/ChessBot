@@ -66,7 +66,8 @@ ChessBot::ChessBot(QThread *parent) :
             this,&ChessBot::boardChanged);
     m_validCalibFileFound = loadCalibrationData();
     if(!m_validCalibFileFound) {
-        m_chessDetectorModel = "chess_piece_resnet18_20260828_100epoch.onnx";
+        m_chessAnalyzerModel = "chess_piece_resnet18_20260828_100epoch.onnx";
+        m_chessDetectorModel = "mini_resnet_chess_240x240_vino_20260918.xml";
         m_chessDetectorClassList = "b,.,k,n,p,q,r";
         m_chessDetectorImageSize = 240;
         m_chessDetectorImageChannels = 3;
@@ -95,12 +96,11 @@ ChessBot::ChessBot(QThread *parent) :
                                            dnnClassNames,
                                            m_chessDetectorImageSize,
                                            m_chessDetectorImageChannels);
-#else
-        m_moveDetector->setDnnNetAllPieces((char*)m_chessDetectorModel.toStdString().c_str(),
+#endif
+        m_moveDetector->setDnnNetAllPieces((char*)m_chessAnalyzerModel.toStdString().c_str(),
                                            dnnClassNames,
                                            m_chessDetectorImageSize,
                                            m_chessDetectorImageChannels);
-#endif
         saveCalibrationData();
     }
 }
@@ -317,7 +317,7 @@ void ChessBot::playLoop()
     switch (m_statePlay) {
     case PLAY_DETECT_CUSTOM_BOARD: {
         qDebug("PLAY_DETECT_CUSTOM_BOARD");
-        if(analyzeChessBoard()!=STATE_PENDING){
+        if(analyzeChessBoard(false)!=STATE_PENDING){
             m_statePlay = PLAY_SETUP_CUSTOM_BOARD;
         }
     }
@@ -497,7 +497,7 @@ void ChessBot::testLoop()
 {
     switch (m_stateTest) {
     case TEST_CLASSIFICATION: {
-        if(analyzeChessBoard()!=STATE_PENDING){
+        if(analyzeChessBoard(true)!=STATE_PENDING){
             m_stateTest = TEST_DONE;
         }
         break;
@@ -1037,7 +1037,7 @@ uint8_t ChessBot::testCheckResult()
     return cmdResult;
 }
 
-uint8_t ChessBot::analyzeChessBoard()
+uint8_t ChessBot::analyzeChessBoard(bool useOpenVino)
 {
 #if defined(IMAGE_PROCESS_MOVE)
     cv::Mat currentImage, warpedImage;
@@ -1070,10 +1070,12 @@ uint8_t ChessBot::analyzeChessBoard()
     Q_EMIT preprocessDone(warpedImagePath);
     m_moveDetector->filterPossibleValidCell(currentImage);
 #if defined (USE_OPENVINO)
-    m_moveDetector->classifyWholeBoardNativeOpenVINO(warpedImage);
-#else
-    m_moveDetector->classsifyChessBoardImage(warpedImage);
+    if(useOpenVino)
+        m_moveDetector->classifyWholeBoardNativeOpenVINO(warpedImage);
+    else
 #endif
+    m_moveDetector->classsifyChessBoardImage(warpedImage);
+
     m_moveDetector->getAnalyzeResult(analyzeResult);
     m_analyzeChessBoardResult.clear();
     m_analyzeChessBoardRevertedResult.clear();
@@ -1613,6 +1615,7 @@ bool ChessBot::saveCalibrationData(QString fileName)
 
     // 1. Store ai models
     QJsonObject childrenObj;
+    childrenObj["chess_analyzer"] = m_chessAnalyzerModel;
     childrenObj["chess_detector"] = m_chessDetectorModel;
     childrenObj["class_list"] = m_chessDetectorClassList;
     childrenObj["input_size"] = m_chessDetectorImageSize;
@@ -1764,6 +1767,7 @@ bool ChessBot::loadCalibrationData(QString fileName)
     if(root.contains("ai_model")) {
         QJsonObject aiModelObj = root["ai_model"].toObject();
 
+        m_chessAnalyzerModel = aiModelObj["chess_analyzer"].toString();
         m_chessDetectorModel = aiModelObj["chess_detector"].toString();
         m_chessDetectorClassList = aiModelObj["class_list"].toString();
         m_chessDetectorImageSize = aiModelObj["input_size"].toInt();
@@ -1775,6 +1779,7 @@ bool ChessBot::loadCalibrationData(QString fileName)
         m_piperModelPath = aiModelObj["piper_model"].toString();
         m_piperExePath = aiModelObj["piper_exe_path"].toString();
         // Print the values to verify
+        qDebug() << "Chess Analyzer Path:" << m_chessAnalyzerModel;
         qDebug() << "Chess Detector Path:" << m_chessDetectorModel;
         qDebug() << "Class List:" << m_chessDetectorClassList;
         qDebug() << "Bot Name:" << m_botName;
@@ -1793,12 +1798,12 @@ bool ChessBot::loadCalibrationData(QString fileName)
                                            dnnClassNames,
                                            m_chessDetectorImageSize,
                                            m_chessDetectorImageChannels);
-#else
-        m_moveDetector->setDnnNetAllPieces((char*)m_chessDetectorModel.toStdString().c_str(),
+#endif
+        m_moveDetector->setDnnNetAllPieces((char*)m_chessAnalyzerModel.toStdString().c_str(),
                                            dnnClassNames,
                                            m_chessDetectorImageSize,
                                            m_chessDetectorImageChannels);
-#endif
+
         std::vector<cv::Point> listCell {
             cv::Point(0,0),cv::Point(1,0),cv::Point(2,0),cv::Point(11,0),
             cv::Point(0,1),cv::Point(1,1),cv::Point(2,1),cv::Point(11,1),

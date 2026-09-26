@@ -186,7 +186,7 @@ private:
     uint8_t configureLevel();
     uint8_t testRobot();
     uint8_t testCheckResult();
-    uint8_t analyzeChessBoard();
+    uint8_t analyzeChessBoard(bool useOpenVino);
     uint8_t setupAnalizedChessBoard();
     void initRobot();
     bool detectArduinoPort(int baudRate = 38400);
@@ -253,6 +253,7 @@ private:
     QString m_timeoutComment;
     QStringList m_analyzeChessBoardResult;
     QStringList m_analyzeChessBoardRevertedResult;
+    QString m_chessAnalyzerModel;
     QString m_chessDetectorModel;
     QString m_chessDetectorClassList;
     int m_chessDetectorImageSize;
