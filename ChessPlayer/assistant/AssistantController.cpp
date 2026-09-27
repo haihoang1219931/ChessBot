@@ -1,6 +1,7 @@
 #include "AssistantController.h"
 
 AssistantController::AssistantController(QObject *parent) : QObject(parent) {
+    qDebug("L[%d] %s",__LINE__,__FUNCTION__);
     // 1. Initialize the Audio input processing thread
     m_audioThread = new QThread(this);
     m_audioWorker = new AudioModelWorker();
@@ -49,10 +50,11 @@ AssistantController::AssistantController(QObject *parent) : QObject(parent) {
         m_audioWorker->togglePause(false);
     });
 
-//    connect(m_audioThread, &QThread::finished, m_audioWorker, &QObject::deleteLater);
-//    connect(m_llmThread, &QThread::started, m_llmWorker, &LLMWorker::doWork);
+    connect(m_audioThread, &QThread::finished, m_audioWorker, &QObject::deleteLater);
+    connect(m_llmThread, &QThread::started, m_llmWorker, &LLMWorker::doWork);
     connect(m_voiceThread, &QThread::started, m_voiceWorker, &AudioOutputWorker::doWork);
     m_playerName = "Player";
+    qDebug("L[%d] %s",__LINE__,__FUNCTION__);
 }
 
 AssistantController::~AssistantController() {
@@ -60,12 +62,12 @@ AssistantController::~AssistantController() {
 }
 
 void AssistantController::startService() {
-//    if (!m_audioThread->isRunning()) {
-//        m_audioThread->start();
-//    }
-//    if (!m_llmThread->isRunning()) {
-//        m_llmThread->start();
-//    }
+    if (!m_audioThread->isRunning()) {
+        m_audioThread->start();
+    }
+    if (!m_llmThread->isRunning()) {
+        m_llmThread->start();
+    }
     if (!m_voiceThread->isRunning()) {
         m_voiceThread->start();
     }
@@ -116,13 +118,14 @@ void AssistantController::generateResponse(const QString &prompt) {
 
 void AssistantController::setAIModel(const QString& botName,
                     const QString& playerName,
-                    const QString& whisperModelPath,
+                     const QString& sherpaModelPath,
+                     const QString& sherpaTokensPath,
                     const QString& llmModelPath,
                     const QString& piperExePath,
                     const QString& piperModelPath) {
-    m_llmWorker->setModel(botName,whisperModelPath, llmModelPath);
+    m_llmWorker->setModel(botName,sherpaModelPath,sherpaTokensPath,llmModelPath);
     m_llmWorker->initializeLlama();
-    m_llmWorker->initializeWhisper();
+    m_llmWorker->initializeSherpaOnnx();
     m_voiceWorker->setVoiceModel(botName,piperExePath,piperModelPath);
     m_playerName = playerName;
 }

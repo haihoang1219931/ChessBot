@@ -203,6 +203,11 @@ INCLUDEPATH += $$WHISPER_DIR/include \
 # Add the core execution files so Qt compiles them natively from source code
 SOURCES += \
     $$WHISPER_DIR/src/whisper.cpp
+LIBS += -L/usr/local/lib/ \
+    -lsherpa-onnx-cxx-api \
+    -lonnxruntime
+INCLUDEPATH += /usr/local/include
+DEPENDPATH += /usr/local/include
 
 SOURCES += \
     assistant/AssistantController.cpp \

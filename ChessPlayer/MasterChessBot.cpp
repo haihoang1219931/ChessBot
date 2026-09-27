@@ -8,7 +8,8 @@ MasterChessBot::MasterChessBot(QObject *parent) : QObject(parent)
     m_workerAssistant = new AssistantController();
     m_workerAssistant->setAIModel(m_workerChessbot->botName(),
                              m_workerChessbot->playerName(),
-                             m_workerChessbot->whisperModelPath(),
+                             m_workerChessbot->sherpaModelPath(),
+                             m_workerChessbot->sherpaTokensPath(),
                              m_workerChessbot->llmModelPath(),
                              m_workerChessbot->piperExePath(),
                              m_workerChessbot->piperModelPath());

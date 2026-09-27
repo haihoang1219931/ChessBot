@@ -128,6 +128,8 @@ public:
     QString botName();
     QString playerName();
     QString whisperModelPath();
+    QString sherpaModelPath();
+    QString sherpaTokensPath();
     QString llmModelPath();
     QString piperExePath();
     QString piperModelPath();
@@ -261,6 +263,8 @@ private:
     QString m_botName;
     QString m_playerName;
     QString m_whisperModelPath;
+    QString m_sherpaModelPath;
+    QString m_sherpaTokensPath;
     QString m_llmModelPath;
     QString m_piperExePath;
     QString m_piperModelPath;

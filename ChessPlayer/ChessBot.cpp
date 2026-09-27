@@ -74,6 +74,8 @@ ChessBot::ChessBot(QThread *parent) :
         m_botName = "Tobot";
         m_playerName = "Bean";
         m_whisperModelPath = "ggml-base.en.bin";
+        m_sherpaModelPath = "model.int8.onnx";
+        m_sherpaTokensPath = "tokens.txt";
         m_llmModelPath = "qwen2.5-1.5b-instruct-q4_k_m.gguf";
         m_piperExePath = "piper";
         m_piperModelPath = "en_US-sam-medium.onnx";
@@ -1623,6 +1625,8 @@ bool ChessBot::saveCalibrationData(QString fileName)
     childrenObj["bot_name"] = m_botName;
     childrenObj["player_name"] = m_playerName;
     childrenObj["whisper_model"] = m_whisperModelPath;
+    childrenObj["sherpa_model"] = m_sherpaModelPath;
+    childrenObj["sherpa_tokens"] = m_sherpaTokensPath;
     childrenObj["llm_model"] = m_llmModelPath;
     childrenObj["piper_model"] = m_piperModelPath;
     childrenObj["piper_exe_path"] = m_piperExePath;
@@ -1775,6 +1779,8 @@ bool ChessBot::loadCalibrationData(QString fileName)
         m_botName = aiModelObj["bot_name"].toString();
         m_playerName = aiModelObj["player_name"].toString();
         m_whisperModelPath = aiModelObj["whisper_model"].toString();
+        m_sherpaModelPath = aiModelObj["sherpa_model"].toString();
+        m_sherpaTokensPath = aiModelObj["sherpa_tokens"].toString();
         m_llmModelPath = aiModelObj["llm_model"].toString();
         m_piperModelPath = aiModelObj["piper_model"].toString();
         m_piperExePath = aiModelObj["piper_exe_path"].toString();
@@ -1785,6 +1791,8 @@ bool ChessBot::loadCalibrationData(QString fileName)
         qDebug() << "Bot Name:" << m_botName;
         qDebug() << "Player Name:" << m_playerName;
         qDebug() << "Whisper Model:" << m_whisperModelPath;
+        qDebug() << "Sherpa Model:" << m_sherpaModelPath;
+        qDebug() << "Sherpa Tokens:" << m_sherpaTokensPath;
         qDebug() << "Llm Model:" << m_llmModelPath;
         qDebug() << "Piper Model:" << m_piperModelPath;
         qDebug() << "Piper Exe:" << m_piperExePath;
@@ -2423,6 +2431,16 @@ QString ChessBot::playerName()
 QString ChessBot::whisperModelPath()
 {
     return m_whisperModelPath;
+}
+
+QString ChessBot::sherpaModelPath()
+{
+    return m_sherpaModelPath;
+}
+
+QString ChessBot::sherpaTokensPath()
+{
+    return m_sherpaTokensPath;
 }
 
 QString ChessBot::llmModelPath()

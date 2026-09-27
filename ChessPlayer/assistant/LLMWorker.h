@@ -7,9 +7,10 @@
 #include <QMutex>
 #include <QVector>
 #include <QWaitCondition>
+#include <memory>
 
 #include "llama.h"
-#include "whisper.h"
+#include "sherpa-onnx/c-api/cxx-api.h"
 
 struct ChatMessage {
     QString role;
@@ -43,10 +44,11 @@ public:
     int analyzeChessMove(QString fen, QString playColor, QString move);
     void requestInterruption();
     void setModel(const QString& name,
-                  const QString& whisperModelPath,
+                  const QString& sherpaModelPath,
+                  const QString& sherpaTokensPath,
                   const QString& llmModelPath);
     void initializeLlama();
-    void initializeWhisper();
+    void initializeSherpaOnnx();
 public Q_SLOTS:
     void doWork();
     void handleSpeech(const QByteArray& pcmData);
@@ -64,10 +66,12 @@ private:
     int transcribeAudio();
     QString generatePromptChat(const QString& userPrompt);
     QString generatePromptChess(QString fen, QString playColor, QString move);
+
+    // Core Models
     llama_model* m_model = nullptr;
     llama_context* m_ctx = nullptr;
-    struct whisper_context* m_whisperCtx = nullptr;
-    whisper_full_params m_whisperParams;
+    sherpa_onnx::cxx::OfflineRecognizer* m_recognizer = nullptr;
+
     QVector<ChatMessage> m_conversationHistory;
     QByteArray m_pcmData;
     QString m_userPrompt;
@@ -77,7 +81,8 @@ private:
     int m_state;
     int m_nextState;
     QString m_llmModelPath;
-    QString m_whisperModelPath;
+    QString m_sherpaModelPath;
+    QString m_sherpaTokensPath;
     QString m_name;
 };
 
