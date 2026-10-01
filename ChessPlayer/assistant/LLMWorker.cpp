@@ -452,8 +452,8 @@ int LLMWorker::runFastQAInference()
 void LLMWorker::initializeFastQA()
 {
     m_fastQA = new FastQANetwork();
-    qDebug("L[%d] [%s] m_sherpaModelPath[%s]\r\n",__LINE__,__FUNCTION__,
-           m_sherpaModelPath.toStdString().c_str());
-    m_fastQA->load_from_file(m_sherpaModelPath.toStdString());
+    qDebug("L[%d] [%s] m_llmModelPath[%s]\r\n",__LINE__,__FUNCTION__,
+           m_llmModelPath.toStdString().c_str());
+    m_fastQA->load_from_file(m_llmModelPath.toStdString());
     qDebug("L[%d] [%s] done\r\n",__LINE__,__FUNCTION__);
 }

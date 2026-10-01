@@ -215,14 +215,16 @@ SOURCES += \
     assistant/AssistantController.cpp \
     assistant/AudioModelWorker.cpp \
     assistant/AudioOutputWorker.cpp \
-    assistant/LLMWorker.cpp
+    assistant/LLMWorker.cpp \
+    assistant/FastQANetwork.cpp
 
 HEADERS += \
     assistant/AssistantController.h \
     assistant/AudioModelWorker.h \
     assistant/AudioOutputWorker.h \
     assistant/LLMWorker.h \
-    assistant/TTSEngines.h
+    assistant/TTSEngines.h \
+    assistant/FastQANetwork.h
 }
 
 SOURCES += \

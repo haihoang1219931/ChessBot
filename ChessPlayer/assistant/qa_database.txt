@@ -12,10 +12,10 @@ how is it going	Calculating checkmate. How are you?
 how is it going bot	Calculating checkmate. How are you?
 you good	Calculating checkmate. How are you?
 you good bot	Calculating checkmate. How are you?
-what is your name	I am the Stockfish of chat bots.
-what is your name bot	I am the Stockfish of chat bots.
-who are you	I am the Stockfish of chat bots.
-who are you bot	I am the Stockfish of chat bots.
+what is your name	I am the Tobot.
+what is your name bot	I am Tobot.
+who are you	I am Tobot.
+who are you bot	I am Tobot.
 who made you	A coder who kept losing to low level players.
 who made you bot	A coder who kept losing to low level players.
 who built you	A coder who kept losing to low level players.
