@@ -10,12 +10,14 @@ LLMWorker::LLMWorker(QObject *parent)
 }
 
 LLMWorker::~LLMWorker() {
+#if defined (USE_LLAMA)
     if (m_ctx) llama_free(m_ctx);
     if (m_model) llama_free_model(m_model);
     llama_backend_free();
+#endif
     // unique_ptr automatically cleans up m_recognizer memory allocations
 }
-
+#if defined (USE_LLAMA)
 void dummy_llama_log_callback(ggml_log_level level, const char * text, void * user_data) {
     (void)level;     // Unused
     (void)text;      // Unused
@@ -38,7 +40,7 @@ void LLMWorker::initializeLlama() {
     ctx_params.n_threads = 2;
     m_ctx = llama_new_context_with_model(m_model, ctx_params);
 }
-
+#endif
 void LLMWorker::stop() {
     m_interrupted.storeRelease(1);
     m_nextState = LLM_PROCESSING_EXIT;
@@ -93,10 +95,16 @@ void LLMWorker::doWork() {
         }
             break;
         case LLM_PROCESSING :{
-            int llamaResult = runLlamaInference();
-            if(llamaResult == LLM_DONE_SUCCESS) {
+            int answerResult = LLM_PENDING;
+#if defined (USE_FASTQA)
+            answerResult = runFastQAInference();
+#endif
+#if defined (USE_LLAMA)
+            answerResult = runLlamaInference();
+#endif
+            if(answerResult == LLM_DONE_SUCCESS) {
                 m_state = LLM_WAITING;
-            } else if(llamaResult == LLM_DONE_FAILED) {
+            } else if(answerResult == LLM_DONE_FAILED) {
                 m_state = LLM_WAITING;
             }
         }
@@ -203,7 +211,7 @@ void LLMWorker::setModel(const QString& name,
     m_sherpaTokensPath = sherpaTokensPath;
     m_llmModelPath = llmModelPath;
 }
-
+#if defined (USE_SHERPA)
 void LLMWorker::initializeSherpaOnnx() {
     if (m_sherpaModelPath.isEmpty() || m_sherpaTokensPath.isEmpty()) {
         qDebug("Sherpa-onnx model paths are unassigned.");
@@ -239,9 +247,10 @@ void LLMWorker::initializeSherpaOnnx() {
         qDebug("Exception during Sherpa allocation: %s", e.what());
     }
 }
-
+#endif
 
 int LLMWorker::transcribeAudio() {
+#if defined (USE_SHERPA)
     // Access validation pointer directly via arrow
     if (!m_recognizer || !m_recognizer->Get() || m_pcmData.isEmpty()) {
         qDebug() << "Sherpa Recognizer not initialized or PCM data payload is empty.";
@@ -283,10 +292,10 @@ int LLMWorker::transcribeAudio() {
     } catch (const std::exception& e) {
         qDebug() << "Exception inside evaluation pipeline framework step:" << e.what();
     }
-
+#endif
     return LLM_DONE_FAILED;
 }
-
+#if defined (USE_LLAMA)
 int LLMWorker::runLlamaInference() {
     int nextState = LLM_PENDING;
     Q_EMIT tokenGenerated("");
@@ -422,4 +431,29 @@ int LLMWorker::runLlamaInference() {
 
     Q_EMIT generationFinished(final_output);
     return nextState;
+}
+#endif
+
+int LLMWorker::runFastQAInference()
+{
+    QString final_output = "";
+    int nextState = LLM_PENDING;
+    final_output = QString::fromStdString(
+                m_fastQA->query(m_userPrompt.toLower().toStdString()));
+    if(!final_output.contains("error")) {
+        Q_EMIT generationFinished(final_output);
+        nextState =LLM_DONE_SUCCESS;
+    } else {
+        nextState =LLM_DONE_FAILED;
+    }
+    return nextState;
+}
+
+void LLMWorker::initializeFastQA()
+{
+    m_fastQA = new FastQANetwork();
+    qDebug("L[%d] [%s] m_sherpaModelPath[%s]\r\n",__LINE__,__FUNCTION__,
+           m_sherpaModelPath.toStdString().c_str());
+    m_fastQA->load_from_file(m_sherpaModelPath.toStdString());
+    qDebug("L[%d] [%s] done\r\n",__LINE__,__FUNCTION__);
 }

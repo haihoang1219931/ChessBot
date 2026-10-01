@@ -124,8 +124,15 @@ void AssistantController::setAIModel(const QString& botName,
                     const QString& piperExePath,
                     const QString& piperModelPath) {
     m_llmWorker->setModel(botName,sherpaModelPath,sherpaTokensPath,llmModelPath);
+#if defined (USE_LLAMA)
     m_llmWorker->initializeLlama();
+#endif
+#if defined (USE_FASTQA)
+    m_llmWorker->initializeFastQA();
+#endif
+#if defined (USE_SHERPA)
     m_llmWorker->initializeSherpaOnnx();
+#endif
     m_voiceWorker->setVoiceModel(botName,piperExePath,piperModelPath);
     m_playerName = playerName;
 }

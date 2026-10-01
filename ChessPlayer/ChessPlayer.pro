@@ -137,6 +137,8 @@ HEADERS += \
 
 use_ai_assistant {
 DEFINES += USE_AI_ASSISTANT
+DEFINES += USE_SHERPA
+DEFINES += USE_FASTQA
     win32 {
         # 1. Update these paths to match where your repositories live on your disk
         LLAMA_SOURCE_DIR = "$$PWD/../../Chatbot/llama.cpp"

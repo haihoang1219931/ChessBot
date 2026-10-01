@@ -9,8 +9,13 @@
 #include <QWaitCondition>
 #include <memory>
 
+#if defined (USE_LLAMA)
 #include "llama.h"
+#endif
+#include "FastQANetwork.h"
+#if defined (USE_SHERPA)
 #include "sherpa-onnx/c-api/cxx-api.h"
+#endif
 
 struct ChatMessage {
     QString role;
@@ -47,8 +52,15 @@ public:
                   const QString& sherpaModelPath,
                   const QString& sherpaTokensPath,
                   const QString& llmModelPath);
+#if defined (USE_LLAMA)
     void initializeLlama();
+#endif
+#if defined (USE_FASTQA)
+    void initializeFastQA();
+#endif
+#if defined (USE_SHERPA)
     void initializeSherpaOnnx();
+#endif
 public Q_SLOTS:
     void doWork();
     void handleSpeech(const QByteArray& pcmData);
@@ -62,16 +74,26 @@ private:
     bool m_pause = false;
     QMutex *m_mutex;
     QWaitCondition* m_pauseCond;
+#if defined (USE_FASTQA)
+    int runFastQAInference();
+#endif
+#if defined (USE_LLAMA)
     int runLlamaInference();
+#endif
     int transcribeAudio();
     QString generatePromptChat(const QString& userPrompt);
     QString generatePromptChess(QString fen, QString playColor, QString move);
 
     // Core Models
+#if defined (USE_LLAMA)
     llama_model* m_model = nullptr;
     llama_context* m_ctx = nullptr;
+#endif
+#if defined (USE_SHERPA)
     sherpa_onnx::cxx::OfflineRecognizer* m_recognizer = nullptr;
 
+#endif
+    FastQANetwork* m_fastQA = nullptr;
     QVector<ChatMessage> m_conversationHistory;
     QByteArray m_pcmData;
     QString m_userPrompt;
