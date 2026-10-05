@@ -2315,7 +2315,7 @@ void ChessImageProcessing::classsifyChessBoardImage(const cv::Mat& warpedBoard) 
 
         // Execute background color checks locally (Uses original color matrix mapping rules)
         checkPieceColor(croppedCellBGR, piece, row, col);
-        m_mapClassifiedCell[row][col] = piece.className;
+        m_mapClassifiedCell[row][col] = piece.probability > 95 ? piece.className:'.';
 
 #ifdef DEBUG_ROI
         cv::rectangle(warpedBoard, tallCellROI,

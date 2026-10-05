@@ -62,12 +62,12 @@ AssistantController::~AssistantController() {
 }
 
 void AssistantController::startService() {
-    if (!m_audioThread->isRunning()) {
-        m_audioThread->start();
-    }
-    if (!m_llmThread->isRunning()) {
-        m_llmThread->start();
-    }
+//    if (!m_audioThread->isRunning()) {
+//        m_audioThread->start();
+//    }
+//    if (!m_llmThread->isRunning()) {
+//        m_llmThread->start();
+//    }
     if (!m_voiceThread->isRunning()) {
         m_voiceThread->start();
     }

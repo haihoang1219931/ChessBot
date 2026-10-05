@@ -1041,6 +1041,7 @@ uint8_t ChessBot::testCheckResult()
 
 uint8_t ChessBot::analyzeChessBoard(bool useOpenVino)
 {
+    Q_EMIT newCommentAdded("Analyzing");
 #if defined(IMAGE_PROCESS_MOVE)
     cv::Mat currentImage, warpedImage;
     QString warpedImagePath = "warpedImage.jpg";
@@ -1095,6 +1096,7 @@ uint8_t ChessBot::analyzeChessBoard(bool useOpenVino)
     qDebug("classificationDone");
     Q_EMIT classificationDone(m_analyzeChessBoardResult,
                               m_analyzeChessBoardRevertedResult);
+    Q_EMIT newCommentAdded("Classification Done");
 #endif
     return STATE_DONE_SUCCESS;
 }
