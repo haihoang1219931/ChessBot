@@ -319,16 +319,17 @@ void ChessBot::playLoop()
     switch (m_statePlay) {
     case PLAY_DETECT_CUSTOM_BOARD: {
         qDebug("PLAY_DETECT_CUSTOM_BOARD");
-        if(analyzeChessBoard(false)!=STATE_PENDING){
+        if(analyzeChessBoard(false) == STATE_DONE_SUCCESS){
             m_statePlay = PLAY_SETUP_CUSTOM_BOARD;
+        } else {
+            togglePause(true);
         }
     }
         break;
     case PLAY_SETUP_CUSTOM_BOARD: {
         qDebug("PLAY_SETUP_CUSTOM_BOARD");
         setupAnalizedChessBoard();
-        m_statePlay = PLAY_PROCESS_DONE;
-        m_handleNewCommand = false;
+        togglePause(true);
     }
         break;
     case PLAY_CHECK_LOG: {
@@ -1047,6 +1048,20 @@ uint8_t ChessBot::analyzeChessBoard(bool useOpenVino)
     QString warpedImagePath = "warpedImage.jpg";
     std::vector<std::string> analyzeResult;
     if(!readFrame(currentImage)) {
+        qDebug("classificationDone");
+        if(m_analyzeChessBoardResult.size() != NUM_ROW * NUM_COL) {
+            m_analyzeChessBoardResult.clear();
+            for(int i=0; i< NUM_ROW * NUM_COL; i++)
+                m_analyzeChessBoardResult.push_back(".");
+        }
+        if(m_analyzeChessBoardRevertedResult.size() != NUM_ROW * NUM_COL) {
+            m_analyzeChessBoardRevertedResult.clear();
+            for(int i=0; i< NUM_ROW * NUM_COL; i++)
+                m_analyzeChessBoardRevertedResult.push_back(".");
+        }
+        Q_EMIT classificationDone(m_analyzeChessBoardResult,
+                                  m_analyzeChessBoardRevertedResult);
+        Q_EMIT newCommentAdded("Please confirm");
         return STATE_DONE_FAIL;
     }
     m_moveDetector->warpChessBoardImage(currentImage, warpedImage);
@@ -1096,7 +1111,7 @@ uint8_t ChessBot::analyzeChessBoard(bool useOpenVino)
     qDebug("classificationDone");
     Q_EMIT classificationDone(m_analyzeChessBoardResult,
                               m_analyzeChessBoardRevertedResult);
-    Q_EMIT newCommentAdded("Classification Done");
+    Q_EMIT newCommentAdded("Please confirm");
 #endif
     return STATE_DONE_SUCCESS;
 }
@@ -1104,7 +1119,9 @@ uint8_t ChessBot::analyzeChessBoard(bool useOpenVino)
 uint8_t ChessBot::setupAnalizedChessBoard()
 {
     std::stringstream fen;
-    printf("1. Piece Placement\r\n");
+    printf("1. Piece Placement m_analyzeChessBoardResult[%d] m_analyzeChessBoardRevertedResult[%d]\r\n",
+           m_analyzeChessBoardResult.length(),
+           m_analyzeChessBoardRevertedResult.length());
     // 1. Piece Placement (Ranks 8 down to 1)
         for (int rank = 7; rank >= 0; --rank) {
             int empty_squares = 0;
@@ -1166,6 +1183,34 @@ void ChessBot::setTimeLimit(int timeOut)
 void ChessBot::setGameTypeCustom()
 {
     m_gameTypeCustom = true;
+}
+
+void ChessBot::startCustomGame(QStringList boardArray)
+{
+    int countWhiteKing = 0;
+    int countBlackKing = 0;
+    for(int row=0;row<8;row++) {
+        for(int col=0;col<8;col++) {
+            if(boardArray[row*8+col] == "K") countWhiteKing++;
+            else if(boardArray[row*8+col] == "k") countBlackKing++;
+        }
+    }
+    if(countBlackKing != 1 || countWhiteKing != 1) {
+        Q_EMIT newCommentAdded("Invalid game. Please check");
+        return;
+    }
+    for(int row=0;row<8;row++) {
+        for(int col=0;col<8;col++) {
+            m_analyzeChessBoardRevertedResult[row*14+col+3] = boardArray[row*8+col];
+            m_analyzeChessBoardResult[row*14+col+3] = boardArray[63-(row*8+col)];
+        }
+    }
+    m_mutex->lock();
+    m_state = STATE_PLAY;
+    m_statePlay = PLAY_SETUP_CUSTOM_BOARD;
+    m_mutex->unlock();
+    togglePause(false);
+    startService();
 }
 
 bool ChessBot::gameTypeCustom()

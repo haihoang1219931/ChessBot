@@ -155,6 +155,7 @@ public:
     int timerLimit();
     void setTimeLimit(int timeOut);
     void setGameTypeCustom();
+    void startCustomGame(QStringList boardArray);
     bool gameTypeCustom();
 
 Q_SIGNALS:
@@ -170,6 +171,7 @@ Q_SIGNALS:
     void newMoveAdded(QString fen, QString playColor, QString move);
     void preprocessDone(QString imagePath);
     void classificationDone(QStringList boardModel,QStringList boardModelReverted);
+    void gameSetupFailed();
 
 private:
     void playLoop();

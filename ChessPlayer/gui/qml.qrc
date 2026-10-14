@@ -25,5 +25,7 @@
         <file>qml/GameTypeSelection.qml</file>
         <file>qml/CustomGame.qml</file>
         <file>qml/HomeOptionWithDetect.qml</file>
+        <file>qml/ConfirmAnalyzeNextStep.qml</file>
+        <file>qml/SetupPieces.qml</file>
     </qresource>
 </RCC>

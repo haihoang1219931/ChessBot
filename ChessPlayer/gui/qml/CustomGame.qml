@@ -13,6 +13,7 @@ Rectangle {
     property int side: 0
     property int gameTurn: 0
     property bool gameEnded: false
+    property string editMode: "" // 2 modes ["setup", "play"]
     signal gobackLevelSelection()
     Keys.onPressed: {
         if (event.key === Qt.Key_Home) {
@@ -31,18 +32,28 @@ Rectangle {
         }
     }
     Keys.onReturnPressed: {
-        if(!gameEnded) chessboard.updateUserSelection();
+        if(root.editMode == "play") {
+            if(!gameEnded) chessboard.updateUserSelection();
+        } else if(root.editMode == "setup") {
+            openSetPiecesOption();
+        }
     }
-    Keys.onSpacePressed: masterBot.processNextMove()
+    Keys.onSpacePressed: {
+        if(root.editMode == "play") {
+            masterBot.processNextMove()
+        } else if(root.editMode == "setup") {
+            openConfirmPlayOption();
+        }
+    }
     Keys.onLeftPressed: chessboard.updateUserInput(-1)
     Keys.onRightPressed: chessboard.updateUserInput(1)
     Keys.onUpPressed: chessboard.updateUserInput(-8)
     Keys.onDownPressed: chessboard.updateUserInput(8)
     function openGameResult(result) {
         // 1. Set the source to your QML file
-        if(loaderDialogEndgame.item === null)
-        loaderDialogEndgame.setSource("GameResult.qml");
-        loaderDialogEndgame.item.gameResult = result
+        if(loaderDialog.item === null)
+        loaderDialog.setSource("GameResult.qml");
+        loaderDialog.item.gameResult = result
         gameEnded = true;
         masterBot.stopGame(result === 2 ?"Player lost":"Player win");
     }
@@ -61,19 +72,28 @@ Rectangle {
 
     function openHomeOption() {
         // 1. Set the source to your QML file
-        if(loaderDialogEndgame.item === null) {
+        if(loaderDialog.item === null) {
             root.focus = false;
-            loaderDialogEndgame.setSource("HomeOptionWithDetect.qml");
+            loaderDialog.setSource("HomeOptionWithDetect.qml");
         }
     }
 
     function openConfirmPlayOption() {
         // 1. Set the source to your QML file
-        if(loaderDialogEndgame.item === null) {
+        if(loaderDialog.item === null) {
             root.focus = false;
-            loaderDialogEndgame.setSource("ConfirmPlay.qml");
+            loaderDialog.setSource("ConfirmAnalyzeNextStep.qml");
         }
     }
+
+    function openSetPiecesOption() {
+        // 1. Set the source to your QML file
+        if(loaderDialog.item === null) {
+            root.focus = false;
+            loaderDialog.setSource("SetupPieces.qml");
+        }
+    }
+
     ColumnLayout {
         spacing: 0
         Rectangle {
@@ -126,7 +146,7 @@ Rectangle {
         }
     }
     Loader {
-        id: loaderDialogEndgame
+        id: loaderDialog
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         focus: true // Necessary for children to receive focus
@@ -137,23 +157,12 @@ Rectangle {
         }
     }
 
-    Loader {
-        id: loaderDialogPromotion
-        anchors.centerIn: parent
-        focus: true // Necessary for children to receive focus
-
-        onLoaded: {
-            // 2. Force focus to the loaded item immediately after it's ready
-            item.forceActiveFocus();
-        }
-    }
-
     Connections {
-        target: loaderDialogEndgame.item // Connects to the loaded object
+        target: loaderDialog.item // Connects to the loaded object
         ignoreUnknownSignals: true // Prevents errors before source is loaded
 
         onGameNextStep: {
-            loaderDialogEndgame.source = ""; // Close it
+            loaderDialog.source = ""; // Close it
             if(nextStep === 1) {
                 console.log("gobackLevelSelection");
                 gobackLevelSelection();
@@ -167,7 +176,7 @@ Rectangle {
             }
         }
         onHomeNextStep: {
-            loaderDialogEndgame.source = ""; // Close it
+            loaderDialog.source = ""; // Close it
             if(nextStep === 2) {
                 console.log("level selection");
                 gobackLevelSelection();
@@ -182,9 +191,29 @@ Rectangle {
                 masterBot.resetGame();
             }
         }
+        onConfirmNextStep: {
+            loaderDialog.source = ""; // Close it
+            if(nextStep === 0) {
+                root.editMode = "play"
+                console.log("startCustomGame");
+                masterBot.startCustomGame(chessboard.board);
+            } else if(nextStep === 1) {
+                root.editMode = "setup"
+                chessboard.enableUserInput(true);
+            }
+        }
+
+        onCancelSelectPiece: {
+            loaderDialog.source = "";
+        }
+        onPieceSelected: {
+            loaderDialog.source = "";
+            chessboard.changeSelectedCell(pieceType);
+            chessboard.enableUserInput(false);
+        }
 
         onGoback: {
-            loaderDialogEndgame.source = ""; // Close it
+            loaderDialog.source = ""; // Close it
             root.forceActiveFocus();
         }
     }
@@ -205,6 +234,10 @@ Rectangle {
             chessboard.playerColor = chessController.playerColor
             chessboard.selectedSquare = chessController.selectedSquare
             chessboard.checkedKingSquare = chessController.checkedKingSquare
+        }
+        onClassificationDone: {
+            chessboard.board = boardModel;
+            openConfirmPlayOption();
         }
     }
     Component.onCompleted: {

@@ -191,6 +191,11 @@ void MasterChessBot::setGameTypeCustom() const
     m_workerChessbot->setGameTypeCustom();
 }
 
+void MasterChessBot::startCustomGame(QStringList boardArray) const
+{
+    m_workerChessbot->startCustomGame(boardArray);
+}
+
 bool MasterChessBot::gameTypeCustom() const
 {
     return m_workerChessbot->gameTypeCustom();
