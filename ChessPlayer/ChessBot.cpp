@@ -274,6 +274,7 @@ void ChessBot::playInputMove(int startUiIndex, int stopUiIndex, int promotePiece
             m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
             m_mutex->unlock();
             Q_EMIT playTurnChanged(m_chessController->playerColor() == Color::WHITE ? 1-m_chessController->playerColor():m_chessController->playerColor());
+            Q_EMIT userInputMoveDone();
             togglePause(false);
             startService();
         } else {
@@ -287,6 +288,7 @@ void ChessBot::playInputMove(int startUiIndex, int stopUiIndex, int promotePiece
         QStringList listPromotions = {"q","r","n","b"};
         m_chessController->choosePromotion(m_chessController->playerColor() == 0 ?listPromotions[promotePiece]:
                                                         listPromotions[promotePiece].toUpper());
+        Q_EMIT userInputMoveDone();
         m_mutex->lock();
         m_state = STATE_PLAY;
         m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
@@ -831,6 +833,7 @@ uint8_t ChessBot::playCalculateNextMove()
 
             //move rook
             qDebug("Castling move rook");
+            Q_EMIT newCommentAdded("Castling");
             sprintf(m_robotCommand,"CST%d%d%d%d%c",fromCoord.y(),fromCoord.x(),
                     toCoord.y(),toCoord.x() > fromCoord.x()?7:0,
                     '-');
@@ -870,12 +873,18 @@ uint8_t ChessBot::playCalculateNextMove()
                     dropCells[0].x <=1 ?'b':'p',dropCells[0].y,dropCells[0].x%12,
                     promoteCell.x <=1?'b':'p',promoteCell.y,promoteCell.x%12,
                     promoteCell.x <=1?'b':'p',promoteCell.y,promoteCell.x%12);
+            if(isPromotionWithCapture) {
+                Q_EMIT newCommentAdded("Promotion with capture");
+            } else {
+                Q_EMIT newCommentAdded("Promotion");
+            }
         }
         else
         {
             if (m_chessController->botMove().isEnPassant()) // watch out ep capture is a capture
             {
                 qDebug("Capture remove pawn color[%d]",m_chessController->playerColor() != 0?"White":"Black");
+                Q_EMIT newCommentAdded("Capture past pawn");
                 std::vector<cv::Point> dropCells;
                 bool validDropCell = m_moveDetector->findDropCells(dropCells);
                 if(!validDropCell) {
@@ -897,6 +906,28 @@ uint8_t ChessBot::playCalculateNextMove()
                 //remove the captured piece
                 char capturePiece = pieceName(m_chessController->botMove().getCapturedPieceType(),
                                               m_chessController->playerColor());
+                switch (capturePiece) {
+                case 'Q':
+                case 'q':
+                    Q_EMIT newCommentAdded("Capture quuen");
+                    break;
+                case 'B':
+                case 'b':
+                    Q_EMIT newCommentAdded("Capture bishop");
+                    break;
+                case 'N':
+                case 'n':
+                    Q_EMIT newCommentAdded("Capture knight");
+                    break;
+                case 'R':
+                case 'r':
+                    Q_EMIT newCommentAdded("Capture rook");
+                    break;
+                case 'P':
+                case 'p':
+                    Q_EMIT newCommentAdded("Capture pawn");
+                    break;
+                }
                 qDebug("Capture remove captured piece[%c] color[%s]",
                        capturePiece,m_chessController->playerColor() != 0?"White":"Black");
                 std::vector<cv::Point> dropCells;

@@ -162,6 +162,7 @@ Q_SIGNALS:
     void boardChanged(QStringList boardModel);
     void detectFailed();
     void playTurnChanged(int nextTurn);
+    void userInputMoveDone();
     void gameEnded(int endState);
     void calibrationUploadProgress(int direction, int progress);
     void calibrationUploadComplete(int direction, bool success);

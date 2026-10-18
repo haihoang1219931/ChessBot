@@ -351,5 +351,8 @@ Rectangle {
             chessboard.selectedSquare = chessController.selectedSquare
             chessboard.checkedKingSquare = chessController.checkedKingSquare
         }
+        onUserInputMoveDone: {
+            chessboard.enableUserInput(false);
+        }
     }
 }

@@ -250,6 +250,9 @@ Rectangle {
             chessboard.board = boardModel;
             openConfirmPlayOption();
         }
+        onUserInputMoveDone: {
+            chessboard.enableUserInput(false);
+        }
     }
     Component.onCompleted: {
         root.levelType = chessController.engineLevel
