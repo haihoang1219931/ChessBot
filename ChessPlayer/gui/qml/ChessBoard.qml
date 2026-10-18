@@ -11,12 +11,11 @@ Item {
     property int userInputIndexStop:-1
 
     function enableUserInput(enable) {
-        if(!activeUserInput) {
-            activeUserInput = enable;
-            userInputIndex = 56;
-            userInputIndexStart = -1
-            userInputIndexStop = -1
-        }
+        console.log("enableUserInput: "+enable)
+        activeUserInput = enable;
+        userInputIndex = 56;
+        userInputIndexStart = -1
+        userInputIndexStop = -1
     }
 
     function updateUserInput(direction) {

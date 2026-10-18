@@ -350,7 +350,6 @@ Rectangle {
             chessboard.playerColor = chessController.playerColor
             chessboard.selectedSquare = chessController.selectedSquare
             chessboard.checkedKingSquare = chessController.checkedKingSquare
-            chessboard.enableUserInput(false);
         }
     }
 }

@@ -329,7 +329,7 @@ void ChessBot::playLoop()
     case PLAY_SETUP_CUSTOM_BOARD: {
         qDebug("PLAY_SETUP_CUSTOM_BOARD");
         setupAnalizedChessBoard();
-        m_state = STATE_EXIT;
+        m_statePlay = PLAY_PROCESS_DONE;
         togglePause(true);
     }
         break;
@@ -2048,9 +2048,12 @@ void ChessBot::initRobotCommunication() {
 }
 void ChessBot::processNextMove()
 {
+    qDebug("processNextMove m_state[%d] m_statePlay[%d]",
+           m_state,
+           m_statePlay);
     if(m_state == STATE_PLAY) {
-        qDebug("Queue command to play next time m_statePlay[%d]",m_statePlay);
         if(m_statePlay != PLAY_PROCESS_DONE) {
+            qDebug("Queue command to play next time m_statePlay[%d]",m_statePlay);
             m_handleNewCommand = true;
             return;
         }

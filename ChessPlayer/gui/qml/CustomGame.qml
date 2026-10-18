@@ -197,12 +197,14 @@ Rectangle {
                 root.editMode = "play"
                 console.log("startCustomGame");
                 masterBot.startCustomGame(chessboard.board);
+                chessboard.enableUserInput(false)
             } else if(nextStep === 1) {
                 root.editMode = "setup"
                 chessboard.enableUserInput(true);
             } else if(nextStep === 2) {
                 root.editMode = "setup"
                 masterBot.resetGame();
+                chessboard.enableUserInput(false)
             }
         }
 
@@ -212,7 +214,6 @@ Rectangle {
         onPieceSelected: {
             loaderDialog.source = "";
             chessboard.changeSelectedCell(pieceType);
-            chessboard.enableUserInput(false);
         }
         onPromoteSelected: {
             loaderDialog.source = "";
@@ -244,7 +245,6 @@ Rectangle {
             chessboard.playerColor = chessController.playerColor
             chessboard.selectedSquare = chessController.selectedSquare
             chessboard.checkedKingSquare = chessController.checkedKingSquare
-            chessboard.enableUserInput(false);
         }
         onClassificationDone: {
             chessboard.board = boardModel;
