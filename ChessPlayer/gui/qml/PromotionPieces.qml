@@ -17,6 +17,10 @@ Item {
     Keys.onReturnPressed: {
         promoteSelected(selection);
     }
+    Keys.onSpacePressed: {
+        promoteSelected(selection);
+    }
+
     Keys.onEscapePressed: {
         cancelSelectPromote();
     }

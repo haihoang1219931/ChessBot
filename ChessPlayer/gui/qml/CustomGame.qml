@@ -61,11 +61,11 @@ Rectangle {
     function enablePromotionSelection(enable) {
         if(enable){
             // 1. Set the source to your QML file
-            if(loaderDialogPromotion.item === null)
-            loaderDialogPromotion.setSource("PromotionPieces.qml");
-            loaderDialogPromotion.item.side = masterBot.playerColor() === 0 ?"white":"black";
+            if(loaderDialog.item === null)
+            loaderDialog.setSource("PromotionPieces.qml");
+            loaderDialog.item.side = masterBot.playerColor() === 0 ?"white":"black";
         } else {
-            loaderDialogPromotion.source = ""; // Close it
+            loaderDialog.source = ""; // Close it
             root.forceActiveFocus();
         }
     }
@@ -200,6 +200,9 @@ Rectangle {
             } else if(nextStep === 1) {
                 root.editMode = "setup"
                 chessboard.enableUserInput(true);
+            } else if(nextStep === 2) {
+                root.editMode = "setup"
+                masterBot.resetGame();
             }
         }
 
@@ -209,6 +212,13 @@ Rectangle {
         onPieceSelected: {
             loaderDialog.source = "";
             chessboard.changeSelectedCell(pieceType);
+            chessboard.enableUserInput(false);
+        }
+        onPromoteSelected: {
+            loaderDialog.source = "";
+            masterBot.playInputMove(chessboard.userInputIndexStart,
+                                  chessboard.userInputIndexStop,
+                                  promotePiece);
             chessboard.enableUserInput(false);
         }
 
@@ -234,6 +244,7 @@ Rectangle {
             chessboard.playerColor = chessController.playerColor
             chessboard.selectedSquare = chessController.selectedSquare
             chessboard.checkedKingSquare = chessController.checkedKingSquare
+            chessboard.enableUserInput(false);
         }
         onClassificationDone: {
             chessboard.board = boardModel;

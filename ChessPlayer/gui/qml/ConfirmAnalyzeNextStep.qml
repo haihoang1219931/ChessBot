@@ -4,22 +4,37 @@ import QtQuick.Layouts 1.12
 
 Rectangle {
     id: root
-    width: 300
+    width: 450
     height: 120
     color: "#88f8f9fa"
     property int selection: 0
     signal confirmNextStep(var nextStep)
     signal gobackNormal()
     Keys.onLeftPressed: {
-        selection = (selection-1) >= 0?(selection-1)%2:1;
+        selection = (selection-1) >= 0?(selection-1)%3:2;
     }
+
+    Keys.onUpPressed: {
+        selection = (selection-1) >= 0?(selection-1)%3:2;
+    }
+
     Keys.onRightPressed: {
-        selection = (selection+1)%2;
+        selection = (selection+1)%3;
     }
+
+    Keys.onDownPressed: {
+        selection = (selection+1)%3;
+    }
+
     Keys.onReturnPressed: {
         console.log("Confirm analyze next step "+selection);
         confirmNextStep(selection);
     }
+    Keys.onSpacePressed: {
+        console.log("Confirm analyze next step "+selection);
+        confirmNextStep(selection);
+    }
+
     Keys.onEscapePressed: {
         gobackNormal()
     }
@@ -61,6 +76,19 @@ Rectangle {
 
                 Text {
                     text: "Set\npieces"
+                    color: "white"
+                    anchors.centerIn: parent
+                    font.pixelSize: 20
+                }
+            }
+            // Change Level Button
+            Rectangle {
+                implicitWidth: 100
+                implicitHeight: 50
+                color: selection == 2? "green": "#1a5f7a"
+
+                Text {
+                    text: "Analyze\nagain"
                     color: "white"
                     anchors.centerIn: parent
                     font.pixelSize: 20

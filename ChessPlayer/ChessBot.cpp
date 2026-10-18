@@ -329,6 +329,7 @@ void ChessBot::playLoop()
     case PLAY_SETUP_CUSTOM_BOARD: {
         qDebug("PLAY_SETUP_CUSTOM_BOARD");
         setupAnalizedChessBoard();
+        m_state = STATE_EXIT;
         togglePause(true);
     }
         break;
