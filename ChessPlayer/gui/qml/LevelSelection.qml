@@ -26,112 +26,124 @@ FocusScope {
         { name: "Master",      scores: [2100, 1900, 1700, 1500, 1300] },
         { name: "Advanced",    scores: [1100, 900, 700, 500] }
     ]
+    ColumnLayout {
+        anchors.centerIn: parent
+        spacing: 30
 
-    Rectangle {
-        anchors.fill: parent
-        color: "#050505"
-        RowLayout {
-            anchors.fill: parent
-            spacing: 0
+        Text {
+            text: "Please choose level"
+            color: "white"
+            font.pixelSize: 22; font.bold: true
+            Layout.alignment: Qt.AlignHCenter
+        }
 
-            ListView {
-                id: rankList
-                Layout.preferredWidth: root.width * 2/3
-                Layout.preferredHeight: 210
-                Layout.alignment: Qt.AlignVCenter
-                model: root.rankData
-                focus: true // Default focus child
-                KeyNavigation.right: scoreList
-                Keys.onReturnPressed: (event) => {
-                    scoreList.forceActiveFocus();
-                    event.accepted = true;
-                }
-                Keys.onSpacePressed: (event) => {
-                    scoreList.forceActiveFocus();
-                    event.accepted = true;
-                }
-                Keys.onEscapePressed: {
-                    root.exitPressed()
-                }
+        Rectangle {
+            Layout.alignment: Qt.AlignVCenter
+            Layout.preferredWidth: root.width
+            Layout.preferredHeight: 210
+            color: "#050505"
+            RowLayout {
+                spacing: 0
+                ListView {
+                    id: rankList
+                    Layout.preferredWidth: root.width * 2/3
+                    Layout.preferredHeight: 210
+                    Layout.alignment: Qt.AlignVCenter
+                    model: root.rankData
+                    focus: true // Default focus child
+                    KeyNavigation.right: scoreList
+                    Keys.onReturnPressed: (event) => {
+                        scoreList.forceActiveFocus();
+                        event.accepted = true;
+                    }
+                    Keys.onSpacePressed: (event) => {
+                        scoreList.forceActiveFocus();
+                        event.accepted = true;
+                    }
+                    Keys.onEscapePressed: {
+                        root.exitPressed()
+                    }
 
-                clip: true
-                highlightFollowsCurrentItem: true
+                    clip: true
+                    highlightFollowsCurrentItem: true
 
-                delegate: Item {
-                    width: rankList.width; height: 70
-                    readonly property bool isSelected: ListView.isCurrentItem
+                    delegate: Item {
+                        width: rankList.width; height: 70
+                        readonly property bool isSelected: ListView.isCurrentItem
 
-                    // Selection Bars
-                    Rectangle {
-                        visible: isSelected
-                        width: parent.width; height: 2; anchors.top: parent.top
-                        gradient: Gradient {
-                            orientation: Gradient.Horizontal
-                            GradientStop { position: 0.0; color: "transparent" }
-                            GradientStop { position: 0.5; color: "#0055ff" }
-                            GradientStop { position: 1.0; color: "transparent" }
+                        // Selection Bars
+                        Rectangle {
+                            visible: isSelected
+                            width: parent.width; height: 2; anchors.top: parent.top
+                            gradient: Gradient {
+                                orientation: Gradient.Horizontal
+                                GradientStop { position: 0.0; color: "transparent" }
+                                GradientStop { position: 0.5; color: "#0055ff" }
+                                GradientStop { position: 1.0; color: "transparent" }
+                            }
+                        }
+                        Rectangle {
+                            visible: isSelected
+                            width: parent.width; height: 2; anchors.bottom: parent.bottom
+                            gradient: Gradient {
+                                orientation: Gradient.Horizontal
+                                GradientStop { position: 0.0; color: "transparent" }
+                                GradientStop { position: 0.5; color: "#0055ff" }
+                                GradientStop { position: 1.0; color: "transparent" }
+                            }
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: (isSelected && rankList.activeFocus ? "> " : "") + modelData.name
+                            color: isSelected ? "#0055ff" : "white"
+                            font.pixelSize: 28; font.bold: isSelected
                         }
                     }
-                    Rectangle {
-                        visible: isSelected
-                        width: parent.width; height: 2; anchors.bottom: parent.bottom
-                        gradient: Gradient {
-                            orientation: Gradient.Horizontal
-                            GradientStop { position: 0.0; color: "transparent" }
-                            GradientStop { position: 0.5; color: "#0055ff" }
-                            GradientStop { position: 1.0; color: "transparent" }
-                        }
-                    }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: (isSelected && rankList.activeFocus ? "> " : "") + modelData.name
-                        color: isSelected ? "#0055ff" : "white"
-                        font.pixelSize: 28; font.bold: isSelected
-                    }
                 }
-            }
 
-            Rectangle { Layout.preferredWidth: 2; Layout.fillHeight: true; color: "#222" }
+                Rectangle { Layout.preferredWidth: 2; Layout.fillHeight: true; color: "#222" }
 
-            ListView {
-                id: scoreList
-                Layout.preferredWidth: root.width * 1/3
-                Layout.preferredHeight: 210
-                Layout.alignment: Qt.AlignVCenter
-                model: root.rankData[rankList.currentIndex].scores
-                KeyNavigation.left: rankList
-                clip: true
+                ListView {
+                    id: scoreList
+                    Layout.preferredWidth: root.width * 1/3
+                    Layout.preferredHeight: 210
+                    Layout.alignment: Qt.AlignVCenter
+                    model: root.rankData[rankList.currentIndex].scores
+                    KeyNavigation.left: rankList
+                    clip: true
 
-                Keys.onReturnPressed: root.itemSelected(root.rankData[rankList.currentIndex].name, model[currentIndex])
-                Keys.onSpacePressed: root.itemSelected(root.rankData[rankList.currentIndex].name, model[currentIndex])
-                Keys.onEscapePressed: (event) => {
-                    rankList.forceActiveFocus();
-                    event.accepted = true;
-                }
-                delegate: Item {
-                    width: scoreList.width; height: 70
-                    readonly property bool isSelected: ListView.isCurrentItem && scoreList.activeFocus
-
-                    Rectangle {
-                        visible: isSelected
-                        width: parent.width; height: 2; anchors.top: parent.top
-                        gradient: Gradient {
-                            orientation: Gradient.Horizontal
-                            GradientStop { position: 0.0; color: "transparent" }
-                            GradientStop { position: 0.5; color: "#0055ff" }
-                            GradientStop { position: 1.0; color: "transparent" }
-                        }
+                    Keys.onReturnPressed: root.itemSelected(root.rankData[rankList.currentIndex].name, model[currentIndex])
+                    Keys.onSpacePressed: root.itemSelected(root.rankData[rankList.currentIndex].name, model[currentIndex])
+                    Keys.onEscapePressed: (event) => {
+                        rankList.forceActiveFocus();
+                        event.accepted = true;
                     }
+                    delegate: Item {
+                        width: scoreList.width; height: 70
+                        readonly property bool isSelected: ListView.isCurrentItem && scoreList.activeFocus
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: (isSelected ? "> " : "") + modelData
-                        color: isSelected ? "#0055ff" : (scoreList.activeFocus ? "white" : "#666")
-                        font.pixelSize: 28; font.bold: isSelected
+                        Rectangle {
+                            visible: isSelected
+                            width: parent.width; height: 2; anchors.top: parent.top
+                            gradient: Gradient {
+                                orientation: Gradient.Horizontal
+                                GradientStop { position: 0.0; color: "transparent" }
+                                GradientStop { position: 0.5; color: "#0055ff" }
+                                GradientStop { position: 1.0; color: "transparent" }
+                            }
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: (isSelected ? "> " : "") + modelData
+                            color: isSelected ? "#0055ff" : (scoreList.activeFocus ? "white" : "#666")
+                            font.pixelSize: 28; font.bold: isSelected
+                        }
                     }
                 }
             }
         }
+
     }
 }

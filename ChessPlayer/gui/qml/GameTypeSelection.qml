@@ -10,7 +10,7 @@ FocusScope {
 
     signal itemSelected(string expireTime)
     signal exitPressed()
-    property var listTimeModel: ["30 mins","10 mins","No limit"]
+    property var listTimeModel: ["30 mins","10 mins","No limit", "Custom game"]
     onItemSelected: (expireTime) => {
         console.log("Selected expireTime: " + expireTime);
     }
@@ -24,7 +24,7 @@ FocusScope {
             spacing: 30
 
             Text {
-                text: "Please choose time out"
+                text: "Please select game type"
                 color: "white"
                 font.pixelSize: 22; font.bold: true
                 Layout.alignment: Qt.AlignHCenter
@@ -36,7 +36,7 @@ FocusScope {
                 ListView {
                     id: listTime
                     Layout.preferredWidth: root.width * 2/3
-                    Layout.preferredHeight: 210
+                    Layout.preferredHeight: 280
                     Layout.alignment: Qt.AlignVCenter
                     orientation: ListView.Vertical
                     verticalLayoutDirection: ListView.TopToBottom

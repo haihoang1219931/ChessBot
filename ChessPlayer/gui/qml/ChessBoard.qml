@@ -11,12 +11,11 @@ Item {
     property int userInputIndexStop:-1
 
     function enableUserInput(enable) {
-        if(!activeUserInput) {
-            activeUserInput = enable;
-            userInputIndex = 56;
-            userInputIndexStart = -1
-            userInputIndexStop = -1
-        }
+        console.log("enableUserInput: "+enable)
+        activeUserInput = enable;
+        userInputIndex = 56;
+        userInputIndexStart = -1
+        userInputIndexStop = -1
     }
 
     function updateUserInput(direction) {
@@ -66,7 +65,8 @@ Item {
         case "p": return "\u265F"
         default: return "."
         }
-    }
+    }    
+
     function isFirstLetterUppercase(str) {
       // Ensure the string isn't empty before testing
       if (!str) return false;
@@ -77,6 +77,11 @@ Item {
     function pieceColor(code) {
         if (code.charAt(0) === ".") return "transparent"
         return isFirstLetterUppercase(code) ? "orange":"gray"
+    }
+
+    function changeSelectedCell(pieceType) {
+        root.board[root.userInputIndex] = pieceType;
+        root.board = root.board;
     }
 
     Grid {

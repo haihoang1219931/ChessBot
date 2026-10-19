@@ -66,13 +66,16 @@ ChessBot::ChessBot(QThread *parent) :
             this,&ChessBot::boardChanged);
     m_validCalibFileFound = loadCalibrationData();
     if(!m_validCalibFileFound) {
-        m_chessDetectorModel = "chess_piece_resnet18_20260828_100epoch.onnx";
+        m_chessAnalyzerModel = "chess_piece_resnet18_20260828_100epoch.onnx";
+        m_chessDetectorModel = "mini_resnet_chess_240x240_vino_20260918.xml";
         m_chessDetectorClassList = "b,.,k,n,p,q,r";
         m_chessDetectorImageSize = 240;
         m_chessDetectorImageChannels = 3;
         m_botName = "Tobot";
         m_playerName = "Bean";
         m_whisperModelPath = "ggml-base.en.bin";
+        m_sherpaModelPath = "model.int8.onnx";
+        m_sherpaTokensPath = "tokens.txt";
         m_llmModelPath = "qwen2.5-1.5b-instruct-q4_k_m.gguf";
         m_piperExePath = "piper";
         m_piperModelPath = "en_US-sam-medium.onnx";
@@ -95,12 +98,11 @@ ChessBot::ChessBot(QThread *parent) :
                                            dnnClassNames,
                                            m_chessDetectorImageSize,
                                            m_chessDetectorImageChannels);
-#else
-        m_moveDetector->setDnnNetAllPieces((char*)m_chessDetectorModel.toStdString().c_str(),
+#endif
+        m_moveDetector->setDnnNetAllPieces((char*)m_chessAnalyzerModel.toStdString().c_str(),
                                            dnnClassNames,
                                            m_chessDetectorImageSize,
                                            m_chessDetectorImageChannels);
-#endif
         saveCalibrationData();
     }
 }
@@ -272,6 +274,7 @@ void ChessBot::playInputMove(int startUiIndex, int stopUiIndex, int promotePiece
             m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
             m_mutex->unlock();
             Q_EMIT playTurnChanged(m_chessController->playerColor() == Color::WHITE ? 1-m_chessController->playerColor():m_chessController->playerColor());
+            Q_EMIT userInputMoveDone();
             togglePause(false);
             startService();
         } else {
@@ -285,6 +288,7 @@ void ChessBot::playInputMove(int startUiIndex, int stopUiIndex, int promotePiece
         QStringList listPromotions = {"q","r","n","b"};
         m_chessController->choosePromotion(m_chessController->playerColor() == 0 ?listPromotions[promotePiece]:
                                                         listPromotions[promotePiece].toUpper());
+        Q_EMIT userInputMoveDone();
         m_mutex->lock();
         m_state = STATE_PLAY;
         m_statePlay = PLAY_CALCULATE_NEXT_MOVE;
@@ -315,6 +319,22 @@ void ChessBot::stopGame(QString comment)
 void ChessBot::playLoop()
 {
     switch (m_statePlay) {
+    case PLAY_DETECT_CUSTOM_BOARD: {
+        qDebug("PLAY_DETECT_CUSTOM_BOARD");
+        if(analyzeChessBoard(false) == STATE_DONE_SUCCESS){
+            m_statePlay = PLAY_SETUP_CUSTOM_BOARD;
+        } else {
+            togglePause(true);
+        }
+    }
+        break;
+    case PLAY_SETUP_CUSTOM_BOARD: {
+        qDebug("PLAY_SETUP_CUSTOM_BOARD");
+        setupAnalizedChessBoard();
+        m_statePlay = PLAY_PROCESS_DONE;
+        togglePause(true);
+    }
+        break;
     case PLAY_CHECK_LOG: {
         qDebug("PLAY_CHECK_LOG");
         if(findLastFENInLog()) {
@@ -483,7 +503,7 @@ void ChessBot::testLoop()
 {
     switch (m_stateTest) {
     case TEST_CLASSIFICATION: {
-        if(analyzeChessBoard()!=STATE_PENDING){
+        if(analyzeChessBoard(true)!=STATE_PENDING){
             m_stateTest = TEST_DONE;
         }
         break;
@@ -813,6 +833,7 @@ uint8_t ChessBot::playCalculateNextMove()
 
             //move rook
             qDebug("Castling move rook");
+            Q_EMIT newCommentAdded("Castling");
             sprintf(m_robotCommand,"CST%d%d%d%d%c",fromCoord.y(),fromCoord.x(),
                     toCoord.y(),toCoord.x() > fromCoord.x()?7:0,
                     '-');
@@ -852,12 +873,18 @@ uint8_t ChessBot::playCalculateNextMove()
                     dropCells[0].x <=1 ?'b':'p',dropCells[0].y,dropCells[0].x%12,
                     promoteCell.x <=1?'b':'p',promoteCell.y,promoteCell.x%12,
                     promoteCell.x <=1?'b':'p',promoteCell.y,promoteCell.x%12);
+            if(isPromotionWithCapture) {
+                Q_EMIT newCommentAdded("Promotion with capture");
+            } else {
+                Q_EMIT newCommentAdded("Promotion");
+            }
         }
         else
         {
             if (m_chessController->botMove().isEnPassant()) // watch out ep capture is a capture
             {
                 qDebug("Capture remove pawn color[%d]",m_chessController->playerColor() != 0?"White":"Black");
+                Q_EMIT newCommentAdded("Capture past pawn");
                 std::vector<cv::Point> dropCells;
                 bool validDropCell = m_moveDetector->findDropCells(dropCells);
                 if(!validDropCell) {
@@ -879,6 +906,28 @@ uint8_t ChessBot::playCalculateNextMove()
                 //remove the captured piece
                 char capturePiece = pieceName(m_chessController->botMove().getCapturedPieceType(),
                                               m_chessController->playerColor());
+                switch (capturePiece) {
+                case 'Q':
+                case 'q':
+                    Q_EMIT newCommentAdded("Capture quuen");
+                    break;
+                case 'B':
+                case 'b':
+                    Q_EMIT newCommentAdded("Capture bishop");
+                    break;
+                case 'N':
+                case 'n':
+                    Q_EMIT newCommentAdded("Capture knight");
+                    break;
+                case 'R':
+                case 'r':
+                    Q_EMIT newCommentAdded("Capture rook");
+                    break;
+                case 'P':
+                case 'p':
+                    Q_EMIT newCommentAdded("Capture pawn");
+                    break;
+                }
                 qDebug("Capture remove captured piece[%c] color[%s]",
                        capturePiece,m_chessController->playerColor() != 0?"White":"Black");
                 std::vector<cv::Point> dropCells;
@@ -1023,13 +1072,28 @@ uint8_t ChessBot::testCheckResult()
     return cmdResult;
 }
 
-uint8_t ChessBot::analyzeChessBoard()
+uint8_t ChessBot::analyzeChessBoard(bool useOpenVino)
 {
+    Q_EMIT newCommentAdded("Analyzing");
 #if defined(IMAGE_PROCESS_MOVE)
     cv::Mat currentImage, warpedImage;
     QString warpedImagePath = "warpedImage.jpg";
     std::vector<std::string> analyzeResult;
     if(!readFrame(currentImage)) {
+        qDebug("classificationDone");
+        if(m_analyzeChessBoardResult.size() != NUM_ROW * NUM_COL) {
+            m_analyzeChessBoardResult.clear();
+            for(int i=0; i< NUM_ROW * NUM_COL; i++)
+                m_analyzeChessBoardResult.push_back(".");
+        }
+        if(m_analyzeChessBoardRevertedResult.size() != NUM_ROW * NUM_COL) {
+            m_analyzeChessBoardRevertedResult.clear();
+            for(int i=0; i< NUM_ROW * NUM_COL; i++)
+                m_analyzeChessBoardRevertedResult.push_back(".");
+        }
+        Q_EMIT classificationDone(m_analyzeChessBoardResult,
+                                  m_analyzeChessBoardRevertedResult);
+        Q_EMIT newCommentAdded("Please confirm");
         return STATE_DONE_FAIL;
     }
     m_moveDetector->warpChessBoardImage(currentImage, warpedImage);
@@ -1056,10 +1120,12 @@ uint8_t ChessBot::analyzeChessBoard()
     Q_EMIT preprocessDone(warpedImagePath);
     m_moveDetector->filterPossibleValidCell(currentImage);
 #if defined (USE_OPENVINO)
-    m_moveDetector->classifyWholeBoardNativeOpenVINO(warpedImage);
-#else
-    m_moveDetector->classsifyChessBoardImage(warpedImage);
+    if(useOpenVino)
+        m_moveDetector->classifyWholeBoardNativeOpenVINO(warpedImage);
+    else
 #endif
+    m_moveDetector->classsifyChessBoardImage(warpedImage);
+
     m_moveDetector->getAnalyzeResult(analyzeResult);
     m_analyzeChessBoardResult.clear();
     m_analyzeChessBoardRevertedResult.clear();
@@ -1077,7 +1143,56 @@ uint8_t ChessBot::analyzeChessBoard()
     qDebug("classificationDone");
     Q_EMIT classificationDone(m_analyzeChessBoardResult,
                               m_analyzeChessBoardRevertedResult);
+    Q_EMIT newCommentAdded("Please confirm");
 #endif
+    return STATE_DONE_SUCCESS;
+}
+
+uint8_t ChessBot::setupAnalizedChessBoard()
+{
+    std::stringstream fen;
+    printf("1. Piece Placement m_analyzeChessBoardResult[%d] m_analyzeChessBoardRevertedResult[%d]\r\n",
+           m_analyzeChessBoardResult.length(),
+           m_analyzeChessBoardRevertedResult.length());
+    // 1. Piece Placement (Ranks 8 down to 1)
+        for (int rank = 7; rank >= 0; --rank) {
+            int empty_squares = 0;
+            for (int file = 0; file < 8; ++file) {
+                char piece_char = m_chessController->playerColor() == Color::WHITE?
+                            m_analyzeChessBoardResult[rank*14+10-file].at(0).toLatin1():
+                            m_analyzeChessBoardRevertedResult[rank*14+10-file].at(0).toLatin1();
+
+                // Added check for '*' since Deepov flags empty spaces with asterisks
+                if (piece_char == '*' || piece_char == ' ' || piece_char == '.' || piece_char == '\0') {
+                    empty_squares++;
+                } else {
+                    if (empty_squares > 0) {
+                        fen << empty_squares;
+                        empty_squares = 0;
+                    }
+                    fen << piece_char;
+                }
+            }
+            if (empty_squares > 0) {
+                fen << empty_squares;
+            }
+            if (rank > 0) {
+                fen << "/";
+            }
+        }
+
+    printf("2. Active Color\r\n");
+    // 2. Active Color
+    fen << " " << (m_chessController->playerColor() == Color::WHITE ? "w" : "b");
+
+    printf("3. Castling Availability\r\n");
+    // 3. Castling Availability
+
+    printf("4. En Passant Target Square\r\n");
+    // 4. En Passant Target Square
+    fen << " - - 0 0";
+    printf("Generate fen done [%s]\r\n",fen.str().c_str());
+    m_chessController->newGame(QString::fromStdString(fen.str()));
     return STATE_DONE_SUCCESS;
 }
 
@@ -1094,6 +1209,45 @@ int ChessBot::timerLimit()
 void ChessBot::setTimeLimit(int timeOut)
 {
     m_timeOut = timeOut;
+    m_gameTypeCustom = false;
+}
+
+void ChessBot::setGameTypeCustom()
+{
+    m_gameTypeCustom = true;
+}
+
+void ChessBot::startCustomGame(QStringList boardArray)
+{
+    int countWhiteKing = 0;
+    int countBlackKing = 0;
+    for(int row=0;row<8;row++) {
+        for(int col=0;col<8;col++) {
+            if(boardArray[row*8+col] == "K") countWhiteKing++;
+            else if(boardArray[row*8+col] == "k") countBlackKing++;
+        }
+    }
+    if(countBlackKing != 1 || countWhiteKing != 1) {
+        Q_EMIT newCommentAdded("Invalid game. Please check");
+        return;
+    }
+    for(int row=0;row<8;row++) {
+        for(int col=0;col<8;col++) {
+            m_analyzeChessBoardRevertedResult[row*14+col+3] = boardArray[row*8+col];
+            m_analyzeChessBoardResult[row*14+col+3] = boardArray[63-(row*8+col)];
+        }
+    }
+    m_mutex->lock();
+    m_state = STATE_PLAY;
+    m_statePlay = PLAY_SETUP_CUSTOM_BOARD;
+    m_mutex->unlock();
+    togglePause(false);
+    startService();
+}
+
+bool ChessBot::gameTypeCustom()
+{
+    return m_gameTypeCustom;
 }
 
 bool ChessBot::readCalibrationPoint(const QString &command,QPoint& point)
@@ -1542,6 +1696,7 @@ bool ChessBot::saveCalibrationData(QString fileName)
 
     // 1. Store ai models
     QJsonObject childrenObj;
+    childrenObj["chess_analyzer"] = m_chessAnalyzerModel;
     childrenObj["chess_detector"] = m_chessDetectorModel;
     childrenObj["class_list"] = m_chessDetectorClassList;
     childrenObj["input_size"] = m_chessDetectorImageSize;
@@ -1549,6 +1704,8 @@ bool ChessBot::saveCalibrationData(QString fileName)
     childrenObj["bot_name"] = m_botName;
     childrenObj["player_name"] = m_playerName;
     childrenObj["whisper_model"] = m_whisperModelPath;
+    childrenObj["sherpa_model"] = m_sherpaModelPath;
+    childrenObj["sherpa_tokens"] = m_sherpaTokensPath;
     childrenObj["llm_model"] = m_llmModelPath;
     childrenObj["piper_model"] = m_piperModelPath;
     childrenObj["piper_exe_path"] = m_piperExePath;
@@ -1693,6 +1850,7 @@ bool ChessBot::loadCalibrationData(QString fileName)
     if(root.contains("ai_model")) {
         QJsonObject aiModelObj = root["ai_model"].toObject();
 
+        m_chessAnalyzerModel = aiModelObj["chess_analyzer"].toString();
         m_chessDetectorModel = aiModelObj["chess_detector"].toString();
         m_chessDetectorClassList = aiModelObj["class_list"].toString();
         m_chessDetectorImageSize = aiModelObj["input_size"].toInt();
@@ -1700,15 +1858,20 @@ bool ChessBot::loadCalibrationData(QString fileName)
         m_botName = aiModelObj["bot_name"].toString();
         m_playerName = aiModelObj["player_name"].toString();
         m_whisperModelPath = aiModelObj["whisper_model"].toString();
+        m_sherpaModelPath = aiModelObj["sherpa_model"].toString();
+        m_sherpaTokensPath = aiModelObj["sherpa_tokens"].toString();
         m_llmModelPath = aiModelObj["llm_model"].toString();
         m_piperModelPath = aiModelObj["piper_model"].toString();
         m_piperExePath = aiModelObj["piper_exe_path"].toString();
         // Print the values to verify
+        qDebug() << "Chess Analyzer Path:" << m_chessAnalyzerModel;
         qDebug() << "Chess Detector Path:" << m_chessDetectorModel;
         qDebug() << "Class List:" << m_chessDetectorClassList;
         qDebug() << "Bot Name:" << m_botName;
         qDebug() << "Player Name:" << m_playerName;
         qDebug() << "Whisper Model:" << m_whisperModelPath;
+        qDebug() << "Sherpa Model:" << m_sherpaModelPath;
+        qDebug() << "Sherpa Tokens:" << m_sherpaTokensPath;
         qDebug() << "Llm Model:" << m_llmModelPath;
         qDebug() << "Piper Model:" << m_piperModelPath;
         qDebug() << "Piper Exe:" << m_piperExePath;
@@ -1722,12 +1885,12 @@ bool ChessBot::loadCalibrationData(QString fileName)
                                            dnnClassNames,
                                            m_chessDetectorImageSize,
                                            m_chessDetectorImageChannels);
-#else
-        m_moveDetector->setDnnNetAllPieces((char*)m_chessDetectorModel.toStdString().c_str(),
+#endif
+        m_moveDetector->setDnnNetAllPieces((char*)m_chessAnalyzerModel.toStdString().c_str(),
                                            dnnClassNames,
                                            m_chessDetectorImageSize,
                                            m_chessDetectorImageChannels);
-#endif
+
         std::vector<cv::Point> listCell {
             cv::Point(0,0),cv::Point(1,0),cv::Point(2,0),cv::Point(11,0),
             cv::Point(0,1),cv::Point(1,1),cv::Point(2,1),cv::Point(11,1),
@@ -1916,9 +2079,12 @@ void ChessBot::initRobotCommunication() {
 }
 void ChessBot::processNextMove()
 {
+    qDebug("processNextMove m_state[%d] m_statePlay[%d]",
+           m_state,
+           m_statePlay);
     if(m_state == STATE_PLAY) {
-        qDebug("Queue command to play next time m_statePlay[%d]",m_statePlay);
         if(m_statePlay != PLAY_PROCESS_DONE) {
+            qDebug("Queue command to play next time m_statePlay[%d]",m_statePlay);
             m_handleNewCommand = true;
             return;
         }
@@ -1960,13 +2126,22 @@ QObject* ChessBot::chessControllerObject() const
 
 void ChessBot::resetGame(){
     qDebug("Reset game side[%d] m_state[%d]",m_chessController->playerColor(),m_state);
-    m_chessController->newGame();
-    m_mutex->lock();
-    m_state = STATE_PLAY;
-    m_statePlay = PLAY_CHECK_LOG;
-    m_mutex->unlock();
-    togglePause(false);
-    startService();
+    if(m_gameTypeCustom) {
+        m_mutex->lock();
+        m_state = STATE_PLAY;
+        m_statePlay = PLAY_DETECT_CUSTOM_BOARD;
+        m_mutex->unlock();
+        togglePause(false);
+        startService();
+    } else {
+        m_chessController->newGame();
+        m_mutex->lock();
+        m_state = STATE_PLAY;
+        m_statePlay = PLAY_CHECK_LOG;
+        m_mutex->unlock();
+        togglePause(false);
+        startService();
+    }
 }
 
 void ChessBot::setEngineElo(QString level, int score)
@@ -2338,6 +2513,16 @@ QString ChessBot::playerName()
 QString ChessBot::whisperModelPath()
 {
     return m_whisperModelPath;
+}
+
+QString ChessBot::sherpaModelPath()
+{
+    return m_sherpaModelPath;
+}
+
+QString ChessBot::sherpaTokensPath()
+{
+    return m_sherpaTokensPath;
 }
 
 QString ChessBot::llmModelPath()

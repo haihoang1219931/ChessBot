@@ -2,7 +2,13 @@
 # Change Log
 All notable changes to this project will be documented in this file.
   
-## [Unreleased] - 2026-09-24
+## [Unreleased] - 2026-10-19
+
+## [1.0.1] - 2026-19-10
+
+### Added
+- Custom game in ChessPlayer
+- Comment capture pieces
 
 ### Changed
 - Use openvino to classify image to reduce execution time

@@ -29,7 +29,8 @@ public:
     Q_INVOKABLE void generateResponse(const QString &prompt);
     Q_INVOKABLE void setAIModel(const QString& botName,
                     const QString& playerName,
-                    const QString& whisperModelPath,
+                    const QString& sherpaModelPath,
+                    const QString& sherpaTokensPath,
                     const QString& llmModelPath,
                     const QString& piperExePath,
                     const QString& piperModelPath);

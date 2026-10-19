@@ -158,8 +158,10 @@ ApplicationWindow {
                     masterBot.setTimeLimit(30*60);
                 else if(expireTime === "10 mins")
                     masterBot.setTimeLimit(10*60);
-                else
+                else if(expireTime === "No limit")
                     masterBot.setTimeLimit(0);
+                else
+                    masterBot.setGameTypeCustom();
                 stack.pop();
                 stack.push(sideSelection);
             }
@@ -174,14 +176,24 @@ ApplicationWindow {
                 stack.push(timeSelection)
             }
             onSideConfirmed: {
-                stack.pop();
-                stack.push(timer, {
+                if(!masterBot.gameTypeCustom()) {
+                    stack.pop();
+                    stack.push(timer, {
                                "side":side==="White"?0:1,
                                "gameTurn":side==="White"?0:1,
                                "playTime": masterBot.timerLimit(),
                            });
-                masterBot.setPlayerColor(side==="White"?0:1);
-                masterBot.resetGame()
+                    masterBot.setPlayerColor(side==="White"?0:1);
+                    masterBot.resetGame()
+                } else {
+                    stack.pop();
+                    stack.push(customGame, {
+                               "side":side==="White"?0:1,
+                               "gameTurn":side==="White"?0:1
+                           });
+                    masterBot.setPlayerColor(side==="White"?0:1);
+                    masterBot.resetGame()
+                }
             }
         }
     }
@@ -192,6 +204,16 @@ ApplicationWindow {
                 stack.pop()
                 stack.push(sideSelection)
             }
+            onGobackLevelSelection: {
+                stack.pop()
+                stack.push(levelSelection)
+            }
+        }
+    }
+
+    Component {
+        id: customGame
+        CustomGame{
             onGobackLevelSelection: {
                 stack.pop()
                 stack.push(levelSelection)

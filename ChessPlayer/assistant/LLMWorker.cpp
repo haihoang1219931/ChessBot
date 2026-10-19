@@ -1,6 +1,7 @@
 #include <QDebug>
+#include <vector>
 #include "LLMWorker.h"
-// Model: https://huggingface.co/msj121/chessgpt-base-v1-Q4_K_M-GGUF/blob/main/chessgpt-base-v1-q4_k_m.gguf
+
 LLMWorker::LLMWorker(QObject *parent)
     : QObject(parent)
 {
@@ -9,22 +10,20 @@ LLMWorker::LLMWorker(QObject *parent)
 }
 
 LLMWorker::~LLMWorker() {
+#if defined (USE_LLAMA)
     if (m_ctx) llama_free(m_ctx);
     if (m_model) llama_free_model(m_model);
     llama_backend_free();
-    if (m_whisperCtx) whisper_free(m_whisperCtx);
+#endif
+    // unique_ptr automatically cleans up m_recognizer memory allocations
 }
-
+#if defined (USE_LLAMA)
 void dummy_llama_log_callback(ggml_log_level level, const char * text, void * user_data) {
     (void)level;     // Unused
     (void)text;      // Unused
     (void)user_data; // Unused
 }
-void dummy_whisper_log_callback(ggml_log_level level, const char * text, void * user_data) {
-    (void)level;
-    (void)text;
-    (void)user_data;
-}
+
 void LLMWorker::initializeLlama() {
     llama_log_set(dummy_llama_log_callback, nullptr);
     llama_backend_init();
@@ -37,23 +36,11 @@ void LLMWorker::initializeLlama() {
     }
 
     llama_context_params ctx_params = llama_context_default_params();
-    ctx_params.n_ctx = 2048;
-    ctx_params.n_threads = QThread::idealThreadCount();
+    ctx_params.n_ctx = 516;
+    ctx_params.n_threads = 2;
     m_ctx = llama_new_context_with_model(m_model, ctx_params);
 }
-
-void LLMWorker::initializeWhisper() {
-    whisper_log_set(dummy_whisper_log_callback, nullptr);
-    m_whisperCtx = whisper_init_from_file(m_whisperModelPath.toStdString().c_str());
-    if (!m_whisperCtx) {
-        qDebug("Failed to find Whisper BIN model path[%s]",
-               m_whisperModelPath.toStdString().c_str());
-        return;
-    }
-    m_whisperParams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
-    m_whisperParams.language = "en";
-}
-
+#endif
 void LLMWorker::stop() {
     m_interrupted.storeRelease(1);
     m_nextState = LLM_PROCESSING_EXIT;
@@ -78,14 +65,13 @@ void LLMWorker::togglePause(bool paused)
 
 void LLMWorker::doWork() {
     qDebug("LLMWorker Dowork");
-    m_stopped = false; // Reset flags
+    m_stopped = false;
     m_state = LLM_INIT;
     m_nextState = LLM_INIT;
     while(!m_stopped){
-        // Check for Stop
         m_mutex->lock();
         if(m_pause)
-            m_pauseCond->wait(m_mutex); // in this place, your thread will stop to execute until someone calls resume
+            m_pauseCond->wait(m_mutex);
         m_mutex->unlock();
         if(m_nextState != m_state && m_state != LLM_WAITING) {
             m_state = m_nextState;
@@ -109,10 +95,16 @@ void LLMWorker::doWork() {
         }
             break;
         case LLM_PROCESSING :{
-            int llamaResult = runLlamaInference();
-            if(llamaResult == LLM_DONE_SUCCESS) {
+            int answerResult = LLM_PENDING;
+#if defined (USE_FASTQA)
+            answerResult = runFastQAInference();
+#endif
+#if defined (USE_LLAMA)
+            answerResult = runLlamaInference();
+#endif
+            if(answerResult == LLM_DONE_SUCCESS) {
                 m_state = LLM_WAITING;
-            } else if(llamaResult == LLM_DONE_FAILED) {
+            } else if(answerResult == LLM_DONE_FAILED) {
                 m_state = LLM_WAITING;
             }
         }
@@ -145,53 +137,44 @@ void LLMWorker::handleSpeech(const QByteArray& pcmData) {
 }
 
 QString LLMWorker::generatePromptChat(const QString& userPrompt) {
-    // 1. CHAT HISTORY MANAGEMENT
-    // Push the new user turn into your structural tracking history vector
     m_conversationHistory.push_back({"user", userPrompt});
 
-    // Safety Sliding Door: Limit history to the last 8 turns so the 0.5B model doesn't drop in intelligence
     while (m_conversationHistory.size() > 3) {
         m_conversationHistory.erase(m_conversationHistory.begin());
     }
-    // 2. FULL GENERAL-PURPOSE PROMPT CONSTRUCTION
-    QString systemContent =
-        "You are "+m_name+"."
-        "Adhere strictly to these rules:\n"
-        "- If you do not know the answer to a question, say 'Sorry. I don't know' instead of making up facts.\n"
-        "- Keep your responses brief, concise, and focused on the core answer.\n"
-        "- Do not repeat yourself or loop the same sentence structural phrases."
-            ;
 
-    // Anchor the system instructions at the top of the context block
+    QString systemContent =
+            "You are "+m_name+"."
+                              "Adhere strictly to these rules:\n"
+                              "- If you do not know the answer to a question, say 'Sorry. I don't know' instead of making up facts.\n"
+                              "- Keep your responses brief, concise, and focused on the core answer.\n"
+                              "- Do not repeat yourself or loop the same sentence structural phrases.";
+
     QString fullPrompt = "<|im_start|>system\n" + systemContent + "<|im_end|>\n";
 
-    // Append previous back-and-forth conversational steps sequentially
     for (const auto& msg : m_conversationHistory) {
         fullPrompt += "<|im_start|>" + msg.role + "\n" + msg.content + "<|im_end|>\n";
     }
 
-    // Open the final structural lane for Qwen to generate text
     fullPrompt += "<|im_start|>assistant\n";
     return fullPrompt;
 }
 
 QString LLMWorker::generatePromptChess(QString fen, QString playColor, QString move) {
     QString fullPrompt = "<|im_start|>system\n"
-         "You are an expert chess grandmaster. Analyze the given move based on the FEN board state. "
-         "Explain the strategic intent, tactical implications, and whether it is a standard book move.\n"
-         "<|im_end|>\n"
-         "<|im_start|>user\n"
-         "FEN State: " + fen + "\n"
-         "Color: " + playColor + "\n"
-         "Move played: " + move + "\n"
-         "Provide one sentence, maximum 10 words analysis on this move.<|im_end|>\n"
-         "<|im_start|>assistant\n";
+                         "You are an expert chess grandmaster. Analyze the given move based on the FEN board state. "
+                         "Explain the strategic intent, tactical implications, and whether it is a standard book move.\n"
+                         "<|im_end|>\n"
+                         "<|im_start|>user\n"
+                         "FEN State: " + fen + "\n"
+                                               "Color: " + playColor + "\n"
+                                                                       "Move played: " + move + "\n"
+                                                                                                "Provide one sentence, maximum 10 words analysis on this move.<|im_end|>\n"
+                                                                                                "<|im_start|>assistant\n";
     return fullPrompt;
 }
 
 int LLMWorker::handlePrompt(const QString& prompt) {
-    qDebug("LLMWorker handlePrompt");
-//    requestInterruption();
     togglePause(true);
     m_mutex->lock();
     m_userPrompt = prompt;
@@ -204,12 +187,10 @@ int LLMWorker::handlePrompt(const QString& prompt) {
 }
 
 int LLMWorker::analyzeChessMove(QString fen, QString playColor, QString move) {
-    qDebug("LLMWorker analyzeChessMove");
-//    requestInterruption();
     togglePause(true);
     m_mutex->lock();
     m_userPrompt =
-    m_fullPrompt = generatePromptChess(fen, playColor, move);
+            m_fullPrompt = generatePromptChess(fen, playColor, move);
     m_nextState = LLM_PROCESSING;
     if(m_state == LLM_WAITING) m_state = m_nextState;
     m_mutex->unlock();
@@ -222,53 +203,99 @@ void LLMWorker::requestInterruption() {
 }
 
 void LLMWorker::setModel(const QString& name,
-                         const QString& whisperModelPath,
+                         const QString& sherpaModelPath,
+                         const QString& sherpaTokensPath,
                          const QString& llmModelPath) {
     m_name = name;
-    m_whisperModelPath = whisperModelPath;
+    m_sherpaModelPath = sherpaModelPath;
+    m_sherpaTokensPath = sherpaTokensPath;
     m_llmModelPath = llmModelPath;
 }
+#if defined (USE_SHERPA)
+void LLMWorker::initializeSherpaOnnx() {
+    if (m_sherpaModelPath.isEmpty() || m_sherpaTokensPath.isEmpty()) {
+        qDebug("Sherpa-onnx model paths are unassigned.");
+        return;
+    }
+
+    // Clean up any historical instance if initializing a second time
+    if (m_recognizer) {
+        delete m_recognizer;
+        m_recognizer = nullptr;
+    }
+
+    sherpa_onnx::cxx::OfflineRecognizerConfig config;
+    config.model_config.sense_voice.model = m_sherpaModelPath.toStdString();
+    config.model_config.sense_voice.language = "en";
+    config.model_config.sense_voice.use_itn = true;
+    config.model_config.tokens = m_sherpaTokensPath.toStdString();
+    config.model_config.num_threads = 4;
+    config.decoding_method = "greedy_search";
+
+    try {
+        // Allocate via new using the factory return value copy constructor
+        m_recognizer = new sherpa_onnx::cxx::OfflineRecognizer(
+            sherpa_onnx::cxx::OfflineRecognizer::Create(config)
+        );
+
+        if (m_recognizer && m_recognizer->Get()) {
+            qDebug("Sherpa-onnx SenseVoice Recognizer created successfully on Heap.");
+        } else {
+            qDebug("Failed to create Sherpa-onnx Recognizer handle runtime mapping.");
+        }
+    } catch (const std::exception& e) {
+        qDebug("Exception during Sherpa allocation: %s", e.what());
+    }
+}
+#endif
 
 int LLMWorker::transcribeAudio() {
-    int nextState = LLM_PENDING;
-    qDebug() << "transcribeAudio "<<m_pcmData.size() << "bytes";
+#if defined (USE_SHERPA)
+    // Access validation pointer directly via arrow
+    if (!m_recognizer || !m_recognizer->Get() || m_pcmData.isEmpty()) {
+        qDebug() << "Sherpa Recognizer not initialized or PCM data payload is empty.";
+        return LLM_DONE_FAILED;
+    }
+
+    qDebug() << "transcribeAudio via Sherpa-onnx: " << m_pcmData.size() << "bytes";
+
     const int16_t* samples = reinterpret_cast<const int16_t*>(m_pcmData.constData());
     int sampleCount = m_pcmData.size() / sizeof(int16_t);
 
-    QVector<float> whisperSamples(sampleCount);
-    for (int i = 0; i < sampleCount; ++i) whisperSamples[i] = samples[i] / 32768.0f;
-
-    if (whisper_full(m_whisperCtx, m_whisperParams, whisperSamples.constData(), whisperSamples.size()) == 0) {
-        std::string textResult = "";
-        int n_segments = whisper_full_n_segments(m_whisperCtx);
-        for (int i = 0; i < n_segments; ++i) {
-//            if (m_interrupted.loadAcquire() == 1) {
-//                emit tokenGenerated("... [Interrupted]");
-//                nextState = LLM_DONE_INTERRUPT;
-//                break; // Break the execution loop instantly
-//            }
-            qDebug() << "ta.";
-            textResult += whisper_full_get_segment_text(m_whisperCtx, i);
-        }
-        QString parsedPrompt = QString::fromStdString(textResult).trimmed();
-        qDebug() << "Whisper Transcribed:" << parsedPrompt;
-        if (!parsedPrompt.isEmpty() && parsedPrompt.length() >=1 &&
-                !parsedPrompt.contains("[") &&
-                !parsedPrompt.contains("]") &&
-                !parsedPrompt.contains("(") &&
-                !parsedPrompt.contains(")") &&
-                !parsedPrompt.contains("*")) {
-            m_userPrompt = parsedPrompt;
-            nextState = LLM_DONE_SUCCESS;
-        } else {
-            nextState = LLM_DONE_FAILED;
-        }
-    } else {
-        nextState = LLM_DONE_FAILED;
+    std::vector<float> sherpaSamples(sampleCount);
+    for (int i = 0; i < sampleCount; ++i) {
+        sherpaSamples[i] = samples[i] / 32768.0f;
     }
-    return nextState;
-}
 
+    try {
+        // Access methods via arrow (->)
+        sherpa_onnx::cxx::OfflineStream stream = m_recognizer->CreateStream();
+
+        stream.AcceptWaveform(16000, sherpaSamples.data(), sherpaSamples.size());
+
+        m_recognizer->Decode(&stream);
+
+        sherpa_onnx::cxx::OfflineRecognizerResult result = m_recognizer->GetResult(&stream);
+        std::string textResult = result.text;
+
+        QString parsedPrompt = QString::fromUtf8(textResult.c_str()).trimmed();
+        qDebug() << "Sherpa-Onnx Transcribed Result:" << parsedPrompt;
+
+        if (!parsedPrompt.isEmpty() && parsedPrompt.length() >= 1 &&
+            !parsedPrompt.contains("[") && !parsedPrompt.contains("]") &&
+            !parsedPrompt.contains("(") && !parsedPrompt.contains(")") &&
+            !parsedPrompt.contains("*")) {
+
+            m_userPrompt = parsedPrompt;
+            return LLM_DONE_SUCCESS;
+        }
+    } catch (const std::exception& e) {
+        qDebug() << "Exception inside evaluation pipeline framework step:" << e.what();
+    }
+#endif
+    return LLM_DONE_FAILED;
+}
+#if defined (USE_LLAMA)
 int LLMWorker::runLlamaInference() {
     int nextState = LLM_PENDING;
     Q_EMIT tokenGenerated("");
@@ -339,7 +366,7 @@ int LLMWorker::runLlamaInference() {
     llama_sampler_chain_add(smpl, llama_sampler_init_dist(1234));
 
     QString final_output = "";
-    int max_new_tokens = 300;
+    int max_new_tokens = 30;
     nextState = LLM_DONE_SUCCESS;
     // 7. Generation Loop (Token by Token generation)
     for (int i = 0; i < max_new_tokens; i++) {
@@ -404,4 +431,29 @@ int LLMWorker::runLlamaInference() {
 
     Q_EMIT generationFinished(final_output);
     return nextState;
+}
+#endif
+
+int LLMWorker::runFastQAInference()
+{
+    QString final_output = "";
+    int nextState = LLM_PENDING;
+    final_output = QString::fromStdString(
+                m_fastQA->query(m_userPrompt.toLower().toStdString()));
+    if(!final_output.contains("error")) {
+        Q_EMIT generationFinished(final_output);
+        nextState =LLM_DONE_SUCCESS;
+    } else {
+        nextState =LLM_DONE_FAILED;
+    }
+    return nextState;
+}
+
+void LLMWorker::initializeFastQA()
+{
+    m_fastQA = new FastQANetwork();
+    qDebug("L[%d] [%s] m_llmModelPath[%s]\r\n",__LINE__,__FUNCTION__,
+           m_llmModelPath.toStdString().c_str());
+    m_fastQA->load_from_file(m_llmModelPath.toStdString());
+    qDebug("L[%d] [%s] done\r\n",__LINE__,__FUNCTION__);
 }

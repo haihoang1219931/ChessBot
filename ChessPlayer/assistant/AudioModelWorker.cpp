@@ -29,7 +29,7 @@ void AudioModelWorker::togglePause(bool pause) {
 
 void AudioModelWorker::initializeAudio() {
     QAudioFormat format;
-    format.setSampleRate(22050); format.setChannelCount(1); format.setSampleSize(16);
+    format.setSampleRate(16000); format.setChannelCount(1); format.setSampleSize(16);
     format.setCodec("audio/pcm"); format.setByteOrder(QAudioFormat::LittleEndian);
     format.setSampleType(QAudioFormat::SignedInt);
     m_audioInput = new QAudioInput(QAudioDeviceInfo::defaultInputDevice(), format, this);

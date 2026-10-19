@@ -51,6 +51,8 @@ typedef enum {
 } STATE_CHESBOT;
 
 typedef enum{
+    PLAY_DETECT_CUSTOM_BOARD,
+    PLAY_SETUP_CUSTOM_BOARD,
     PLAY_CHECK_LOG,
     PLAY_CALCULATE_NEXT_MOVE_RESET,
     PLAY_SETUP,
@@ -126,6 +128,8 @@ public:
     QString botName();
     QString playerName();
     QString whisperModelPath();
+    QString sherpaModelPath();
+    QString sherpaTokensPath();
     QString llmModelPath();
     QString piperExePath();
     QString piperModelPath();
@@ -150,11 +154,15 @@ public:
     bool isClassificationDone();
     int timerLimit();
     void setTimeLimit(int timeOut);
+    void setGameTypeCustom();
+    void startCustomGame(QStringList boardArray);
+    bool gameTypeCustom();
 
 Q_SIGNALS:
     void boardChanged(QStringList boardModel);
     void detectFailed();
     void playTurnChanged(int nextTurn);
+    void userInputMoveDone();
     void gameEnded(int endState);
     void calibrationUploadProgress(int direction, int progress);
     void calibrationUploadComplete(int direction, bool success);
@@ -164,6 +172,7 @@ Q_SIGNALS:
     void newMoveAdded(QString fen, QString playColor, QString move);
     void preprocessDone(QString imagePath);
     void classificationDone(QStringList boardModel,QStringList boardModelReverted);
+    void gameSetupFailed();
 
 private:
     void playLoop();
@@ -182,7 +191,8 @@ private:
     uint8_t configureLevel();
     uint8_t testRobot();
     uint8_t testCheckResult();
-    uint8_t analyzeChessBoard();
+    uint8_t analyzeChessBoard(bool useOpenVino);
+    uint8_t setupAnalizedChessBoard();
     void initRobot();
     bool detectArduinoPort(int baudRate = 38400);
     bool readCalibrationPoint(const QString &command, QPoint& point);
@@ -248,6 +258,7 @@ private:
     QString m_timeoutComment;
     QStringList m_analyzeChessBoardResult;
     QStringList m_analyzeChessBoardRevertedResult;
+    QString m_chessAnalyzerModel;
     QString m_chessDetectorModel;
     QString m_chessDetectorClassList;
     int m_chessDetectorImageSize;
@@ -255,10 +266,13 @@ private:
     QString m_botName;
     QString m_playerName;
     QString m_whisperModelPath;
+    QString m_sherpaModelPath;
+    QString m_sherpaTokensPath;
     QString m_llmModelPath;
     QString m_piperExePath;
     QString m_piperModelPath;
     int m_timeOut;
+    bool m_gameTypeCustom;
 };
 
 #endif // CHESSBOT_H

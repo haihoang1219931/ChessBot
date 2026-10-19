@@ -189,7 +189,6 @@ int AudioOutputWorker::processAudioLoop()
     m_emitVoiceStop = false;
     Q_EMIT voiceStarted();
     textToSpeak = m_textQueue.dequeue();
-    m_textQueue.clear();
     qDebug("AudioOutputWorker::processAudioLoop m_textQueue size[%d]",
            m_textQueue.size());
 #ifdef DEBUG_AUDIO_OUTPUT

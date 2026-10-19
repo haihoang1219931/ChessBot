@@ -137,6 +137,8 @@ HEADERS += \
 
 use_ai_assistant {
 DEFINES += USE_AI_ASSISTANT
+DEFINES += USE_SHERPA
+DEFINES += USE_FASTQA
     win32 {
         # 1. Update these paths to match where your repositories live on your disk
         LLAMA_SOURCE_DIR = "$$PWD/../../Chatbot/llama.cpp"
@@ -203,19 +205,26 @@ INCLUDEPATH += $$WHISPER_DIR/include \
 # Add the core execution files so Qt compiles them natively from source code
 SOURCES += \
     $$WHISPER_DIR/src/whisper.cpp
+LIBS += -L/usr/local/lib/ \
+    -lsherpa-onnx-cxx-api \
+    -lonnxruntime
+INCLUDEPATH += /usr/local/include
+DEPENDPATH += /usr/local/include
 
 SOURCES += \
     assistant/AssistantController.cpp \
     assistant/AudioModelWorker.cpp \
     assistant/AudioOutputWorker.cpp \
-    assistant/LLMWorker.cpp
+    assistant/LLMWorker.cpp \
+    assistant/FastQANetwork.cpp
 
 HEADERS += \
     assistant/AssistantController.h \
     assistant/AudioModelWorker.h \
     assistant/AudioOutputWorker.h \
     assistant/LLMWorker.h \
-    assistant/TTSEngines.h
+    assistant/TTSEngines.h \
+    assistant/FastQANetwork.h
 }
 
 SOURCES += \

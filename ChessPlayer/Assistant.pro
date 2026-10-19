@@ -1,4 +1,4 @@
-TEMPLATE = app
+ TEMPLATE = app
 QT += core gui qml quick texttospeech multimedia
 CONFIG += c++11 console
 
@@ -9,6 +9,7 @@ CONFIG += use_ai_assistant
 
 use_ai_assistant {
 DEFINES += USE_AI_ASSISTANT
+DEFINES += USE_FASTQA
     win32 {
         # 1. Update these paths to match where your repositories live on your disk
         LLAMA_SOURCE_DIR = "$$PWD/../../Chatbot/llama.cpp"
@@ -80,14 +81,16 @@ SOURCES += \
     assistant/AssistantController.cpp \
     assistant/AudioModelWorker.cpp \
     assistant/AudioOutputWorker.cpp \
-    assistant/LLMWorker.cpp
+    assistant/LLMWorker.cpp \
+    assistant/FastQANetwork.cpp
 
 HEADERS += \
     assistant/AssistantController.h \
     assistant/AudioModelWorker.h \
     assistant/AudioOutputWorker.h \
     assistant/LLMWorker.h \
-    assistant/TTSEngines.h
+    assistant/TTSEngines.h \
+    assistant/FastQANetwork.h
 }
 
 

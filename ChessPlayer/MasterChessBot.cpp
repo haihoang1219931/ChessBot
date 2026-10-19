@@ -8,7 +8,8 @@ MasterChessBot::MasterChessBot(QObject *parent) : QObject(parent)
     m_workerAssistant = new AssistantController();
     m_workerAssistant->setAIModel(m_workerChessbot->botName(),
                              m_workerChessbot->playerName(),
-                             m_workerChessbot->whisperModelPath(),
+                             m_workerChessbot->sherpaModelPath(),
+                             m_workerChessbot->sherpaTokensPath(),
                              m_workerChessbot->llmModelPath(),
                              m_workerChessbot->piperExePath(),
                              m_workerChessbot->piperModelPath());
@@ -185,12 +186,27 @@ void MasterChessBot::setTimeLimit(int timeout) const
     m_workerChessbot->setTimeLimit(timeout);
 }
 
-Q_INVOKABLE QString MasterChessBot::botName() const
+void MasterChessBot::setGameTypeCustom() const
+{
+    m_workerChessbot->setGameTypeCustom();
+}
+
+void MasterChessBot::startCustomGame(QStringList boardArray) const
+{
+    m_workerChessbot->startCustomGame(boardArray);
+}
+
+bool MasterChessBot::gameTypeCustom() const
+{
+    return m_workerChessbot->gameTypeCustom();
+}
+
+QString MasterChessBot::botName() const
 {
     return m_workerChessbot->botName();
 }
 
-Q_INVOKABLE QString MasterChessBot::playerName() const
+QString MasterChessBot::playerName() const
 {
 #if defined(USE_AI_ASSISTANT)
     return m_workerAssistant->playerName();
